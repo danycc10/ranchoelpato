@@ -1,0 +1,297 @@
+<?php
+
+namespace App\Exports\Sheets;
+
+use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithTitle;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
+use Maatwebsite\Excel\Events\AfterSheet;
+
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+
+class MonthlyIncomeDetailSheet implements
+    FromCollection,
+    WithHeadings,
+    WithTitle,
+    WithColumnFormatting,
+    WithEvents
+{
+    public function __construct(
+        public int $anio,
+        public int $mes,
+        public ?int $propietarioId,
+        public string $modoVista,
+    ) {}
+
+    public function title(): string
+    {
+        return "Detalle";
+    }
+
+    protected function monthRange(): array
+    {
+        $start = now()->setDate($this->anio, $this->mes, 1)->startOfDay();
+        $end   = (clone $start)->endOfMonth()->endOfDay();
+
+        return [$start->toDateString(), $end->toDateString()];
+    }
+
+    protected function modoVistaLabel(): string
+    {
+        return $this->modoVista === 'flujo_real'
+            ? 'FLUJO REAL MENSUAL'
+            : 'CÓMO VA EL MES';
+    }
+
+    public function headings(): array
+    {
+        return [
+            'FOLIO',
+            'FECHA',
+            'SEMANA_PAGO',
+            'FRACCIONAMIENTO',
+            'MANZANA',
+            'LOTE',
+            'CLIENTE',
+            'CONCEPTO',
+            'FORMA_PAGO',
+            'CUENTA_BANCARIA',
+            'PERIODO',
+            'MONTO',
+        ];
+    }
+
+    public function collection()
+    {
+        [$start, $end] = $this->monthRange();
+
+        $q = DB::table('recibos')
+            ->leftJoin('contratos', 'contratos.id', '=', 'recibos.contrato_id')
+            ->leftJoin('clientes', 'clientes.id', '=', 'recibos.cliente_id')
+            ->leftJoin('lotes', 'lotes.id', '=', 'recibos.lote_id')
+            ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
+            ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
+            ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos.forma_pago_id')
+            ->leftJoin('cuentas_bancarias', 'cuentas_bancarias.id', '=', 'recibos.cuentas_bancarias_id')
+            ->leftJoin('periodos', 'periodos.id', '=', 'recibos.periodo_id')
+            ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
+
+            ->whereNull('recibos.deleted_at')
+            ->whereNull('recibos.anulado_at')
+            ->where('recibos.es_historico', false)
+
+            ->when(
+                $this->propietarioId,
+                fn ($qq) => $qq->where('fraccionamientos.propietario_id', $this->propietarioId)
+            );
+
+        // ===== CAMBIO CLAVE: RESPETAR SWITCH =====
+     if ($this->modoVista === 'flujo_real') {
+
+    $q->where(function ($main) use ($start, $end) {
+        $main->where(function ($sub) use ($start, $end) {
+            $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
+                ->whereBetween('cuotas.fecha_vencimiento', [$start, $end])
+                ->whereBetween('recibos.fecha', [$start, $end]);
+        })->orWhere(function ($sub) use ($start, $end) {
+            $sub->where(function ($x) {
+                $x->whereNull('tipos_cobro.nombre')
+                  ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
+            })
+            ->whereBetween('recibos.fecha', [$start, $end]);
+        });
+    });
+
+} else {
+
+    $q->where(function ($main) use ($start, $end) {
+        $main->where(function ($sub) use ($start, $end) {
+            $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
+                ->whereBetween('cuotas.fecha_vencimiento', [$start, $end]);
+        })->orWhere(function ($sub) use ($start, $end) {
+            $sub->where(function ($x) {
+                $x->whereNull('tipos_cobro.nombre')
+                  ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
+            })
+            ->whereBetween('recibos.fecha', [$start, $end]);
+        });
+    });
+
+}
+
+        $q->orderBy('recibos.fecha')
+          ->orderBy('recibos.id')
+
+          ->select([
+                'recibos.folio',
+                'recibos.fecha',
+                'recibos.semana_pago',
+
+                DB::raw('COALESCE(fraccionamientos.nombre, "Sin finca") as fraccionamiento'),
+
+                'lotes.manzana',
+                'lotes.lote',
+
+                DB::raw("
+                    COALESCE(
+                        NULLIF(TRIM(CONCAT_WS(' ', clientes.nombres, clientes.apellidos)), ''),
+                        'SIN CLIENTE'
+                    ) as cliente
+                "),
+
+                DB::raw('COALESCE(tipos_cobro.nombre, "SIN CONCEPTO") as concepto'),
+                DB::raw('COALESCE(formas_pago.nombre, "SIN FORMA") as forma_pago'),
+
+                DB::raw("
+                    COALESCE(
+                        NULLIF(cuentas_bancarias.alias, ''),
+                        NULLIF(TRIM(CONCAT_WS(' - ', cuentas_bancarias.banco, cuentas_bancarias.numero)), ''),
+                        NULLIF(cuentas_bancarias.banco, ''),
+                        'SIN CUENTA'
+                    ) as cuenta_bancaria
+                "),
+
+                DB::raw('COALESCE(periodos.nombre, "SIN PERIODO") as periodo'),
+
+                'recibos.monto',
+          ]);
+
+        return $q->get()->map(function ($r) {
+            return [
+                (string) ($r->folio ?? ''),
+                (string) ($r->fecha ?? ''),
+                (string) ($r->semana_pago ?? ''),
+                (string) ($r->fraccionamiento ?? ''),
+                (string) ($r->manzana ?? ''),
+                (string) ($r->lote ?? ''),
+                (string) ($r->cliente ?? ''),
+                (string) ($r->concepto ?? ''),
+                (string) ($r->forma_pago ?? ''),
+                (string) ($r->cuenta_bancaria ?? ''),
+                (string) ($r->periodo ?? ''),
+                (float) ($r->monto ?? 0),
+            ];
+        });
+    }
+
+    public function columnFormats(): array
+    {
+        return [
+            'L' => '"$"#,##0.00',
+        ];
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+
+                $sheet = $event->sheet->getDelegate();
+
+                $highestRow = $sheet->getHighestRow();
+                $highestCol = $sheet->getHighestColumn();
+
+                // ===== TITULO =====
+                $sheet->insertNewRowBefore(1, 2);
+
+                $sheet->mergeCells("A1:{$highestCol}1");
+                $sheet->mergeCells("A2:{$highestCol}2");
+
+                $sheet->setCellValue('A1', 'DETALLE DE INGRESOS');
+                $sheet->setCellValue('A2', 'MODO: ' . $this->modoVistaLabel());
+
+                $sheet->getStyle("A1:{$highestCol}1")->applyFromArray([
+                    'font' => [
+                        'name' => 'Dubai Medium',
+                        'bold' => true,
+                        'size' => 16,
+                        'color' => ['rgb' => 'FFFFFF'],
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER,
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => '111827'],
+                    ],
+                ]);
+
+                $sheet->getStyle("A2:{$highestCol}2")->applyFromArray([
+                    'font' => [
+                        'name' => 'Dubai Medium',
+                        'bold' => true,
+                        'size' => 11,
+                        'color' => ['rgb' => '111827'],
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER,
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => 'E5E7EB'],
+                    ],
+                ]);
+
+                $sheet->freezePane('A4');
+                $sheet->setAutoFilter("A3:{$highestCol}3");
+
+                $sheet->getStyle("A3:{$highestCol}3")->applyFromArray([
+                    'font' => [
+                        'name' => 'Dubai Medium',
+                        'bold' => true,
+                        'color' => ['rgb' => 'FFFFFF'],
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER,
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => '111827'],
+                    ],
+                ]);
+
+                $highestRow = $sheet->getHighestRow();
+
+                for ($r = 4; $r <= $highestRow; $r++) {
+                    if (($r % 2) === 0) {
+                        $sheet->getStyle("A{$r}:{$highestCol}{$r}")
+                            ->applyFromArray([
+                                'fill' => [
+                                    'fillType' => Fill::FILL_SOLID,
+                                    'startColor' => ['rgb' => 'F9FAFB'],
+                                ],
+                            ]);
+                    }
+                }
+
+                $sheet->getStyle("L4:L{$highestRow}")
+                    ->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+                // ===== ANCHOS =====
+                $sheet->getColumnDimension('A')->setWidth(14);
+                $sheet->getColumnDimension('B')->setWidth(12);
+                $sheet->getColumnDimension('C')->setWidth(14);
+                $sheet->getColumnDimension('D')->setWidth(28);
+                $sheet->getColumnDimension('E')->setWidth(12);
+                $sheet->getColumnDimension('F')->setWidth(12);
+                $sheet->getColumnDimension('G')->setWidth(28);
+                $sheet->getColumnDimension('H')->setWidth(18);
+                $sheet->getColumnDimension('I')->setWidth(16);
+                $sheet->getColumnDimension('J')->setWidth(24);
+                $sheet->getColumnDimension('K')->setWidth(18);
+                $sheet->getColumnDimension('L')->setWidth(14);
+
+                $sheet->setShowGridlines(false);
+            },
+        ];
+    }
+}

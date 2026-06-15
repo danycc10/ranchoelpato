@@ -1,0 +1,558 @@
+<?php
+
+namespace App\Livewire\Reports;
+
+use App\Exports\MonthlyIncomeExport;
+use App\Models\Propietario;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Livewire\Component;
+use Maatwebsite\Excel\Facades\Excel;
+
+class MonthlyIncomeReport extends Component
+{
+    public int $anio;
+    public int $mes;
+    public ?int $propietarioId = null;
+
+    public string $modoVista = 'flujo_real';
+
+    public function mount(): void
+    {
+        $this->anio = (int) now()->year;
+        $this->mes = (int) now()->month;
+        $this->modoVista = 'flujo_real';
+
+        $user = auth()->user();
+
+        if ($user->propietario_id) {
+            $this->propietarioId = $user->propietario_id;
+        }
+    }
+
+    public function getPropietariosProperty()
+    {
+        return Propietario::query()
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+    }
+
+    public function getModoVistaLabelProperty(): string
+    {
+        return match ($this->modoVista) {
+            'flujo_real' => 'FLUJO REAL MENSUAL',
+            default => 'CÓMO VA EL MES',
+        };
+    }
+
+    protected function monthRange(): array
+    {
+        $start = now()->setDate($this->anio, $this->mes, 1)->startOfDay();
+        $end = (clone $start)->endOfMonth()->endOfDay();
+
+        return [$start->toDateString(), $end->toDateString()];
+    }
+
+    protected function baseJoinRecibosFlujoReal()
+    {
+        [$start, $end] = $this->monthRange();
+
+        return DB::table('recibos_pagos')
+            ->join('recibos', 'recibos.id', '=', 'recibos_pagos.recibo_id')
+            ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos_pagos.forma_pago_id')
+            ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
+            ->leftJoin('contratos', 'contratos.id', '=', 'recibos.contrato_id')
+            ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
+            ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
+            ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
+            ->whereNull('recibos_pagos.deleted_at')
+            ->whereNull('recibos.deleted_at')
+            ->whereNull('recibos.anulado_at')
+            ->where(function ($q) {
+                $q->whereNull('recibos.es_historico')
+                    ->orWhere('recibos.es_historico', false);
+            })
+            ->where('recibos.afecta_reportes', true)
+            ->where('recibos.folio', 'not like', 'REC%')
+            ->where('contratos.estatus', 'activo')
+            ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end])
+            ->where(function ($q) use ($start, $end) {
+                $q->where(function ($sub) use ($start, $end) {
+                    $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
+                        ->whereBetween('cuotas.fecha_vencimiento', [$start, $end]);
+                })
+                ->orWhere(function ($sub) use ($start, $end) {
+                    $sub->where(function ($x) {
+                        $x->whereNull('tipos_cobro.nombre')
+                            ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
+                    })
+                    ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
+                });
+            })
+            ->when(
+                $this->propietarioId,
+                fn ($q) => $q->where('recibos.propietario_contable_id', $this->propietarioId)
+            );
+    }
+
+    protected function baseJoinRecibos()
+    {
+        if ($this->modoVista === 'flujo_real') {
+            return $this->baseJoinRecibosFlujoReal();
+        }
+
+        [$start, $end] = $this->monthRange();
+
+        return DB::table('recibos_pagos')
+            ->join('recibos', 'recibos.id', '=', 'recibos_pagos.recibo_id')
+            ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos_pagos.forma_pago_id')
+            ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
+            ->leftJoin('contratos', 'contratos.id', '=', 'recibos.contrato_id')
+            ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
+            ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
+            ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
+            ->whereNull('recibos_pagos.deleted_at')
+            ->whereNull('recibos.deleted_at')
+            ->whereNull('recibos.anulado_at')
+            ->where('contratos.estatus', 'activo')
+            ->where(function ($q) use ($start, $end) {
+                $q->where(function ($sub) use ($start, $end) {
+                    $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
+                        ->whereBetween('cuotas.fecha_vencimiento', [$start, $end]);
+                })
+                ->orWhere(function ($sub) use ($start, $end) {
+                    $sub->where(function ($x) {
+                        $x->whereNull('tipos_cobro.nombre')
+                            ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
+                    })
+                    ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
+                });
+            })
+            ->when(
+                $this->propietarioId,
+                fn ($q) => $q->where('recibos.propietario_contable_id', $this->propietarioId)
+            );
+    }
+
+    protected function baseJoinRecibosHistoricosComoVaMes()
+    {
+        [$start, $end] = $this->monthRange();
+
+        return DB::table('recibos')
+            ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
+            ->leftJoin('contratos', 'contratos.id', '=', 'recibos.contrato_id')
+            ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
+            ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
+            ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
+            ->whereNull('recibos.deleted_at')
+            ->whereNull('recibos.anulado_at')
+            ->where('contratos.estatus', 'activo')
+            ->where('recibos.es_historico', true)
+            ->where('tipos_cobro.nombre', 'MENSUALIDAD')
+            ->where('contratos.tipo', 'terreno')
+            ->whereBetween('cuotas.fecha_vencimiento', [$start, $end])
+            ->when(
+                $this->propietarioId,
+                fn ($q) => $q->where('recibos.propietario_contable_id', $this->propietarioId)
+            );
+    }
+
+    protected function baseJoinRecibosMensualidad()
+    {
+        return $this->baseJoinRecibos()
+            ->where('tipos_cobro.nombre', 'MENSUALIDAD')
+            ->where('contratos.tipo', 'terreno');
+    }
+
+    protected function baseJoinRecibosAdelantado()
+    {
+        [$start, $end] = $this->monthRange();
+
+        return $this->baseJoinRecibosMensualidad()
+            ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end])
+            ->whereDate('cuotas.fecha_vencimiento', '>', $end);
+    }
+
+    protected function baseJoinRecibosAtrasado()
+    {
+        [$start, $end] = $this->monthRange();
+
+        return $this->baseJoinRecibosMensualidad()
+            ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end])
+            ->whereDate('cuotas.fecha_vencimiento', '<', $start);
+    }
+
+    public function getMetodosPagoProperty()
+    {
+        return $this->baseJoinRecibos()
+            ->selectRaw('COALESCE(formas_pago.nombre, "SIN FORMA") as metodo')
+            ->distinct()
+            ->orderBy('metodo')
+            ->pluck('metodo')
+            ->values();
+    }
+
+    public function getFilasProperty()
+    {
+        $metodos = $this->metodosPago;
+        [$start, $end] = $this->monthRange();
+
+        $esperado = DB::table('cuotas')
+            ->leftJoin('contratos', 'contratos.id', '=', 'cuotas.contrato_id')
+            ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
+            ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
+            ->when(
+                $this->propietarioId,
+                fn ($q) => $q->where('fraccionamientos.propietario_id', $this->propietarioId)
+            )
+            ->whereBetween('cuotas.fecha_vencimiento', [$start, $end])
+            ->where('contratos.tipo', 'terreno')
+            ->whereIn('cuotas.estatus', ['pendiente', 'parcial', 'pagada', 'vencida'])
+            ->whereNotExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('pagos')
+                    ->whereColumn('pagos.cuota_id', 'cuotas.id')
+                    ->whereNull('pagos.anulado_at')
+                    ->whereRaw('UPPER(pagos.referencia) LIKE ?', ['%IMPORT%']);
+            })
+            ->groupBy('fraccionamientos.id', 'fraccionamientos.nombre')
+            ->selectRaw('
+                fraccionamientos.id as finca_id,
+                COALESCE(fraccionamientos.nombre, "Sin finca") as finca,
+                COALESCE(SUM(cuotas.monto), 0) as esperado
+            ')
+            ->get()
+            ->keyBy('finca_id');
+
+        $recibidoNormal = $this->baseJoinRecibosMensualidad()
+            ->groupBy('fraccionamientos.id', 'fraccionamientos.nombre')
+            ->selectRaw('
+                fraccionamientos.id as finca_id,
+                COALESCE(fraccionamientos.nombre, "Sin finca") as finca,
+                COALESCE(SUM(recibos_pagos.monto), 0) as recibido
+            ')
+            ->get()
+            ->keyBy('finca_id');
+
+        $recibidoHistorico = collect();
+
+        if ($this->modoVista !== 'flujo_real') {
+            $recibidoHistorico = $this->baseJoinRecibosHistoricosComoVaMes()
+                ->groupBy('fraccionamientos.id', 'fraccionamientos.nombre')
+                ->selectRaw('
+                    fraccionamientos.id as finca_id,
+                    COALESCE(fraccionamientos.nombre, "Sin finca") as finca,
+                    COALESCE(SUM(recibos.monto), 0) as recibido
+                ')
+                ->get()
+                ->keyBy('finca_id');
+        }
+
+        $recibido = collect();
+
+        foreach ($recibidoNormal as $id => $row) {
+            $row->recibido = (float) $row->recibido;
+            $recibido[$id] = $row;
+        }
+
+        foreach ($recibidoHistorico as $id => $row) {
+            if (isset($recibido[$id])) {
+                $recibido[$id]->recibido += (float) $row->recibido;
+            } else {
+                $row->recibido = (float) $row->recibido;
+                $recibido[$id] = $row;
+            }
+        }
+
+        $adelantado = $this->baseJoinRecibosAdelantado()
+            ->groupBy('fraccionamientos.id', 'fraccionamientos.nombre')
+            ->selectRaw('
+                fraccionamientos.id as finca_id,
+                COALESCE(fraccionamientos.nombre, "Sin finca") as finca,
+                COALESCE(SUM(recibos_pagos.monto), 0) as adelantado
+            ')
+            ->get()
+            ->keyBy('finca_id');
+
+        $atrasado = $this->baseJoinRecibosAtrasado()
+            ->groupBy('fraccionamientos.id', 'fraccionamientos.nombre')
+            ->selectRaw('
+                fraccionamientos.id as finca_id,
+                COALESCE(fraccionamientos.nombre, "Sin finca") as finca,
+                COALESCE(SUM(recibos_pagos.monto), 0) as atrasado
+            ')
+            ->get()
+            ->keyBy('finca_id');
+
+        $recPorMetodo = $this->baseJoinRecibosMensualidad()
+            ->groupBy('fraccionamientos.id', 'formas_pago.nombre')
+            ->selectRaw('
+                fraccionamientos.id as finca_id,
+                COALESCE(formas_pago.nombre, "SIN FORMA") as metodo,
+                COALESCE(SUM(recibos_pagos.monto), 0) as total
+            ')
+            ->get();
+
+        $mapMetodo = [];
+
+        foreach ($recPorMetodo as $r) {
+            $mapMetodo[$r->finca_id][$r->metodo] = (float) $r->total;
+        }
+
+        if ($this->modoVista !== 'flujo_real') {
+            $historicoPorMetodo = $this->baseJoinRecibosHistoricosComoVaMes()
+                ->groupBy('fraccionamientos.id')
+                ->selectRaw('
+                    fraccionamientos.id as finca_id,
+                    COALESCE(SUM(recibos.monto), 0) as total
+                ')
+                ->get();
+
+            foreach ($historicoPorMetodo as $r) {
+                $mapMetodo[$r->finca_id]['HISTÓRICO'] =
+                    (float) ($mapMetodo[$r->finca_id]['HISTÓRICO'] ?? 0) + (float) $r->total;
+            }
+
+            if ($historicoPorMetodo->isNotEmpty() && ! $metodos->contains('HISTÓRICO')) {
+                $metodos->push('HISTÓRICO');
+            }
+        }
+
+        $fincaIds = collect($esperado->keys())
+            ->merge($recibido->keys())
+            ->merge($adelantado->keys())
+            ->merge($atrasado->keys())
+            ->unique()
+            ->values();
+
+        $rows = $fincaIds->map(function ($id) use ($esperado, $recibido, $adelantado, $atrasado, $metodos, $mapMetodo) {
+            $e = $esperado->get($id);
+            $r = $recibido->get($id);
+            $a = $adelantado->get($id);
+            $d = $atrasado->get($id);
+
+            $finca = $e->finca ?? $r->finca ?? $a->finca ?? $d->finca ?? 'Sin finca';
+
+            $valEsperado = (float) ($e->esperado ?? 0);
+            $valRecibido = (float) ($r->recibido ?? 0);
+            $valAdelantado = (float) ($a->adelantado ?? 0);
+            $valAtrasado = (float) ($d->atrasado ?? 0);
+
+            $met = [];
+
+            foreach ($metodos as $m) {
+                $met[$m] = (float) ($mapMetodo[$id][$m] ?? 0);
+            }
+
+            return (object) [
+                'finca' => $finca,
+                'esperado' => $valEsperado,
+                'recibido' => $valRecibido,
+                'adelantado' => $valAdelantado,
+                'atrasado' => $valAtrasado,
+                'diferencia' => $valRecibido - $valEsperado,
+                'metodos' => $met,
+            ];
+        });
+
+        return $rows->sortBy('finca', SORT_NATURAL | SORT_FLAG_CASE)->values();
+    }
+
+    public function getTotalesConceptosHeaderProperty()
+    {
+        $targets = [
+            'RECARGO' => 'Recargo',
+            'CAMBIO DE CONTRATO' => 'Cambio de contrato',
+            'ELECTRICIDAD' => 'Pago electricidad',
+            'ENGANCHE' => 'Enganche',
+        ];
+
+        $rows = $this->baseJoinRecibos()
+            ->whereNotNull('tipos_cobro.nombre')
+            ->groupBy('tipos_cobro.nombre')
+            ->selectRaw('tipos_cobro.nombre as concepto, SUM(recibos_pagos.monto) as total')
+            ->get();
+
+        $out = [];
+
+        foreach ($targets as $label) {
+            $out[$label] = 0.0;
+        }
+
+        foreach ($rows as $r) {
+            $name = mb_strtoupper((string) $r->concepto);
+
+            foreach ($targets as $needle => $label) {
+                if (str_contains($name, $needle)) {
+                    $out[$label] += (float) $r->total;
+                }
+            }
+        }
+
+        return (object) $out;
+    }
+
+    public function getConceptosPorFincaProperty()
+    {
+        $conceptos = [
+            'PAGO ELECTRICIDAD' => ['ELECTRICIDAD'],
+            'ENGANCHE' => ['ENGANCHE'],
+        ];
+
+        $rows = $this->baseJoinRecibos()
+            ->whereNotNull('tipos_cobro.nombre')
+            ->groupBy('fraccionamientos.id', 'fraccionamientos.nombre', 'tipos_cobro.nombre')
+            ->selectRaw('
+                fraccionamientos.id as finca_id,
+                COALESCE(fraccionamientos.nombre, "Sin finca") as finca,
+                tipos_cobro.nombre as concepto,
+                COALESCE(SUM(recibos_pagos.monto), 0) as total
+            ')
+            ->get();
+
+        $catalogoNombres = $rows
+            ->filter(fn ($r) => ! is_null($r->finca_id))
+            ->map(fn ($r) => [
+                'id' => $r->finca_id,
+                'nombre' => $r->finca,
+            ])
+            ->unique('id')
+            ->values();
+
+        foreach ($this->filas as $f) {
+            $yaExiste = collect($catalogoNombres)->firstWhere('nombre', $f->finca);
+
+            if (! $yaExiste) {
+                $catalogoNombres->push([
+                    'id' => 'name_' . md5($f->finca),
+                    'nombre' => $f->finca,
+                ]);
+            }
+        }
+
+        $catalogoNombres = collect($catalogoNombres)
+            ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $out = [];
+
+        foreach ($conceptos as $label => $needles) {
+            $out[$label] = [
+                'concepto' => $label,
+                'fincas' => [],
+                'total' => 0.0,
+            ];
+
+            foreach ($catalogoNombres as $finca) {
+                $out[$label]['fincas'][$finca['nombre']] = 0.0;
+            }
+        }
+
+        foreach ($rows as $r) {
+            $nombreConcepto = mb_strtoupper((string) $r->concepto);
+            $nombreFinca = (string) ($r->finca ?? 'Sin finca');
+
+            foreach ($conceptos as $label => $needles) {
+                foreach ($needles as $needle) {
+                    if (str_contains($nombreConcepto, $needle)) {
+                        $out[$label]['fincas'][$nombreFinca] =
+                            (float) ($out[$label]['fincas'][$nombreFinca] ?? 0) + (float) $r->total;
+
+                        $out[$label]['total'] += (float) $r->total;
+
+                        break;
+                    }
+                }
+            }
+        }
+
+        return (object) [
+            'fincas' => $catalogoNombres,
+            'filas' => collect($out)->values(),
+        ];
+    }
+
+    public function getTotalesProperty()
+    {
+        $metodos = $this->metodosPago;
+
+        $sumEsperado = 0.0;
+        $sumRecibido = 0.0;
+        $sumAdelantado = 0.0;
+        $sumAtrasado = 0.0;
+        $sumMetodos = array_fill_keys($metodos->toArray(), 0.0);
+
+        foreach ($this->filas as $f) {
+            $sumEsperado += (float) $f->esperado;
+            $sumRecibido += (float) $f->recibido;
+            $sumAdelantado += (float) ($f->adelantado ?? 0);
+            $sumAtrasado += (float) ($f->atrasado ?? 0);
+
+            foreach ($metodos as $m) {
+                $sumMetodos[$m] += (float) ($f->metodos[$m] ?? 0);
+            }
+        }
+
+        return (object) [
+            'esperado' => $sumEsperado,
+            'recibido' => $sumRecibido,
+            'adelantado' => $sumAdelantado,
+            'atrasado' => $sumAtrasado,
+            'diferencia' => $sumRecibido - $sumEsperado,
+            'metodos' => $sumMetodos,
+        ];
+    }
+
+    public function exportExcel()
+    {
+        $propNombre = null;
+
+        if ($this->propietarioId) {
+            $propNombre = Propietario::query()
+                ->whereKey($this->propietarioId)
+                ->value('nombre');
+        }
+
+        $timestamp = now()->format('Y-m-d_H-i-s');
+
+        $file = 'ingresos_mensuales_' . $this->anio . '_' . str_pad((string) $this->mes, 2, '0', STR_PAD_LEFT);
+
+        if ($propNombre) {
+            $file .= '_' . Str::slug($propNombre, '_');
+        }
+
+        $file .= '_' . $this->modoVista . '_' . $timestamp . '.xlsx';
+
+        return Excel::download(
+            new MonthlyIncomeExport(
+                anio: $this->anio,
+                mes: $this->mes,
+                propietarioId: $this->propietarioId,
+                modoVista: $this->modoVista,
+                metodosPago: $this->metodosPago,
+                filas: $this->filas,
+                totales: $this->totales,
+                headerConceptos: $this->totalesConceptosHeader,
+                conceptosPorFinca: $this->conceptosPorFinca,
+            ),
+            $file
+        );
+    }
+
+    public function render()
+    {
+        $mesNombre = now()->setMonth($this->mes)->translatedFormat('F');
+
+        return view('livewire.reports.monthly-income-report', [
+            'propietarios' => $this->propietarios,
+            'metodosPago' => $this->metodosPago,
+            'filas' => $this->filas,
+            'totales' => $this->totales,
+            'headerConceptos' => $this->totalesConceptosHeader,
+            'conceptosPorFinca' => $this->conceptosPorFinca,
+            'mesNombre' => mb_strtoupper($mesNombre),
+            'anio' => $this->anio,
+            'modoVistaLabel' => $this->modoVistaLabel,
+        ])->layout('layouts.app');
+    }
+}
