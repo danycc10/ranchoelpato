@@ -35,6 +35,7 @@ class Contrato extends Model
         'tipo_recargo',   // fijo|porcentaje
         'valor_recargo',
         'dias_gracia',
+        'frecuencia_recargo_dias',
         'estatus',        // activo|moroso|liquidado|cancelado
         'archivo_contrato',
         'tipo',
@@ -82,6 +83,7 @@ class Contrato extends Model
         'monto_pago' => 'decimal:2',
         'valor_recargo' => 'decimal:2',
         'dias_gracia' => 'integer',
+        'frecuencia_recargo_dias' => 'integer',
         'dia_semana' => 'integer',
         'dia_mes' => 'integer',
         'es_financiamiento_instalacion' => 'boolean',
@@ -183,7 +185,7 @@ class Contrato extends Model
 
     public function historial()
     {
-        return $this->hasMany(\App\Models\ContratoHistorial::class);
+        return $this->hasMany(ContratoHistorial::class);
     }
 
     protected static function booted()
