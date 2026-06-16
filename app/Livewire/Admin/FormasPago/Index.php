@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Admin\FormasPago;
 
-use Livewire\Component;
-use Livewire\WithPagination;
 use App\Models\FormaPago;
 use Illuminate\Database\Eloquent\Builder;
+use Livewire\Component;
+use Livewire\WithPagination;
 
 class Index extends Component
 {
@@ -13,16 +13,21 @@ class Index extends Component
 
     // Tabla
     public string $q = '';
+
     public string $sortBy = 'id';
+
     public string $sortDir = 'asc';
 
     // Modal / edición
     public bool $modal = false;
+
     public ?int $editId = null;
 
     // Campos (ya NO usamos $form genérico)
     public string $nombre = '';
+
     public bool $requiere_cuenta = false;
+
     public bool $activa = true;
 
     protected $queryString = [
@@ -101,7 +106,7 @@ class Index extends Component
 
     public function eliminar(int $id): void
     {
-        // Si quieres “proteger” cuando ya tenga recibos, aquí es el lugar:
+        // Si quieres "proteger" cuando ya tenga recibos, aquí es el lugar:
         // $it = FormaPago::query()->withCount('recibos')->findOrFail($id);
         // if ($it->recibos_count > 0) { ... return; }
 
@@ -119,7 +124,9 @@ class Index extends Component
     protected function applySearch(Builder $query): Builder
     {
         $term = trim($this->q);
-        if ($term === '') return $query;
+        if ($term === '') {
+            return $query;
+        }
 
         return $query->where(function (Builder $qq) use ($term) {
             $qq->where('nombre', 'like', "%{$term}%");

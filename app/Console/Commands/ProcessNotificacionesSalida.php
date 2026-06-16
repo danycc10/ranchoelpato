@@ -18,8 +18,6 @@ class ProcessNotificacionesSalida extends Command
     {
         $limit = (int) $this->option('limit');
 
-
-
         $items = Notificacion::query()
             ->where('estatus', 'en_cola')
             ->orderBy('id')
@@ -33,12 +31,12 @@ class ProcessNotificacionesSalida extends Command
 
         if ($items->isEmpty()) {
             $this->info('No hay notificaciones en cola.');
+
             return self::SUCCESS;
         }
 
         foreach ($items as $n) {
             try {
-
 
                 $payload = is_array($n->payload)
                     ? $n->payload
@@ -46,10 +44,8 @@ class ProcessNotificacionesSalida extends Command
 
                 if ($n->canal === 'correo') {
 
-
                     Mail::to($n->destino)
                         ->send(new CuotaAtrasadaMail($payload));
-
 
                 }
 
@@ -62,14 +58,12 @@ class ProcessNotificacionesSalida extends Command
                 $n->error = null;
                 $n->save();
 
-   
-
             } catch (\Throwable $e) {
                 $n->estatus = 'fallido';
                 $n->error = mb_substr($e->getMessage(), 0, 255);
                 $n->save();
 
-                Log::error('Error procesando notificaci��n', [
+                Log::error('Error procesando notificación', [
                     'id' => $n->id ?? null,
                     'canal' => $n->canal ?? null,
                     'destino' => $n->destino ?? null,
@@ -79,7 +73,7 @@ class ProcessNotificacionesSalida extends Command
                     'trace' => $e->getTraceAsString(),
                 ]);
 
-                $this->error("Error en notificaci��n #{$n->id}: {$e->getMessage()}");
+                $this->error("Error en notificación #{$n->id}: {$e->getMessage()}");
             }
         }
 
