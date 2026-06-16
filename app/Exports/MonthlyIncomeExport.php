@@ -3,8 +3,9 @@
 namespace App\Exports;
 
 use App\Exports\Sheets\MonthlyIncomeActiveContractsSheet;
-use App\Exports\Sheets\MonthlyIncomeDetailSheet;
 use App\Exports\Sheets\MonthlyIncomeAdvanceDetailSheet;
+use App\Exports\Sheets\MonthlyIncomeDetailSheet;
+use App\Exports\Sheets\MonthlyIncomeHistoricDetailSheet;
 use App\Exports\Sheets\MonthlyIncomeLateDetailSheet;
 use App\Exports\Sheets\MonthlyIncomePendingSheet;
 use App\Exports\Sheets\MonthlyIncomeSummarySheet;
@@ -17,7 +18,7 @@ class MonthlyIncomeExport implements WithMultipleSheets
         public int $anio,
         public int $mes,
         public ?int $propietarioId,
-         public string $modoVista,
+        public string $modoVista,
         public Collection $metodosPago,
         public Collection $filas,
         public object $totales,
@@ -27,11 +28,11 @@ class MonthlyIncomeExport implements WithMultipleSheets
 
     public function sheets(): array
     {
-        return [
+        $sheets = [
             new MonthlyIncomeSummarySheet(
                 anio: $this->anio,
                 mes: $this->mes,
-                 modoVista: $this->modoVista,
+                modoVista: $this->modoVista,
                 metodosPago: $this->metodosPago,
                 conceptosPorFinca: $this->conceptosPorFinca,
                 filas: $this->filas,
@@ -44,37 +45,42 @@ class MonthlyIncomeExport implements WithMultipleSheets
                 anio: $this->anio,
                 mes: $this->mes,
                 propietarioId: $this->propietarioId,
-                 modoVista: $this->modoVista,
+                modoVista: $this->modoVista,
             ),
-            
+
             new MonthlyIncomeAdvanceDetailSheet(
                 anio: $this->anio,
                 mes: $this->mes,
                 propietarioId: $this->propietarioId,
             ),
-            
-                new MonthlyIncomeLateDetailSheet(
-        anio: $this->anio,
-        mes: $this->mes,
-        propietarioId: $this->propietarioId,
-    ),
 
-
-            // ✅ NUEVA pestaña: contratos vigentes del mes
-            new MonthlyIncomeActiveContractsSheet(
+            new MonthlyIncomeLateDetailSheet(
                 anio: $this->anio,
                 mes: $this->mes,
                 propietarioId: $this->propietarioId,
             ),
-
-            // ✅ cuotas pendientes por pagar (hasta fin del mes)
-            new MonthlyIncomePendingSheet(
-                anio: $this->anio,
-                mes: $this->mes,
-                propietarioId: $this->propietarioId,
-            ),
-            
-            
         ];
+
+        if ($this->modoVista !== 'flujo_real') {
+            $sheets[] = new MonthlyIncomeHistoricDetailSheet(
+                anio: $this->anio,
+                mes: $this->mes,
+                propietarioId: $this->propietarioId,
+            );
+        }
+
+        $sheets[] = new MonthlyIncomeActiveContractsSheet(
+            anio: $this->anio,
+            mes: $this->mes,
+            propietarioId: $this->propietarioId,
+        );
+
+        $sheets[] = new MonthlyIncomePendingSheet(
+            anio: $this->anio,
+            mes: $this->mes,
+            propietarioId: $this->propietarioId,
+        );
+
+        return $sheets;
     }
 }

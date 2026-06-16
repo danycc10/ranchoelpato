@@ -12,7 +12,9 @@ use Maatwebsite\Excel\Facades\Excel;
 class MonthlyIncomeReport extends Component
 {
     public int $anio;
+
     public int $mes;
+
     public ?int $propietarioId = null;
 
     public string $modoVista = 'flujo_real';
@@ -81,13 +83,13 @@ class MonthlyIncomeReport extends Component
                     $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
                         ->whereBetween('cuotas.fecha_vencimiento', [$start, $end]);
                 })
-                ->orWhere(function ($sub) use ($start, $end) {
-                    $sub->where(function ($x) {
-                        $x->whereNull('tipos_cobro.nombre')
-                            ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
-                    })
-                    ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
-                });
+                    ->orWhere(function ($sub) use ($start, $end) {
+                        $sub->where(function ($x) {
+                            $x->whereNull('tipos_cobro.nombre')
+                                ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
+                        })
+                            ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
+                    });
             })
             ->when(
                 $this->propietarioId,
@@ -120,13 +122,13 @@ class MonthlyIncomeReport extends Component
                     $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
                         ->whereBetween('cuotas.fecha_vencimiento', [$start, $end]);
                 })
-                ->orWhere(function ($sub) use ($start, $end) {
-                    $sub->where(function ($x) {
-                        $x->whereNull('tipos_cobro.nombre')
-                            ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
-                    })
-                    ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
-                });
+                    ->orWhere(function ($sub) use ($start, $end) {
+                        $sub->where(function ($x) {
+                            $x->whereNull('tipos_cobro.nombre')
+                                ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
+                        })
+                            ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
+                    });
             })
             ->when(
                 $this->propietarioId,
@@ -164,21 +166,50 @@ class MonthlyIncomeReport extends Component
             ->where('contratos.tipo', 'terreno');
     }
 
-    protected function baseJoinRecibosAdelantado()
+    protected function baseJoinRecibosMensualidadPorFechaPago()
     {
         [$start, $end] = $this->monthRange();
 
-        return $this->baseJoinRecibosMensualidad()
+        return DB::table('recibos_pagos')
+            ->join('recibos', 'recibos.id', '=', 'recibos_pagos.recibo_id')
+            ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos_pagos.forma_pago_id')
+            ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
+            ->leftJoin('contratos', 'contratos.id', '=', 'recibos.contrato_id')
+            ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
+            ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
+            ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
+            ->whereNull('recibos_pagos.deleted_at')
+            ->whereNull('recibos.deleted_at')
+            ->whereNull('recibos.anulado_at')
+            ->where(function ($q) {
+                $q->whereNull('recibos.es_historico')
+                    ->orWhere('recibos.es_historico', false);
+            })
+            ->where('recibos.afecta_reportes', true)
+            ->where('recibos.folio', 'not like', 'REC%')
+            ->where('contratos.estatus', 'activo')
+            ->where('tipos_cobro.nombre', 'MENSUALIDAD')
+            ->where('contratos.tipo', 'terreno')
             ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end])
+            ->when(
+                $this->propietarioId,
+                fn ($q) => $q->where('recibos.propietario_contable_id', $this->propietarioId)
+            );
+    }
+
+    protected function baseJoinRecibosAdelantado()
+    {
+        [, $end] = $this->monthRange();
+
+        return $this->baseJoinRecibosMensualidadPorFechaPago()
             ->whereDate('cuotas.fecha_vencimiento', '>', $end);
     }
 
     protected function baseJoinRecibosAtrasado()
     {
-        [$start, $end] = $this->monthRange();
+        [$start] = $this->monthRange();
 
-        return $this->baseJoinRecibosMensualidad()
-            ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end])
+        return $this->baseJoinRecibosMensualidadPorFechaPago()
             ->whereDate('cuotas.fecha_vencimiento', '<', $start);
     }
 
@@ -424,7 +455,7 @@ class MonthlyIncomeReport extends Component
 
             if (! $yaExiste) {
                 $catalogoNombres->push([
-                    'id' => 'name_' . md5($f->finca),
+                    'id' => 'name_'.md5($f->finca),
                     'nombre' => $f->finca,
                 ]);
             }
@@ -515,13 +546,13 @@ class MonthlyIncomeReport extends Component
 
         $timestamp = now()->format('Y-m-d_H-i-s');
 
-        $file = 'ingresos_mensuales_' . $this->anio . '_' . str_pad((string) $this->mes, 2, '0', STR_PAD_LEFT);
+        $file = 'ingresos_mensuales_'.$this->anio.'_'.str_pad((string) $this->mes, 2, '0', STR_PAD_LEFT);
 
         if ($propNombre) {
-            $file .= '_' . Str::slug($propNombre, '_');
+            $file .= '_'.Str::slug($propNombre, '_');
         }
 
-        $file .= '_' . $this->modoVista . '_' . $timestamp . '.xlsx';
+        $file .= '_'.$this->modoVista.'_'.$timestamp.'.xlsx';
 
         return Excel::download(
             new MonthlyIncomeExport(
