@@ -2,66 +2,82 @@
 
 namespace App\Livewire\Admin\Contratos;
 
-use Livewire\Component;
-use Livewire\WithFileUploads;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Validation\Rule;
-use Carbon\Carbon;
-
 use App\Models\Cliente;
-use App\Models\Propietario;
-use App\Models\Lote;
 use App\Models\Contrato;
 use App\Models\Cuota;
-use App\Models\Promocion;
 use App\Models\Fraccionamiento;
+use App\Models\Lote;
+use App\Models\Promocion;
 use App\Services\Contratos\ContratoPlanService;
 use App\Services\Contratos\ContratoWordService;
-
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Route;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Create extends Component
 {
     use WithFileUploads;
 
     public int $step = 1;
+
     public bool $es_donacion = false;
 
     public string $cliente_q = '';
+
     public array $clientes_suggest = [];
+
     public ?int $cliente_id = null;
 
     public ?int $fraccionamiento_id = null;
+
     public ?string $manzana = null;
+
     public array $manzanasDisponibles = [];
+
     public array $lotesDisponibles = [];
+
     public ?int $lote_id = null;
 
     public ?int $promocion_id = null;
 
     public string $fecha_inicio = '';
+
     public string $frecuencia = 'mensual';
+
     public ?int $dia_semana = null;
+
     public ?int $dia_mes = null;
 
     public float $precio_total = 0.0;
+
     public float $enganche = 0.0;
+
     public float $saldo_inicial = 0.0;
+
     public float $saldo_actual = 0.0;
+
     public float $monto_pago = 0.0;
 
     public string $tipo_recargo = 'fijo';
+
     public float $valor_recargo = 0.0;
+
     public int $dias_gracia = 0;
 
     public bool $tiene_anualidad = false;
+
     public ?string $anualidad_fecha = null;
+
     public float $anualidad_monto = 0.0;
 
     public bool $usar_configuracion_manual = false;
+
     public array $previewCuotas = [];
+
     public string $diaSemanaTexto = '';
 
     // ===========================
@@ -70,32 +86,48 @@ class Create extends Component
     public ?float $area_m2 = null;
 
     public ?string $medida_norte = null;
+
     public ?string $medida_sur = null;
+
     public ?string $medida_este = null;
+
     public ?string $medida_oeste = null;
 
     public ?string $colindancia_norte = null;
+
     public ?string $colindancia_sur = null;
+
     public ?string $colindancia_este = null;
+
     public ?string $colindancia_oeste = null;
 
     public ?string $vendedor_nombre_legal = null;
+
     public ?string $vendedor_curp = null;
+
     public ?string $comprador_nombre_legal = null;
+
     public ?string $comprador_curp = null;
 
     public $comprador_ine_frente;
+
     public $comprador_ine_reverso;
+
     public $vendedor_ine_frente;
+
     public $vendedor_ine_reverso;
 
     // Paths precargados
     public ?string $comprador_ine_frente_path = null;
+
     public ?string $comprador_ine_reverso_path = null;
+
     public ?string $vendedor_ine_frente_path = null;
+
     public ?string $vendedor_ine_reverso_path = null;
 
     public ?string $comprador_docs_disk = 'private';
+
     public ?string $vendedor_docs_disk = 'private';
 
     public function mount(): void
@@ -139,7 +171,7 @@ class Create extends Component
     public function getTotalPreviewProperty(): float
     {
         return round(
-            collect($this->previewCuotas)->sum(fn($r) => (float) ($r['monto'] ?? 0)),
+            collect($this->previewCuotas)->sum(fn ($r) => (float) ($r['monto'] ?? 0)),
             2
         );
     }
@@ -148,8 +180,6 @@ class Create extends Component
     {
         return $this->es_donacion;
     }
-
-
 
     // ===========================
     // Cliente buscador
@@ -161,11 +191,13 @@ class Create extends Component
         if ($q === '') {
             $this->cliente_id = null;
             $this->clientes_suggest = [];
+
             return;
         }
 
         if (mb_strlen($q) < 2) {
             $this->clientes_suggest = [];
+
             return;
         }
 
@@ -181,9 +213,9 @@ class Create extends Component
             ->orderBy('apellidos')
             ->limit(8)
             ->get()
-            ->map(fn($c) => [
+            ->map(fn ($c) => [
                 'id' => (int) $c->id,
-                'label' => $c->nombre_completo . ($c->telefono ? " 路 {$c->telefono}" : ''),
+                'label' => $c->nombre_completo.($c->telefono ? " 路 {$c->telefono}" : ''),
             ])
             ->toArray();
     }
@@ -338,7 +370,9 @@ class Create extends Component
     {
         $this->lotesDisponibles = [];
 
-        if (! $this->fraccionamiento_id) return;
+        if (! $this->fraccionamiento_id) {
+            return;
+        }
 
         $q = Lote::query()
             ->where('fraccionamiento_id', $this->fraccionamiento_id)
@@ -352,7 +386,7 @@ class Create extends Component
             ->orderByRaw('CAST(lote AS UNSIGNED) ASC')
             ->orderBy('lote', 'ASC')
             ->get(['id', 'lote'])
-            ->map(fn($l) => [
+            ->map(fn ($l) => [
                 'id' => (int) $l->id,
                 'label' => (string) $l->lote,
             ])
@@ -449,6 +483,7 @@ class Create extends Component
     {
         if (! $this->fecha_inicio) {
             $this->diaSemanaTexto = '';
+
             return;
         }
 
@@ -529,7 +564,6 @@ class Create extends Component
     protected function generarPreviewAutomatico(): array
     {
 
-
         if ($this->esDonacion) {
             return [];
         }
@@ -542,8 +576,6 @@ class Create extends Component
             return [];
         }
 
-
-
         try {
             $data = $this->payloadContrato();
 
@@ -552,7 +584,7 @@ class Create extends Component
             $plan = ContratoPlanService::generarCuotas($data, $this->promocion);
 
             return collect($plan)
-                ->map(fn($row, $i) => [
+                ->map(fn ($row, $i) => [
                     'numero' => (int) ($row['numero'] ?? ($i + 1)),
                     'fecha_vencimiento' => (string) ($row['fecha_vencimiento'] ?? ''),
                     'monto' => round((float) ($row['monto'] ?? 0), 2),
@@ -563,6 +595,7 @@ class Create extends Component
                 ->toArray();
         } catch (\Throwable $e) {
             report($e);
+
             return [];
         }
     }
@@ -589,6 +622,7 @@ class Create extends Component
             'tipo_recargo' => $this->tipo_recargo,
             'valor_recargo' => $this->valor_recargo,
             'dias_gracia' => $this->dias_gracia,
+            'frecuencia_recargo_dias' => Contrato::frecuenciaRecargoDiasPorGracia((int) $this->dias_gracia),
             'tiene_anualidad' => (bool) $tieneAnual,
             'anualidad_fecha' => $tieneAnual ? $this->anualidad_fecha : null,
             'anualidad_monto' => $tieneAnual ? $this->anualidad_monto : 0,
@@ -691,6 +725,7 @@ class Create extends Component
     {
         if (empty($this->previewCuotas)) {
             $this->addError('previewCuotas', 'Debes tener al menos una cuota en el calendario.');
+
             return;
         }
 
@@ -714,7 +749,7 @@ class Create extends Component
             $this->renumerarPreviewCuotas();
 
             return collect($this->previewCuotas)
-                ->map(fn($row, $i) => [
+                ->map(fn ($row, $i) => [
                     'numero' => $i + 1,
                     'fecha_vencimiento' => $row['fecha_vencimiento'],
                     'monto' => round((float) $row['monto'], 2),
@@ -783,7 +818,6 @@ class Create extends Component
 
         if ($this->step === 2) {
 
-
             if ($this->esDonacion) {
 
                 $rules = [
@@ -807,7 +841,6 @@ class Create extends Component
             }
 
             $rules = array_merge($rules, [
-
 
                 'area_m2' => ['nullable', 'numeric', 'min:0.01'],
                 'medida_norte' => ['nullable', 'string', 'max:255'],
@@ -840,16 +873,16 @@ class Create extends Component
                 'vendedor_curp' => ['required', 'string', 'max:30'],
                 'comprador_nombre_legal' => ['required', 'string', 'max:255'],
                 'comprador_curp' => ['required', 'string', 'max:30'],
-            
+
                 'comprador_ine_frente' => [$this->comprador_ine_frente_path ? 'nullable' : 'required', 'image', 'max:10240'],
                 'comprador_ine_reverso' => [$this->comprador_ine_reverso_path ? 'nullable' : 'required', 'image', 'max:10240'],
                 'vendedor_ine_frente' => [$this->vendedor_ine_frente_path ? 'nullable' : 'required', 'image', 'max:10240'],
                 'vendedor_ine_reverso' => [$this->vendedor_ine_reverso_path ? 'nullable' : 'required', 'image', 'max:10240'],*/
 
-                'comprador_ine_frente'   => ['nullable', 'image', 'max:10240'],
-                'comprador_ine_reverso'  => ['nullable', 'image', 'max:10240'],
-                'vendedor_ine_frente'    => ['nullable', 'image', 'max:10240'],
-                'vendedor_ine_reverso'   => ['nullable', 'image', 'max:10240'],
+                'comprador_ine_frente' => ['nullable', 'image', 'max:10240'],
+                'comprador_ine_reverso' => ['nullable', 'image', 'max:10240'],
+                'vendedor_ine_frente' => ['nullable', 'image', 'max:10240'],
+                'vendedor_ine_reverso' => ['nullable', 'image', 'max:10240'],
             ]);
 
             if ($this->promocion && $this->promocion->tipo === 'cuotas_fijas') {
@@ -881,18 +914,18 @@ class Create extends Component
 
     protected function generarFolioSeguro(): string
     {
-        return 'CT-' . now()->format('YmdHis') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+        return 'CT-'.now()->format('YmdHis').'-'.strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
     }
 
     protected function buildContratoPrivateBase(Lote $lote, Contrato $contrato): string
     {
         $fraccionamientoNombre = $lote->fraccionamiento?->nombre ?: 'sin-fraccionamiento';
-        $fraccionamientoSlug = \Illuminate\Support\Str::slug($fraccionamientoNombre);
+        $fraccionamientoSlug = Str::slug($fraccionamientoNombre);
 
-        $loteNombre = $lote->lote ?: ($lote->lote ? 'lote-' . $lote->lote : 'sin-lote');
-        $loteSlug = \Illuminate\Support\Str::slug($loteNombre);
+        $loteNombre = $lote->lote ?: ($lote->lote ? 'lote-'.$lote->lote : 'sin-lote');
+        $loteSlug = Str::slug($loteNombre);
 
-        return 'contratos/' . $fraccionamientoSlug . '/' . $loteSlug . '/' . $contrato->uuid;
+        return 'contratos/'.$fraccionamientoSlug.'/'.$loteSlug.'/'.$contrato->uuid;
     }
 
     protected function persistirDatosCompradorSiFaltan(?string $compradorFrente, ?string $compradorReverso): void
@@ -1043,6 +1076,7 @@ class Create extends Component
                     'tipo_recargo' => $this->esDonacion ? 'fijo' : $data['tipo_recargo'],
                     'valor_recargo' => $this->esDonacion ? 0 : $data['valor_recargo'],
                     'dias_gracia' => $this->esDonacion ? 0 : $data['dias_gracia'],
+                    'frecuencia_recargo_dias' => $this->esDonacion ? 1 : $data['frecuencia_recargo_dias'],
 
                     'estatus' => $this->es_donacion ? 'donacion' : 'activo',
 
@@ -1084,7 +1118,7 @@ class Create extends Component
                 $contrato = Contrato::query()->create($contratoData);
 
                 $baseContrato = $this->buildContratoPrivateBase($lote, $contrato);
-                $baseCredenciales = $baseContrato . '/credenciales';
+                $baseCredenciales = $baseContrato.'/credenciales';
 
                 $compradorFrente = $this->comprador_ine_frente_path;
                 $compradorReverso = $this->comprador_ine_reverso_path;
@@ -1154,6 +1188,7 @@ class Create extends Component
 
             if (! $contrato) {
                 $this->dispatch('toast', type: 'error', message: 'No se pudo generar el contrato.');
+
                 return;
             }
 
@@ -1177,7 +1212,7 @@ class Create extends Component
             $this->dispatch(
                 'toast',
                 type: 'error',
-                message: 'Ocurrió un error al guardar el contrato: ' . $e->getMessage()
+                message: 'Ocurrió un error al guardar el contrato: '.$e->getMessage()
             );
 
             return;
@@ -1199,9 +1234,10 @@ class Create extends Component
         }
 
         try {
-            return url('/admin/private-files/show?disk=private&path=' . urlencode(encrypt($path)));
+            return url('/admin/private-files/show?disk=private&path='.urlencode(encrypt($path)));
         } catch (\Throwable $e) {
             report($e);
+
             return null;
         }
     }

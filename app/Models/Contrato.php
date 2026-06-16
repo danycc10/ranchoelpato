@@ -95,6 +95,16 @@ class Contrato extends Model
         'medida_oeste_snapshot' => 'decimal:2',
     ];
 
+    public static function frecuenciaRecargoDiasPorGracia(int $diasGracia): int
+    {
+        return match ($diasGracia) {
+            0 => 1,
+            3 => 4,
+            7 => 7,
+            default => max(1, $diasGracia),
+        };
+    }
+
     /**
      * ✅ Spatie Activity Log options
      */
