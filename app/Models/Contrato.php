@@ -5,13 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
-
+use Illuminate\Database\Eloquent\SoftDeletes;
 // ✅ Spatie Activity Log
-use Spatie\Activitylog\Traits\LogsActivity;
+use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Models\Activity;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Contrato extends Model
 {
@@ -42,9 +41,15 @@ class Contrato extends Model
         'servicio_tipo',
         'contrato_base_id',
         'es_financiamiento_instalacion',
-                 'archivo_contrato_disk',
+        'archivo_contrato_disk',
 
-                'archivo_contrato_docx',
+        'archivo_contrato_docx',
+        'archivo_constancia_terminacion_pago',
+        'archivo_constancia_terminacion_pago_docx',
+        'archivo_convenio_pago',
+        'archivo_convenio_pago_docx',
+        'archivo_convenio_pago_reconocimiento_adeudo',
+        'archivo_convenio_pago_reconocimiento_adeudo_docx',
 
         'comprador_ine_frente',
         'comprador_ine_reverso',
@@ -81,7 +86,7 @@ class Contrato extends Model
         'dia_mes' => 'integer',
         'es_financiamiento_instalacion' => 'boolean',
 
-                'area_m2_snapshot' => 'decimal:2',
+        'area_m2_snapshot' => 'decimal:2',
         'medida_norte_snapshot' => 'decimal:2',
         'medida_sur_snapshot' => 'decimal:2',
         'medida_este_snapshot' => 'decimal:2',
@@ -103,7 +108,7 @@ class Contrato extends Model
                 'created_at',
                 'deleted_at',
             ])
-            ->setDescriptionForEvent(fn(string $eventName) => match ($eventName) {
+            ->setDescriptionForEvent(fn (string $eventName) => match ($eventName) {
                 'created' => 'Contrato creado',
                 'updated' => 'Contrato actualizado',
                 'deleted' => 'Contrato eliminado',
@@ -177,9 +182,9 @@ class Contrato extends Model
     }
 
     public function historial()
-{
-    return $this->hasMany(\App\Models\ContratoHistorial::class);
-}
+    {
+        return $this->hasMany(\App\Models\ContratoHistorial::class);
+    }
 
     protected static function booted()
     {

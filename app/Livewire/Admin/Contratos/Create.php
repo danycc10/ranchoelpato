@@ -1157,11 +1157,9 @@ class Create extends Component
                 return;
             }
 
-            $docxPath = $contratoWordService->generarDocx($contrato);
-
-            $contrato->update([
-                'archivo_contrato_docx' => $docxPath,
-            ]);
+            $contrato->update(
+                $contratoWordService->generarTodosDocx($contrato)
+            );
 
             session()->flash(
                 'success',

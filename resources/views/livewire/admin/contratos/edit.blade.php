@@ -289,6 +289,7 @@
                         <option value="activo">Activo</option>
                         <option value="moroso">Moroso</option>
                         <option value="liquidado">Liquidado</option>
+                         <option value="donacion">Donacion</option>
                     </select>
 
                     @error('nuevo_estatus')

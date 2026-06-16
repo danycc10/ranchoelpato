@@ -221,6 +221,12 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
 
         Route::get('/private/contratos/{uuid}/docx/download', [PrivateFileController::class, 'downloadContratoDocx'])
             ->name('private.contratos.docx.download');
+
+        Route::get('/private/contratos/{uuid}/documentos/{tipo}/docx/download', [PrivateFileController::class, 'downloadContratoDocumentoDocx'])
+            ->name('private.contratos.documentos.docx.download');
+
+        Route::get('/private/contratos/{uuid}/documentos/{tipo}/scan', [PrivateFileController::class, 'showContratoDocumentoScan'])
+            ->name('private.contratos.documentos.scan');
             
         Route::get('/private-files/show', [PrivateFileController::class, 'show'])
             ->name('private-files.show');

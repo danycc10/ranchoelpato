@@ -1,5 +1,21 @@
 @php
     $contratoCancelado = strtolower((string) ($contrato->estatus ?? '')) === 'cancelado';
+    $documentosContrato = $documentosContrato ?? [];
+    $documentosCollection = collect($documentosContrato);
+    $documentosScanCargados = $documentosCollection
+        ->filter(fn($documento) => filled($contrato->{$documento['scan_field']} ?? null))
+        ->count();
+    $documentosTotal = $documentosCollection->count();
+    $documentoSeleccionado = $documentosContrato[$documentoTipoSeleccionado] ?? ($documentosCollection->first() ?: null);
+    $scanPathSeleccionado = $documentoSeleccionado
+        ? ($contrato->{$documentoSeleccionado['scan_field']} ?? null)
+        : null;
+    $scanUrlSeleccionado = ($documentoSeleccionado && $scanPathSeleccionado)
+        ? route('admin.private.contratos.documentos.scan', [
+            'uuid' => $contrato->uuid,
+            'tipo' => $documentoSeleccionado['key'],
+        ]) . '?v=' . urlencode((string) $scanPathSeleccionado)
+        : null;
 @endphp
 
 <div class="max-w-6xl mx-auto p-4">
@@ -23,68 +39,24 @@
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
-            {{-- BOTÓN CONTRATO --}}
+            {{-- DOCUMENTOS --}}
             <button type="button"
                 @unless($contratoCancelado) wire:click="abrirModalContrato" @endunless
                 @disabled($contratoCancelado)
-                class="p-2 rounded-lg transition relative {{ $contratoCancelado ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60' : 'bg-blue-600 text-white hover:bg-blue-700' }}"
-                title="{{ $contratoCancelado ? 'Contrato cancelado' : ($contrato->archivo_contrato ? 'Contrato digital' : 'Subir contrato PDF') }}">
+                class="inline-flex items-center gap-2 px-3 py-2 rounded-lg transition relative font-bold {{ $contratoCancelado ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60' : 'bg-blue-600 text-white hover:bg-blue-700' }}"
+                title="{{ $contratoCancelado ? 'Contrato cancelado' : 'Documentos del contrato' }}">
 
-                @if($contrato->archivo_contrato)
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M6 2h8l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
-                        <path d="M14 2v4h4" fill="white" opacity="0.3" />
-                    </svg>
-                @else
-                    <div class="relative">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M6 2h8l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
-                            <path d="M14 2v4h4" fill="white" opacity="0.3" />
-                        </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 2h8l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
+                    <path d="M14 2v4h4" fill="white" opacity="0.35" />
+                </svg>
 
-                        <svg xmlns="http://www.w3.org/2000/svg"
-                            class="w-3 h-3 absolute -top-1 -right-1 bg-white text-blue-600 rounded-full p-[2px]"
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
-                                d="M5 15l7-7 7 7" />
-                        </svg>
-                    </div>
-                @endif
+                <span>Documentos</span>
+
+                <span class="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-xs">
+                    {{ $documentosScanCargados }}/{{ $documentosTotal }}
+                </span>
             </button>
-
-            {{-- BOTÓN DESCARGAR DOCX --}}
-            @if($contrato->archivo_contrato_docx)
-                @if($contratoCancelado)
-                    <button
-                        type="button"
-                        disabled
-                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-300 text-gray-500 cursor-not-allowed opacity-60 shadow-sm"
-                        title="Contrato cancelado">
-                        <div class="flex items-center justify-center w-6 h-6 bg-white text-gray-500 font-bold rounded">
-                            W
-                        </div>
-
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 3v12m0 0l-3-3m3 3l3-3M4 20h16" />
-                        </svg>
-                    </button>
-                @else
-                    <a href="{{ route('admin.private.contratos.docx.download', ['uuid' => $contrato->uuid]) }}"
-                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-700 text-white hover:bg-blue-800 transition shadow-sm"
-                        title="Descargar contrato en Word">
-
-                        <div class="flex items-center justify-center w-6 h-6 bg-white text-blue-700 font-bold rounded">
-                            W
-                        </div>
-
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 3v12m0 0l-3-3m3 3l3-3M4 20h16" />
-                        </svg>
-                    </a>
-                @endif
-            @endif
 
             @if($contratoCancelado)
                 <button
@@ -168,15 +140,26 @@
                 <p class="text-green-700"><b>Promoción:</b> {{ $contrato->promocion->nombre }}</p>
             @endif
 
-            @if($contrato->archivo_contrato)
-                <p class="mt-2 text-green-700 font-semibold">
-                    <b>Contrato digital:</b> Cargado
-                </p>
-            @else
-                <p class="mt-2 text-gray-500">
-                    <b>Contrato digital:</b> no cargado
-                </p>
-            @endif
+            <div class="mt-3 rounded-xl border bg-gray-50 p-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="font-semibold text-gray-800">Documentos escaneados</div>
+                    <div class="text-sm font-black {{ $documentosScanCargados === $documentosTotal ? 'text-green-700' : 'text-gray-600' }}">
+                        {{ $documentosScanCargados }}/{{ $documentosTotal }}
+                    </div>
+                </div>
+
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    @foreach($documentosContrato as $tipoDocumento => $documento)
+                        @php
+                            $scanCargado = filled($contrato->{$documento['scan_field']} ?? null);
+                        @endphp
+
+                        <span class="inline-flex rounded-full px-2 py-1 text-[11px] font-bold {{ $scanCargado ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500' }}">
+                            {{ $documento['label'] }}
+                        </span>
+                    @endforeach
+                </div>
+            </div>
         </div>
 
         <div class="bg-white rounded-2xl border p-4">
@@ -318,6 +301,7 @@
                                 'ambos' => 'bg-green-100 text-green-800',
                                 'pago_historico' => 'bg-emerald-100 text-emerald-800',
                                 'archivo_contrato' => 'bg-sky-100 text-sky-800',
+                                'archivo_documento_contrato' => 'bg-sky-100 text-sky-800',
                                 default => 'bg-gray-100 text-gray-700',
                             };
 
@@ -371,10 +355,11 @@
                                         <br>
                                         <b>Origen:</b> {{ $despues['origen_pago'] ?? '—' }}
                                     </div>
-                                @elseif($tipo === 'archivo_contrato')
+                                @elseif(in_array($tipo, ['archivo_contrato', 'archivo_documento_contrato'], true))
                                     @php
-                                        $antesArchivo = $antes['archivo_contrato'] ?? null;
-                                        $despuesArchivo = $despues['archivo_contrato'] ?? null;
+                                        $antesArchivo = $antes['archivo_contrato'] ?? ($antes['archivo'] ?? null);
+                                        $despuesArchivo = $despues['archivo_contrato'] ?? ($despues['archivo'] ?? null);
+                                        $documentoLabel = $despues['documento_label'] ?? ($antes['documento_label'] ?? 'Contrato');
 
                                         $accion = 'actualizado';
 
@@ -388,6 +373,9 @@
                                     @endphp
 
                                     <div class="text-xs space-y-1">
+                                        <div>
+                                            <b>Documento:</b> {{ $documentoLabel }}
+                                        </div>
                                         <div>
                                             <b>Archivo:</b>
                                             <span class="
@@ -417,13 +405,13 @@
         </div>
     </div>
 
-    {{-- MODAL CONTRATO DIGITAL --}}
+    {{-- MODAL DOCUMENTOS LEGALES --}}
     @if($modalContratoOpen)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white w-full max-w-3xl rounded-2xl shadow-xl overflow-hidden">
+            <div class="bg-white w-full max-w-4xl rounded-2xl shadow-xl overflow-hidden">
                 <div class="px-5 py-4 border-b flex items-center justify-between">
                     <div>
-                        <h2 class="text-lg font-black">Contrato digital</h2>
+                        <h2 class="text-lg font-black">Documentos del contrato</h2>
                         <p class="text-sm text-gray-500">{{ $contrato->folio_contrato }}</p>
                     </div>
 
@@ -436,121 +424,198 @@
                 </div>
 
                 <div class="p-5 space-y-5">
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                        <div>
-                            <div class="text-sm font-bold mb-2">Actual</div>
+                    @if(!$documentoAccion)
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button type="button"
+                                wire:click="seleccionarAccionDocumento('descargar')"
+                                class="text-left rounded-2xl border p-5 hover:border-blue-300 hover:bg-blue-50 transition">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white font-black">
+                                        W
+                                    </div>
+                                    <div>
+                                        <div class="font-black text-gray-900">Descargar documentos</div>
+                                        <div class="text-sm text-gray-500">Genera o baja el Word de cualquiera de los 4 documentos.</div>
+                                    </div>
+                                </div>
+                            </button>
 
-                            <div class="rounded-2xl border bg-gray-50 min-h-[280px] flex items-center justify-center overflow-hidden">
-                                @if($contratoArchivoPath)
-                                    <div class="text-center px-4">
-                                        <div class="h-20 w-20 mx-auto rounded-2xl border bg-red-50 text-red-700 flex items-center justify-center text-sm font-black">
-                                            PDF
+                            <button type="button"
+                                wire:click="seleccionarAccionDocumento('subir')"
+                                class="text-left rounded-2xl border p-5 hover:border-emerald-300 hover:bg-emerald-50 transition">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white font-black">
+                                        PDF
+                                    </div>
+                                    <div>
+                                        <div class="font-black text-gray-900">Subir scan</div>
+                                        <div class="text-sm text-gray-500">Carga o reemplaza el PDF escaneado de cada documento.</div>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+
+                        <div class="rounded-2xl border bg-gray-50 p-4 text-sm text-gray-600">
+                            Scans cargados: <b>{{ $documentosScanCargados }} de {{ $documentosTotal }}</b>.
+                        </div>
+                    @elseif($documentoAccion === 'descargar')
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <div class="text-sm font-black text-gray-900">Selecciona un Word para descargar</div>
+                                <div class="text-xs text-gray-500">Si no existe, se genera con la plantilla correspondiente.</div>
+                            </div>
+
+                            <button type="button"
+                                wire:click="volverAccionesDocumento"
+                                class="px-3 py-1.5 rounded-lg border text-sm hover:bg-gray-50">
+                                Cambiar acción
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            @foreach($documentosContrato as $tipoDocumento => $documento)
+                                @php
+                                    $docxGenerado = filled($contrato->{$documento['docx_field']} ?? null);
+                                    $scanCargado = filled($contrato->{$documento['scan_field']} ?? null);
+                                @endphp
+
+                                <div class="rounded-2xl border p-4 bg-white">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <div class="font-black text-gray-900">{{ $documento['label'] }}</div>
+                                            <div class="mt-1 flex flex-wrap gap-1">
+                                                <span class="rounded-full px-2 py-0.5 text-[11px] font-bold {{ $docxGenerado ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500' }}">
+                                                    {{ $docxGenerado ? 'Word generado' : 'Word pendiente' }}
+                                                </span>
+                                                <span class="rounded-full px-2 py-0.5 text-[11px] font-bold {{ $scanCargado ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500' }}">
+                                                    {{ $scanCargado ? 'Scan cargado' : 'Sin scan' }}
+                                                </span>
+                                            </div>
                                         </div>
+                                    </div>
 
-                                        <div class="mt-3 text-sm font-bold text-gray-800">
-                                            {{ $contratoArchivoNombre }}
+                                    <a href="{{ route('admin.private.contratos.documentos.docx.download', ['uuid' => $contrato->uuid, 'tipo' => $tipoDocumento]) }}"
+                                        class="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-blue-700 px-4 py-2 font-bold text-white hover:bg-blue-800">
+                                        Descargar Word
+                                    </a>
+                                </div>
+                            @endforeach
+                        </div>
+                    @elseif($documentoAccion === 'subir' && $documentoSeleccionado)
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <div class="text-sm font-black text-gray-900">Subir PDF escaneado</div>
+                                <div class="text-xs text-gray-500">Selecciona el documento y carga su scan firmado.</div>
+                            </div>
+
+                            <button type="button"
+                                wire:click="volverAccionesDocumento"
+                                class="px-3 py-1.5 rounded-lg border text-sm hover:bg-gray-50">
+                                Cambiar acción
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            <div class="space-y-2">
+                                @foreach($documentosContrato as $tipoDocumento => $documento)
+                                    @php
+                                        $scanCargado = filled($contrato->{$documento['scan_field']} ?? null);
+                                        $isSelected = $documentoTipoSeleccionado === $tipoDocumento;
+                                    @endphp
+
+                                    <button type="button"
+                                        wire:click="seleccionarDocumentoContrato('{{ $tipoDocumento }}')"
+                                        class="w-full rounded-xl border px-3 py-2 text-left transition {{ $isSelected ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50' }}">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <span class="text-sm font-bold text-gray-800">{{ $documento['label'] }}</span>
+                                            <span class="rounded-full px-2 py-0.5 text-[11px] font-bold {{ $scanCargado ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500' }}">
+                                                {{ $scanCargado ? 'Cargado' : 'Pendiente' }}
+                                            </span>
                                         </div>
+                                    </button>
+                                @endforeach
+                            </div>
 
-                                        <div class="text-xs text-gray-500 mt-1">
-                                            El contrato actual está guardado como PDF.
-                                        </div>
+                            <div class="lg:col-span-2 rounded-2xl border bg-white p-4">
+                                <div class="font-black text-gray-900">{{ $documentoSeleccionado['label'] }}</div>
 
-                                        <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
-                                            <a
-                                                href="{{ $contratoArchivoUrl }}"
+                                <div class="mt-3 rounded-2xl border bg-gray-50 min-h-[150px] flex items-center justify-center overflow-hidden">
+                                    @if($scanPathSeleccionado)
+                                        <div class="text-center px-4">
+                                            <div class="h-16 w-16 mx-auto rounded-2xl border bg-red-50 text-red-700 flex items-center justify-center text-sm font-black">
+                                                PDF
+                                            </div>
+                                            <div class="mt-3 text-sm font-bold text-gray-800">
+                                                {{ basename((string) $scanPathSeleccionado) }}
+                                            </div>
+                                            <a href="{{ $scanUrlSeleccionado }}"
                                                 target="_blank"
-                                                class="inline-flex px-4 py-2 rounded-xl border font-semibold hover:bg-gray-50">
+                                                class="mt-3 inline-flex px-4 py-2 rounded-xl border font-semibold hover:bg-white">
                                                 Ver PDF
                                             </a>
                                         </div>
+                                    @else
+                                        <div class="text-sm text-gray-400 px-4 text-center">
+                                            Este documento aún no tiene PDF escaneado.
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <div class="mt-4">
+                                    <input
+                                        type="file"
+                                        accept="application/pdf,.pdf"
+                                        wire:model="documentoScan"
+                                        wire:key="documento-scan-{{ $documentoTipoSeleccionado }}"
+                                        @disabled($contratoCancelado)
+                                        class="w-full rounded-xl border p-2 disabled:opacity-50 disabled:cursor-not-allowed">
+
+                                    @error('documentoScan')
+                                        <div class="text-sm text-red-600 mt-1">{{ $message }}</div>
+                                    @enderror
+
+                                    <div wire:loading wire:target="documentoScan" class="text-sm text-gray-500 mt-2">
+                                        Procesando archivo...
                                     </div>
-                                @else
-                                    <div class="text-sm text-gray-400 px-4 text-center">
-                                        Este contrato no tiene PDF cargado.
+
+                                    @if($documentoScan)
+                                        <div class="mt-3 rounded-xl border bg-gray-50 p-3 text-sm">
+                                            Archivo seleccionado:
+                                            <span class="font-bold">{{ $documentoScan->getClientOriginalName() }}</span>
+                                        </div>
+                                    @endif
+
+                                    <div class="text-xs text-gray-400 mt-2">
+                                        Solo se permite PDF de hasta 10 MB.
                                     </div>
-                                @endif
+                                </div>
+
+                                <div class="mt-4 flex flex-col sm:flex-row gap-2 sm:justify-end">
+                                    @if($scanPathSeleccionado)
+                                        <button
+                                            type="button"
+                                            wire:click="eliminarArchivoContrato"
+                                            wire:loading.attr="disabled"
+                                            wire:target="eliminarArchivoContrato"
+                                            @disabled($contratoCancelado)
+                                            class="px-4 py-2 rounded-xl border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                            Eliminar PDF
+                                        </button>
+                                    @endif
+
+                                    <button
+                                        type="button"
+                                        wire:click="subirArchivoContrato"
+                                        wire:loading.attr="disabled"
+                                        wire:target="subirArchivoContrato,documentoScan"
+                                        @disabled($contratoCancelado)
+                                        class="px-4 py-2 rounded-xl bg-black text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                                        {{ $scanPathSeleccionado ? 'Reemplazar PDF' : 'Subir PDF' }}
+                                    </button>
+                                </div>
                             </div>
                         </div>
-
-                        <div>
-                            <div class="text-sm font-bold mb-2">
-                                @if($contratoArchivoPath)
-                                    Reemplazar PDF
-                                @else
-                                    Subir PDF
-                                @endif
-                            </div>
-
-                            <input
-                                type="file"
-                                accept="application/pdf,.pdf"
-                                wire:model="pdfContrato"
-                                @disabled($contratoCancelado)
-                                class="w-full rounded-xl border p-2 disabled:opacity-50 disabled:cursor-not-allowed">
-
-                            @error('pdfContrato')
-                                <div class="text-sm text-red-600 mt-1">{{ $message }}</div>
-                            @enderror
-
-                            <div wire:loading wire:target="pdfContrato" class="text-sm text-gray-500 mt-2">
-                                Procesando archivo...
-                            </div>
-
-                            <div class="mt-3 rounded-2xl border bg-gray-50 min-h-[220px] flex items-center justify-center overflow-hidden">
-                                @if($pdfContrato)
-                                    <div class="text-center px-4">
-                                        <div class="h-20 w-20 mx-auto rounded-2xl border bg-red-50 text-red-700 flex items-center justify-center text-sm font-black">
-                                            PDF
-                                        </div>
-
-                                        <div class="mt-3 text-sm font-bold text-gray-800">
-                                            {{ $pdfContrato->getClientOriginalName() }}
-                                        </div>
-
-                                        <div class="text-xs text-gray-500 mt-1">
-                                            PDF cargado correctamente.
-                                        </div>
-                                    </div>
-                                @else
-                                    <div class="text-sm text-gray-400 px-4 text-center">
-                                        Selecciona un archivo PDF para subir o reemplazar.
-                                    </div>
-                                @endif
-                            </div>
-
-                            <div class="text-xs text-gray-400 mt-2">
-                                Solo se permite PDF de hasta 10 MB.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col sm:flex-row gap-2 sm:justify-end">
-                        @if($contratoArchivoPath)
-                            <button
-                                type="button"
-                                wire:click="eliminarArchivoContrato"
-                                wire:loading.attr="disabled"
-                                wire:target="eliminarArchivoContrato"
-                                @disabled($contratoCancelado)
-                                class="px-4 py-2 rounded-xl border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed">
-                                Eliminar PDF
-                            </button>
-                        @endif
-
-                        <button
-                            type="button"
-                            wire:click="subirArchivoContrato"
-                            wire:loading.attr="disabled"
-                            wire:target="subirArchivoContrato,pdfContrato"
-                            @disabled($contratoCancelado)
-                            class="px-4 py-2 rounded-xl bg-black text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                            @if($contratoArchivoPath)
-                                Reemplazar PDF
-                            @else
-                                Subir PDF
-                            @endif
-                        </button>
-                    </div>
+                    @endif
                 </div>
             </div>
         </div>

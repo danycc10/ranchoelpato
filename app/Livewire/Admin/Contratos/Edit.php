@@ -142,7 +142,7 @@ class Edit extends Component
         $rules = [
             'cliente_id'                 => ['required', 'integer', 'exists:clientes,id'],
             'fraccionamiento_id'         => ['required', 'integer', 'exists:fraccionamientos,id'],
-            'nuevo_estatus'              => ['required', 'in:activo,moroso,liquidado'],
+            'nuevo_estatus'              => ['required', 'in:activo,moroso,liquidado,donacion'],
             'nueva_fecha_inicio'         => ['nullable', 'date'],
             'nueva_frecuencia'           => ['required', 'in:semanal,mensual'],
             'nueva_fecha_primera_cuota'  => ['nullable', 'date'],

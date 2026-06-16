@@ -2,21 +2,21 @@
 
 namespace App\Livewire\Admin\Contratos;
 
-use Livewire\Component;
-use Livewire\WithFileUploads;
 use App\Models\Contrato;
 use App\Models\ContratoHistorial;
 use App\Models\Cuota;
 use App\Models\Recibo;
-use App\Models\ReciboPago;
-use App\Services\Contratos\ContratoPlanService;
 use App\Services\Contratos\ContratoCuotasReprogramarService;
+use App\Services\Contratos\ContratoPlanService;
+use App\Services\Contratos\ContratoWordService;
 use App\Services\Contratos\CuotaPagoRollbackService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Show extends Component
 {
@@ -24,22 +24,25 @@ class Show extends Component
 
     public Contrato $contrato;
 
-    public $pdfContrato;
+    public $documentoScan;
 
-    // Modal contrato digital
+    // Modal documentos legales
     public bool $modalContratoOpen = false;
-    public ?string $contratoArchivoPath = null;
-    public ?string $contratoArchivoUrl = null;
-    public ?string $contratoArchivoNombre = null;
-    public ?string $contratoArchivoUuid = null;
+
+    public ?string $documentoAccion = null;
+
+    public string $documentoTipoSeleccionado = 'contrato';
 
     // ✅ Reprogramar
     public bool $showReprogramar = false;
+
     public ?string $nuevaFechaPrimerPago = null;
 
     // ✅ Anular pago/recibo por cuota
     public bool $showAnularPago = false;
+
     public ?int $cuotaAnularId = null;
+
     public string $motivoAnulacion = 'Corrección de pago/recibo';
 
     // ✅ Preview de anulación
@@ -47,7 +50,9 @@ class Show extends Component
 
     // ✅ Marcar pagado histórico
     public bool $showMarcarPagada = false;
+
     public ?int $cuotaIdMarcarPagada = null;
+
     public string $observacionPagoHistorico = 'Pago histórico registrado fuera del sistema.';
 
     public function mount(Contrato $contrato): void
@@ -61,9 +66,9 @@ class Show extends Component
             'cliente',
             'lote.fraccionamiento',
             'lote.fraccionamiento.propietario',
-            'cuotas' => fn($q) => $q->orderBy('numero'),
+            'cuotas' => fn ($q) => $q->orderBy('numero'),
             'promocion',
-            'historial' => fn($q) => $q->with('user')->latest('id')->limit(100),
+            'historial' => fn ($q) => $q->with('user')->latest('id')->limit(100),
         ]);
     }
 
@@ -72,7 +77,7 @@ class Show extends Component
         return ContratoPlanService::diasSemana();
     }
 
-    // ===================== CONTRATO DIGITAL =====================
+    // ===================== DOCUMENTOS LEGALES =====================
 
     public function abrirModalContrato(): void
     {
@@ -81,20 +86,9 @@ class Show extends Component
         $this->contrato->refresh();
         $this->loadContrato($this->contrato);
 
-        $this->contratoArchivoPath = $this->contrato->archivo_contrato;
-        $this->contratoArchivoUuid = $this->contrato->uuid;
-
-        if ($this->contrato->archivo_contrato) {
-            $this->contratoArchivoNombre = basename($this->contrato->archivo_contrato);
-            $this->contratoArchivoUrl = route('admin.private.contratos.pdf', $this->contrato->uuid)
-                . '?v=' . urlencode((string) $this->contrato->archivo_contrato);
-        } else {
-            $this->contratoArchivoNombre = null;
-            $this->contratoArchivoUrl = null;
-        }
-
-        $this->resetErrorBag('pdfContrato');
-        $this->resetValidation('pdfContrato');
+        $this->documentoAccion = null;
+        $this->documentoTipoSeleccionado = 'contrato';
+        $this->resetDocumentoUpload();
 
         $this->modalContratoOpen = true;
     }
@@ -102,101 +96,97 @@ class Show extends Component
     public function cerrarModalContrato(): void
     {
         $this->modalContratoOpen = false;
-        $this->reset('pdfContrato');
-        $this->resetErrorBag('pdfContrato');
-        $this->resetValidation('pdfContrato');
+        $this->documentoAccion = null;
+        $this->documentoTipoSeleccionado = 'contrato';
+        $this->resetDocumentoUpload();
+    }
+
+    public function seleccionarAccionDocumento(string $accion): void
+    {
+        abort_unless(auth()->user()?->can('sistema.ver'), 403);
+
+        if (! in_array($accion, ['descargar', 'subir'], true)) {
+            return;
+        }
+
+        $this->documentoAccion = $accion;
+        $this->resetDocumentoUpload();
+    }
+
+    public function seleccionarDocumentoContrato(string $tipo): void
+    {
+        abort_unless(auth()->user()?->can('sistema.ver'), 403);
+
+        if (! ContratoWordService::documentType($tipo)) {
+            return;
+        }
+
+        $this->documentoTipoSeleccionado = $tipo;
+        $this->resetDocumentoUpload();
+    }
+
+    public function volverAccionesDocumento(): void
+    {
+        $this->documentoAccion = null;
+        $this->resetDocumentoUpload();
     }
 
     public function subirArchivoContrato(): void
     {
         abort_unless(auth()->user()?->can('sistema.ver'), 403);
 
+        $documento = $this->documentoSeleccionadoConfig();
+
         $this->validate([
-            'pdfContrato' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'documentoScan' => ['required', 'file', 'mimes:pdf', 'max:10240'],
         ], [
-            'pdfContrato.required' => 'Debes seleccionar un archivo PDF.',
-            'pdfContrato.mimes' => 'El archivo debe ser un PDF.',
-            'pdfContrato.max' => 'El PDF no debe pesar más de 10 MB.',
+            'documentoScan.required' => 'Debes seleccionar un archivo PDF.',
+            'documentoScan.mimes' => 'El archivo debe ser un PDF.',
+            'documentoScan.max' => 'El PDF no debe pesar más de 10 MB.',
         ]);
 
-        $this->contrato->loadMissing([
-            'lote.fraccionamiento',
-        ]);
+        $field = $documento['scan_field'];
+        $archivoAnterior = $this->contrato->{$field};
 
-        $nombreFinca = trim((string) ($this->contrato->lote?->fraccionamiento?->nombre ?? 'sin-finca'));
-        $nombreLote  = trim((string) (
-            $this->contrato->lote?->lote
-            ?? $this->contrato->lote?->clave
-            ?? ('lote-' . ($this->contrato->lote_id ?? $this->contrato->id))
-        ));
-
-        $fincaSlug = Str::slug($nombreFinca);
-        $loteSlug  = Str::slug($nombreLote);
-
-        if ($fincaSlug === '') {
-            $fincaSlug = 'sin-finca';
-        }
-
-        if ($loteSlug === '') {
-            $loteSlug = 'sin-lote';
-        }
-
-        $directory = "contratos/{$fincaSlug}/{$loteSlug}";
-        $filename = 'contrato.pdf';
-
-        $archivoAnterior = $this->contrato->archivo_contrato;
-
-        if (!empty($archivoAnterior) && Storage::disk('private')->exists($archivoAnterior)) {
+        if (! empty($archivoAnterior) && Storage::disk('private')->exists($archivoAnterior)) {
             Storage::disk('private')->delete($archivoAnterior);
         }
 
-        $path = $this->pdfContrato->storeAs(
-            $directory,
-            $filename,
+        $path = $this->documentoScan->storeAs(
+            $this->buildDocumentoDirectory(),
+            $documento['scan_filename'],
             'private'
         );
 
         $this->contrato->update([
-            'archivo_contrato' => $path,
+            $field => $path,
+            'archivo_contrato_disk' => 'private',
         ]);
 
-        ContratoHistorial::create([
-            'contrato_id' => $this->contrato->id,
-            'user_id' => auth()->id(),
-            'tipo' => 'archivo_contrato',
-            'antes' => [
-                'archivo_contrato' => $archivoAnterior,
-            ],
-            'despues' => [
-                'archivo_contrato' => $path,
-            ],
-            'saldo_anterior' => (float) ($this->contrato->saldo_actual ?? 0),
-            'saldo_nuevo' => (float) ($this->contrato->saldo_actual ?? 0),
-            'motivo' => 'Carga de contrato digital',
-            'nota' => 'Se subió o reemplazó el PDF del contrato.',
-        ]);
+        $this->registrarHistorialDocumento(
+            $documento,
+            $archivoAnterior,
+            $path,
+            'Se subió o reemplazó el PDF escaneado de '.$documento['label'].'.'
+        );
 
-        $this->reset('pdfContrato');
+        $this->resetDocumentoUpload();
 
         $this->contrato->refresh();
         $this->loadContrato($this->contrato);
 
-        $this->contratoArchivoPath = $this->contrato->archivo_contrato;
-        $this->contratoArchivoUuid = $this->contrato->uuid;
-        $this->contratoArchivoNombre = basename((string) $this->contrato->archivo_contrato);
-        $this->contratoArchivoUrl = route('admin.private.contratos.pdf', $this->contrato->uuid)
-            . '?v=' . urlencode((string) $this->contrato->archivo_contrato);
-
-        $this->dispatch('toast', type: 'success', message: 'El PDF del contrato se guardó correctamente.');
+        $this->dispatch('toast', type: 'success', message: 'El PDF escaneado se guardó correctamente.');
     }
 
     public function eliminarArchivoContrato(): void
     {
         abort_unless(auth()->user()?->can('sistema.ver'), 403);
 
-        $archivoAnterior = $this->contrato->archivo_contrato;
+        $documento = $this->documentoSeleccionadoConfig();
+        $field = $documento['scan_field'];
+        $archivoAnterior = $this->contrato->{$field};
 
-        if (!$archivoAnterior) {
+        if (! $archivoAnterior) {
             return;
         }
 
@@ -205,36 +195,83 @@ class Show extends Component
         }
 
         $this->contrato->update([
-            'archivo_contrato' => null,
+            $field => null,
         ]);
 
-        ContratoHistorial::create([
-            'contrato_id' => $this->contrato->id,
-            'user_id' => auth()->id(),
-            'tipo' => 'archivo_contrato',
-            'antes' => [
-                'archivo_contrato' => $archivoAnterior,
-            ],
-            'despues' => [
-                'archivo_contrato' => null,
-            ],
-            'saldo_anterior' => (float) ($this->contrato->saldo_actual ?? 0),
-            'saldo_nuevo' => (float) ($this->contrato->saldo_actual ?? 0),
-            'motivo' => 'Eliminación de contrato digital',
-            'nota' => 'Se eliminó el PDF del contrato.',
-        ]);
+        $this->registrarHistorialDocumento(
+            $documento,
+            $archivoAnterior,
+            null,
+            'Se eliminó el PDF escaneado de '.$documento['label'].'.'
+        );
 
-        $this->reset('pdfContrato');
+        $this->resetDocumentoUpload();
 
         $this->contrato->refresh();
         $this->loadContrato($this->contrato);
 
-        $this->contratoArchivoPath = null;
-        $this->contratoArchivoUuid = $this->contrato->uuid;
-        $this->contratoArchivoNombre = null;
-        $this->contratoArchivoUrl = null;
+        $this->dispatch('toast', type: 'success', message: 'El PDF escaneado fue eliminado correctamente.');
+    }
 
-        $this->dispatch('toast', type: 'success', message: 'El PDF del contrato fue eliminado correctamente.');
+    private function documentoSeleccionadoConfig(): array
+    {
+        $documento = ContratoWordService::documentType($this->documentoTipoSeleccionado);
+
+        abort_unless($documento, 404);
+
+        return $documento;
+    }
+
+    private function resetDocumentoUpload(): void
+    {
+        $this->reset('documentoScan');
+        $this->resetErrorBag('documentoScan');
+        $this->resetValidation('documentoScan');
+    }
+
+    private function buildDocumentoDirectory(): string
+    {
+        $this->contrato->loadMissing([
+            'lote.fraccionamiento',
+        ]);
+
+        $nombreFinca = trim((string) ($this->contrato->lote?->fraccionamiento?->nombre ?? 'sin-finca'));
+        $nombreLote = trim((string) (
+            $this->contrato->lote?->lote
+            ?? $this->contrato->lote?->clave
+            ?? ('lote-'.($this->contrato->lote_id ?? $this->contrato->id))
+        ));
+
+        $fincaSlug = Str::slug($nombreFinca) ?: 'sin-finca';
+        $loteSlug = Str::slug($nombreLote) ?: 'sin-lote';
+
+        return "contratos/{$fincaSlug}/{$loteSlug}";
+    }
+
+    private function registrarHistorialDocumento(
+        array $documento,
+        ?string $archivoAnterior,
+        ?string $archivoNuevo,
+        string $nota
+    ): void {
+        ContratoHistorial::create([
+            'contrato_id' => $this->contrato->id,
+            'user_id' => auth()->id(),
+            'tipo' => 'archivo_documento_contrato',
+            'antes' => [
+                'documento_tipo' => $documento['key'],
+                'documento_label' => $documento['label'],
+                'archivo' => $archivoAnterior,
+            ],
+            'despues' => [
+                'documento_tipo' => $documento['key'],
+                'documento_label' => $documento['label'],
+                'archivo' => $archivoNuevo,
+            ],
+            'saldo_anterior' => (float) ($this->contrato->saldo_actual ?? 0),
+            'saldo_nuevo' => (float) ($this->contrato->saldo_actual ?? 0),
+            'nota' => $nota,
+        ]);
     }
 
     // ===================== REPROGRAMAR =====================
@@ -320,6 +357,7 @@ class Show extends Component
 
         if ($tienePago) {
             $this->dispatch('toast', type: 'warning', message: 'La cuota ya tiene pago registrado.');
+
             return;
         }
 
@@ -331,6 +369,7 @@ class Show extends Component
 
         if ($tieneReciboHistorico) {
             $this->dispatch('toast', type: 'warning', message: 'La cuota ya tiene un recibo histórico activo. Se requiere sincronizar la cuota.');
+
             return;
         }
 
@@ -506,13 +545,13 @@ class Show extends Component
         $ultimoNumero = (int) Recibo::query()
             ->withTrashed()
             ->whereRaw("folio REGEXP '^REC-[0-9]{6}$'")
-            ->selectRaw("MAX(CAST(SUBSTRING(folio, 5) AS UNSIGNED)) as max_num")
+            ->selectRaw('MAX(CAST(SUBSTRING(folio, 5) AS UNSIGNED)) as max_num')
             ->lockForUpdate()
             ->value('max_num');
 
         $siguiente = $ultimoNumero + 1;
 
-        return 'REC-' . str_pad((string) $siguiente, 6, '0', STR_PAD_LEFT);
+        return 'REC-'.str_pad((string) $siguiente, 6, '0', STR_PAD_LEFT);
     }
 
     protected function recalcularSaldoContrato(int $contratoId): float
@@ -570,7 +609,7 @@ class Show extends Component
         $recibos = Recibo::query()
             ->with([
                 'tipoCobro',
-                'pagosDetalle' => fn($q) => $q
+                'pagosDetalle' => fn ($q) => $q
                     ->whereNull('anulado_at')
                     ->whereNull('deleted_at')
                     ->with([
@@ -587,6 +626,7 @@ class Show extends Component
 
         if ($recibos->isEmpty()) {
             $this->dispatch('toast', type: 'warning', message: 'No se encontraron recibos activos para esa cuota.');
+
             return;
         }
 
@@ -599,12 +639,12 @@ class Show extends Component
                 'concepto' => (string) ($recibo->tipoCobro?->nombre ?? '—'),
                 'monto_recibo' => (float) ($recibo->monto ?? 0),
                 'pagos_count' => (int) $pagos->count(),
-                'pagos_total' => (float) $pagos->sum(fn($p) => (float) ($p->monto ?? 0)),
+                'pagos_total' => (float) $pagos->sum(fn ($p) => (float) ($p->monto ?? 0)),
                 'pagos' => $pagos->map(function ($p) {
                     $cuenta = trim(
                         ($p->cuentaBancaria?->alias ?? '')
-                            . (($p->cuentaBancaria?->banco ?? '') ? ' - ' . $p->cuentaBancaria->banco : '')
-                            . (($p->cuentaBancaria?->numero ?? '') ? ' (' . $p->cuentaBancaria->numero . ')' : '')
+                            .(($p->cuentaBancaria?->banco ?? '') ? ' - '.$p->cuentaBancaria->banco : '')
+                            .(($p->cuentaBancaria?->numero ?? '') ? ' ('.$p->cuentaBancaria->numero.')' : '')
                     );
 
                     if ($cuenta === '') {
@@ -630,8 +670,8 @@ class Show extends Component
             'cuota_id' => (int) $cuota->id,
             'cuota_numero' => (int) ($cuota->numero ?? 0),
             'recibos_count' => (int) $recibos->count(),
-            'recibos_total' => (float) $recibos->sum(fn($r) => (float) ($r->monto ?? 0)),
-            'pagos_total' => (float) $recibosPreview->sum(fn($r) => (float) ($r['pagos_total'] ?? 0)),
+            'recibos_total' => (float) $recibos->sum(fn ($r) => (float) ($r->monto ?? 0)),
+            'pagos_total' => (float) $recibosPreview->sum(fn ($r) => (float) ($r['pagos_total'] ?? 0)),
             'recibos' => $recibosPreview->all(),
         ];
 
@@ -657,7 +697,7 @@ class Show extends Component
         $recibos = Recibo::query()
             ->with([
                 'tipoCobro',
-                'pagosDetalle' => fn($q) => $q
+                'pagosDetalle' => fn ($q) => $q
                     ->whereNull('deleted_at')
                     ->whereNull('anulado_at')
                     ->with(['formaPago', 'cuentaBancaria']),
@@ -683,7 +723,7 @@ class Show extends Component
                 'deleted_at' => optional($recibo->deleted_at)?->toDateTimeString(),
                 'anulado_at' => optional($recibo->anulado_at)?->toDateTimeString(),
                 'pagos_count' => (int) $pagos->count(),
-                'pagos_total' => (float) $pagos->sum(fn($p) => (float) ($p->monto ?? 0)),
+                'pagos_total' => (float) $pagos->sum(fn ($p) => (float) ($p->monto ?? 0)),
                 'pagos' => $pagos->map(function ($p) {
                     return [
                         'id' => (int) $p->id,
@@ -703,7 +743,7 @@ class Show extends Component
             'estatus' => (string) ($cuota?->estatus ?? ''),
             'origen_pago' => (string) ($cuota?->origen_pago ?? ''),
             'recibos_count' => (int) count($recibosAntes),
-            'recibos_total' => (float) collect($recibosAntes)->sum(fn($r) => (float) ($r['monto'] ?? 0)),
+            'recibos_total' => (float) collect($recibosAntes)->sum(fn ($r) => (float) ($r['monto'] ?? 0)),
             'recibos' => $recibosAntes,
         ];
 
@@ -727,7 +767,7 @@ class Show extends Component
             ->withTrashed()
             ->with([
                 'tipoCobro',
-                'pagosDetalle' => fn($q) => $q->withTrashed(),
+                'pagosDetalle' => fn ($q) => $q->withTrashed(),
             ])
             ->whereIn('id', $reciboIdsAfectados)
             ->orderBy('id')
@@ -789,7 +829,9 @@ class Show extends Component
 
     public function render()
     {
-        return view('livewire.admin.contratos.show')
+        return view('livewire.admin.contratos.show', [
+            'documentosContrato' => ContratoWordService::documentTypes(),
+        ])
             ->layout('layouts.app');
     }
 }
