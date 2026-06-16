@@ -2,37 +2,42 @@
 
 namespace App\Livewire\Admin\Recibos;
 
-use Livewire\Component;
-use Livewire\WithPagination;
-use Livewire\WithFileUploads;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
-
+use App\Models\CuentaBancaria;
+use App\Models\FormaPago;
+use App\Models\Propietario;
 use App\Models\Recibo;
 use App\Models\ReciboPago;
-use App\Models\Propietario;
 use App\Models\TipoCobro;
-use App\Models\FormaPago;
-use App\Models\CuentaBancaria;
 use App\Services\ImageUploadService;
-
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
+use Livewire\WithPagination;
 
 class Index extends Component
 {
-    use WithPagination, WithFileUploads;
+    use WithFileUploads, WithPagination;
 
     protected string $paginationTheme = 'tailwind';
 
     public string $q = '';
+
     public ?int $propietario_id = null;
+
     public ?string $mes = null;
+
     public ?string $desde = null;
+
     public ?string $hasta = null;
+
     public ?int $tipo_cobro_id = null;
+
     public ?int $forma_pago_id = null;
+
     public ?int $cuenta_id = null;
 
     // activos | eliminados | todos
@@ -40,24 +45,38 @@ class Index extends Component
 
     // ===== Evidencia por recibo_pago =====
     public bool $modalEvidenciaOpen = false;
+
     public ?int $reciboPagoEvidenciaId = null;
+
     public ?int $reciboEvidenciaId = null;
+
     public ?string $reciboEvidenciaFolio = null;
+
     public ?string $reciboEvidenciaPath = null;
+
     public ?string $reciboEvidenciaUuid = null;
+
     public ?string $reciboEvidenciaFormaPago = null;
+
     public ?string $reciboEvidenciaCuenta = null;
+
     public bool $reciboEvidenciaEditable = false;
 
     public ?TemporaryUploadedFile $nuevaEvidencia = null;
+
     public ?string $nuevaEvidenciaPreviewUrl = null;
 
     // ===== Firma =====
     public bool $modalFirmaOpen = false;
+
     public ?int $reciboFirmaId = null;
+
     public ?string $reciboFirmaFolio = null;
+
     public ?string $reciboFirmaPath = null;
+
     public ?string $reciboFirmaUuid = null;
+
     public ?string $firmaData = null;
 
     protected $queryString = [
@@ -108,6 +127,7 @@ class Index extends Component
 
         if (! $this->nuevaEvidencia) {
             $this->nuevaEvidenciaPreviewUrl = null;
+
             return;
         }
 
@@ -115,6 +135,7 @@ class Index extends Component
 
         if ($ext === 'pdf') {
             $this->nuevaEvidenciaPreviewUrl = null;
+
             return;
         }
 
@@ -126,22 +147,22 @@ class Index extends Component
         return (bool) ($reciboPago->formaPago?->requiere_cuenta);
     }
 
-private function aplicarRangoPorMes(): void
-{
-    if (! $this->mes) {
-        return;
-    }
+    private function aplicarRangoPorMes(): void
+    {
+        if (! $this->mes) {
+            return;
+        }
 
-    try {
-        $inicio = Carbon::createFromFormat('!Y-m', $this->mes)->startOfMonth();
-        $fin = $inicio->copy()->endOfMonth();
+        try {
+            $inicio = Carbon::createFromFormat('!Y-m', $this->mes)->startOfMonth();
+            $fin = $inicio->copy()->endOfMonth();
 
-        $this->desde = $inicio->format('Y-m-d');
-        $this->hasta = $fin->format('Y-m-d');
-    } catch (\Throwable $e) {
-        // silencioso
+            $this->desde = $inicio->format('Y-m-d');
+            $this->hasta = $fin->format('Y-m-d');
+        } catch (\Throwable $e) {
+            // silencioso
+        }
     }
-}
 
     public function limpiarFiltros(): void
     {
@@ -172,7 +193,7 @@ private function aplicarRangoPorMes(): void
     {
         $reciboPago = ReciboPago::query()
             ->with([
-                'recibo' => fn($q) => $q->withTrashed(),
+                'recibo' => fn ($q) => $q->withTrashed(),
                 'formaPago',
                 'cuentaBancaria',
             ])
@@ -224,6 +245,7 @@ private function aplicarRangoPorMes(): void
 
         if (! $this->reciboPagoPermiteEvidencia($reciboPago)) {
             $this->dispatch('toast', type: 'warning', message: 'Este pago no permite manejar evidencia.');
+
             return;
         }
 
@@ -261,6 +283,7 @@ private function aplicarRangoPorMes(): void
 
         if (! $this->reciboPagoPermiteEvidencia($reciboPago)) {
             $this->dispatch('toast', type: 'warning', message: 'Este pago no permite subir evidencia.');
+
             return;
         }
 
@@ -278,7 +301,7 @@ private function aplicarRangoPorMes(): void
                 maxWidth: 1600,
                 maxHeight: 1600,
                 quality: 72,
-                referenceFolder: $folioBase . '-pago-' . $ordenPago
+                referenceFolder: $folioBase.'-pago-'.$ordenPago
             );
 
             $reciboPago->update([
@@ -308,6 +331,7 @@ private function aplicarRangoPorMes(): void
 
         if ($recibo->trashed()) {
             $this->dispatch('toast', type: 'warning', message: 'No puedes firmar un recibo eliminado.');
+
             return;
         }
 
@@ -355,6 +379,7 @@ private function aplicarRangoPorMes(): void
 
         if ($recibo->trashed()) {
             $this->dispatch('toast', type: 'warning', message: 'No puedes firmar un recibo eliminado.');
+
             return;
         }
 
@@ -362,11 +387,13 @@ private function aplicarRangoPorMes(): void
             $this->reciboFirmaPath = $recibo->firma_path;
             $this->reciboFirmaUuid = $recibo->uuid;
             $this->dispatch('toast', type: 'info', message: 'Este recibo ya está firmado.');
+
             return;
         }
 
         if (! str_starts_with($this->firmaData, 'data:image/png;base64,')) {
             $this->dispatch('toast', type: 'error', message: 'Formato de firma inválido.');
+
             return;
         }
 
@@ -376,6 +403,7 @@ private function aplicarRangoPorMes(): void
 
         if ($binary === false) {
             $this->dispatch('toast', type: 'error', message: 'No se pudo procesar la firma.');
+
             return;
         }
 
@@ -437,10 +465,18 @@ private function aplicarRangoPorMes(): void
                 $isWhite = $r >= 245 && $g >= 245 && $b >= 245;
 
                 if (! $isWhite) {
-                    if ($x < $minX) $minX = $x;
-                    if ($y < $minY) $minY = $y;
-                    if ($x > $maxX) $maxX = $x;
-                    if ($y > $maxY) $maxY = $y;
+                    if ($x < $minX) {
+                        $minX = $x;
+                    }
+                    if ($y < $minY) {
+                        $minY = $y;
+                    }
+                    if ($x > $maxX) {
+                        $maxX = $x;
+                    }
+                    if ($y > $maxY) {
+                        $maxY = $y;
+                    }
                 }
             }
         }
@@ -450,6 +486,7 @@ private function aplicarRangoPorMes(): void
             imagepng($source);
             $out = ob_get_clean();
             imagedestroy($source);
+
             return $out ?: $binary;
         }
 
@@ -523,23 +560,23 @@ private function aplicarRangoPorMes(): void
             })
             ->when(
                 $this->tipo_cobro_id,
-                fn($q) => $q->where('tipos_cobro_id', $this->tipo_cobro_id)
+                fn ($q) => $q->where('tipos_cobro_id', $this->tipo_cobro_id)
             )
             ->when(
                 $this->forma_pago_id,
-                fn($q) => $q->whereHas('pagosDetalle', fn($rp) => $rp->where('forma_pago_id', $this->forma_pago_id))
+                fn ($q) => $q->whereHas('pagosDetalle', fn ($rp) => $rp->where('forma_pago_id', $this->forma_pago_id))
             )
             ->when(
                 $this->cuenta_id,
-                fn($q) => $q->whereHas('pagosDetalle', fn($rp) => $rp->where('cuentas_bancarias_id', $this->cuenta_id))
+                fn ($q) => $q->whereHas('pagosDetalle', fn ($rp) => $rp->where('cuenta_bancaria_id', $this->cuenta_id))
             )
             ->when(
                 $this->desde,
-                fn($q) => $q->whereDate('fecha', '>=', $this->desde)
+                fn ($q) => $q->whereDate('fecha', '>=', $this->desde)
             )
             ->when(
                 $this->hasta,
-                fn($q) => $q->whereDate('fecha', '<=', $this->hasta)
+                fn ($q) => $q->whereDate('fecha', '<=', $this->hasta)
             )
             ->when($term !== '', function ($q) use ($term, $tokens) {
                 $q->where(function ($qq) use ($term, $tokens) {
@@ -579,7 +616,7 @@ private function aplicarRangoPorMes(): void
         $formasPago = FormaPago::orderBy('nombre')->get();
 
         $cuentas = CuentaBancaria::query()
-            ->when($this->propietario_id, fn($q) => $q->where('propietario_id', $this->propietario_id))
+            ->when($this->propietario_id, fn ($q) => $q->where('propietario_id', $this->propietario_id))
             ->orderBy('alias')
             ->get();
 

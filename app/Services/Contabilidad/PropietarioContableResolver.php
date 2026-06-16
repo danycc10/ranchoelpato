@@ -2,8 +2,8 @@
 
 namespace App\Services\Contabilidad;
 
-use App\Models\TipoCobro;
 use App\Models\Fraccionamiento;
+use App\Models\TipoCobro;
 use App\Models\TipoCobroPropietarioConfig;
 
 class PropietarioContableResolver
@@ -41,8 +41,8 @@ class PropietarioContableResolver
 
         $tipoCobro = TipoCobro::find($tipoCobroId);
 
-        if ($tipoCobro?->propietario_id) {
-            return $tipoCobro->propietario_id;
+        if ($tipoCobro?->propietario_contable_id) {
+            return $tipoCobro->propietario_contable_id;
         }
 
         if ($fraccionamientoId) {

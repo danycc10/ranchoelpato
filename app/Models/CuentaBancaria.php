@@ -30,6 +30,11 @@ class CuentaBancaria extends Model
 
     public function recibos(): HasMany
     {
-        return $this->hasMany(Recibo::class, 'cuenta_bancaria_id');
+        return $this->hasMany(Recibo::class, 'cuentas_bancarias_id');
+    }
+
+    public function recibosPagos(): HasMany
+    {
+        return $this->hasMany(ReciboPago::class, 'cuenta_bancaria_id');
     }
 }

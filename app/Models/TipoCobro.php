@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TipoCobro extends Model
@@ -27,14 +28,13 @@ class TipoCobro extends Model
         return $this->hasMany(Recibo::class, 'tipos_cobro_id');
     }
 
-
     public function propietarioConfigs()
     {
         return $this->hasMany(TipoCobroPropietarioConfig::class, 'tipo_cobro_id');
     }
 
-    public function propietarioContable()
+    public function propietarioContable(): BelongsTo
     {
-        return $this->belongsTo(Propietario::class, 'propietario_id');
+        return $this->belongsTo(Propietario::class, 'propietario_contable_id');
     }
 }

@@ -2,12 +2,13 @@
 
 namespace App\Livewire\Admin\CuentasBancarias;
 
-use Livewire\Component;
-use Livewire\WithPagination;
 use App\Models\CuentaBancaria;
 use App\Models\Propietario;
 use App\Models\Recibo;
+use App\Models\ReciboPago;
 use Illuminate\Database\Eloquent\Builder;
+use Livewire\Component;
+use Livewire\WithPagination;
 
 class Index extends Component
 {
@@ -15,19 +16,27 @@ class Index extends Component
 
     // Tabla
     public string $q = '';
+
     public string $sortBy = 'alias'; // default como tu CRUD genérico
+
     public string $sortDir = 'asc';
 
     // Modal / edición
     public bool $modal = false;
+
     public ?int $editId = null;
 
     // Campos
     public ?int $propietario_id = null;
+
     public string $alias = '';
+
     public ?string $banco = null;
+
     public ?string $tipo = null;
+
     public ?string $numero = null;
+
     public bool $activa = true;
 
     protected $queryString = [
@@ -117,9 +126,11 @@ class Index extends Component
     public function eliminar(int $id): void
     {
         // ✅ Evita borrar si ya se usó en recibos (tu FK real es cuentas_bancarias_id)
-        $tieneRecibos = Recibo::query()->where('cuentas_bancarias_id', $id)->exists();
+        $tieneRecibos = Recibo::query()->where('cuentas_bancarias_id', $id)->exists()
+            || ReciboPago::query()->where('cuenta_bancaria_id', $id)->exists();
         if ($tieneRecibos) {
-            $this->dispatch('toast', type: 'error', message: 'No se puede eliminar: ya existe en recibos.');
+            $this->dispatch('toast', type: 'error', message: 'No se puede eliminar: ya existe en recibos o pagos.');
+
             return;
         }
 
@@ -140,14 +151,16 @@ class Index extends Component
     protected function applySearch(Builder $query): Builder
     {
         $term = trim($this->q);
-        if ($term === '') return $query;
+        if ($term === '') {
+            return $query;
+        }
 
         return $query->where(function (Builder $qq) use ($term) {
             $qq->where('alias', 'like', "%{$term}%")
-               ->orWhere('banco', 'like', "%{$term}%")
-               ->orWhere('tipo', 'like', "%{$term}%")
-               ->orWhere('numero', 'like', "%{$term}%")
-               ->orWhereHas('propietario', fn (Builder $p) => $p->where('nombre', 'like', "%{$term}%"));
+                ->orWhere('banco', 'like', "%{$term}%")
+                ->orWhere('tipo', 'like', "%{$term}%")
+                ->orWhere('numero', 'like', "%{$term}%")
+                ->orWhereHas('propietario', fn (Builder $p) => $p->where('nombre', 'like', "%{$term}%"));
         });
     }
 

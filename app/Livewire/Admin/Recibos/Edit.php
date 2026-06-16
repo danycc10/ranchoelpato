@@ -2,42 +2,52 @@
 
 namespace App\Livewire\Admin\Recibos;
 
-use Livewire\Component;
-use App\Models\Recibo;
-use App\Models\FormaPago;
-use App\Models\TipoCobro;
-use App\Models\CuentaBancaria;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Str;
-
 use App\Models\Contrato;
 use App\Models\ContratoHistorial;
+use App\Models\CuentaBancaria;
 use App\Models\Cuota;
+use App\Models\FormaPago;
+use App\Models\Recibo;
+use App\Models\TipoCobro;
 use App\Services\Contratos\CuotaPagoRollbackService;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Livewire\Component;
 
 class Edit extends Component
 {
     public string $uuid;
+
     public Recibo $recibo;
 
     public ?string $fecha = null;
+
     public ?int $tipos_cobro_id = null;
+
     public ?string $observaciones = null;
 
     public bool $showAnularRecibo = false;
+
     public string $motivoAnulacion = 'Corrección de recibo';
+
     public ?array $anularPreview = null;
 
     public array $pagos = [];
 
     // MODAL RECARGO
     public bool $showRecargoModal = false;
+
     public ?float $recargo_monto = null;
+
     public ?int $recargo_forma_pago_id = null;
+
     public ?int $recargo_cuentas_bancarias_id = null;
+
     public ?string $recargo_referencia = null;
+
     public ?string $recargo_observaciones = null;
+
     public bool $recargo_requiere_cuenta = false;
 
     public function mount(string $uuid): void
@@ -62,7 +72,7 @@ class Edit extends Component
             abort(403, 'No se puede editar un recibo eliminado.');
         }
 
-        if (!empty($this->recibo->anulado_at)) {
+        if (! empty($this->recibo->anulado_at)) {
             abort(403, 'No se puede editar un recibo anulado.');
         }
 
@@ -101,7 +111,7 @@ class Edit extends Component
 
             $this->pagos[$index]['requiere_cuenta'] = $requiereCuenta;
 
-            if (!$requiereCuenta) {
+            if (! $requiereCuenta) {
                 $this->pagos[$index]['cuentas_bancarias_id'] = null;
             }
         }
@@ -112,7 +122,7 @@ class Edit extends Component
         $forma = $value ? FormaPago::find($value) : null;
         $this->recargo_requiere_cuenta = (bool) ($forma?->requiere_cuenta);
 
-        if (!$this->recargo_requiere_cuenta) {
+        if (! $this->recargo_requiere_cuenta) {
             $this->recargo_cuentas_bancarias_id = null;
         }
     }
@@ -122,16 +132,17 @@ class Edit extends Component
         $this->recibo->refresh();
         $this->recibo->load(['cuota', 'contrato', 'cliente', 'lote']);
 
-        if (!$this->recibo->cuota_id || !$this->recibo->cuota) {
+        if (! $this->recibo->cuota_id || ! $this->recibo->cuota) {
             $this->dispatch('toast', type: 'error', message: 'Este recibo no tiene cuota relacionada.');
+
             return;
         }
 
         $this->recargo_monto = null;
         $this->recargo_forma_pago_id = $this->recibo->forma_pago_id;
-        $this->recargo_cuentas_bancarias_id = $this->recibo->cuenta_bancaria_id;
+        $this->recargo_cuentas_bancarias_id = $this->recibo->cuentas_bancarias_id;
         $this->recargo_referencia = null;
-        $this->recargo_observaciones = 'Recargo generado desde recibo ' . $this->recibo->folio;
+        $this->recargo_observaciones = 'Recargo generado desde recibo '.$this->recibo->folio;
 
         $forma = $this->recargo_forma_pago_id ? FormaPago::find($this->recargo_forma_pago_id) : null;
         $this->recargo_requiere_cuenta = (bool) ($forma?->requiere_cuenta);
@@ -165,8 +176,9 @@ class Edit extends Component
         $this->recibo->refresh();
         $this->recibo->load(['cuota', 'contrato', 'cliente', 'lote']);
 
-        if (!$this->recibo->cuota_id || !$this->recibo->cuota) {
+        if (! $this->recibo->cuota_id || ! $this->recibo->cuota) {
             $this->dispatch('toast', type: 'error', message: 'Este recibo no tiene cuota relacionada.');
+
             return;
         }
 
@@ -175,69 +187,70 @@ class Edit extends Component
             ->orderBy('id')
             ->value('id');
 
-        if (!$tipoRecargoId) {
+        if (! $tipoRecargoId) {
             $this->dispatch('toast', type: 'error', message: 'No existe un tipo de cobro RECARGO.');
+
             return;
         }
 
         DB::transaction(function () use ($data, $tipoRecargoId) {
             $cuota = $this->recibo->cuota;
 
-           $fecha = now();
+            $fecha = now();
 
-$reciboRecargo = $this->crearReciboConFolioSeguro([
-    'fecha' => $fecha->toDateString(),
-    'anio' => (int) $fecha->format('Y'),
+            $reciboRecargo = $this->crearReciboConFolioSeguro([
+                'fecha' => $fecha->toDateString(),
+                'anio' => (int) $fecha->format('Y'),
 
-    'semana_pago' => (int) ($cuota->numero ?? 0),
-    'semana_del_anio' => (int) $fecha->format('W'),
-    'mes_del_anio' => (int) $fecha->format('m'),
+                'semana_pago' => (int) ($cuota->numero ?? 0),
+                'semana_del_anio' => (int) $fecha->format('W'),
+                'mes_del_anio' => (int) $fecha->format('m'),
 
-    'cliente_id' => $this->recibo->cliente_id,
-    'contrato_id' => $this->recibo->contrato_id,
-    'lote_id' => $this->recibo->lote_id,
-    'cuota_id' => $cuota->id,
+                'cliente_id' => $this->recibo->cliente_id,
+                'contrato_id' => $this->recibo->contrato_id,
+                'lote_id' => $this->recibo->lote_id,
+                'cuota_id' => $cuota->id,
 
-    'tipos_cobro_id' => $tipoRecargoId,
-    'forma_pago_id' => $data['recargo_forma_pago_id'],
+                'tipos_cobro_id' => $tipoRecargoId,
+                'forma_pago_id' => $data['recargo_forma_pago_id'],
 
-    'cuentas_bancarias_id' => $this->formaPagoEsEfectivo($data['recargo_forma_pago_id'])
-        ? null
-        : ($data['recargo_cuentas_bancarias_id'] ?? null),
+                'cuentas_bancarias_id' => $this->formaPagoEsEfectivo($data['recargo_forma_pago_id'])
+                    ? null
+                    : ($data['recargo_cuentas_bancarias_id'] ?? null),
 
-    'periodo_id' => $this->recibo->periodo_id,
+                'periodo_id' => $this->recibo->periodo_id,
 
-    'propietario_contable_id' => $this->recibo->propietario_contable_id,
+                'propietario_contable_id' => $this->recibo->propietario_contable_id,
 
-    'monto' => round((float) $data['recargo_monto'], 2),
+                'monto' => round((float) $data['recargo_monto'], 2),
 
-    'saldo_anterior' => null,
-    'saldo_posterior' => null,
+                'saldo_anterior' => null,
+                'saldo_posterior' => null,
 
-    'observaciones' => trim(
-        'RECARGO de cuota #' . $cuota->numero .
-        ' — generado desde recibo ' . $this->recibo->folio .
-        ' ' .
-        ($data['recargo_observaciones'] ?? '')
-    ),
+                'observaciones' => trim(
+                    'RECARGO de cuota #'.$cuota->numero.
+                    ' — generado desde recibo '.$this->recibo->folio.
+                    ' '.
+                    ($data['recargo_observaciones'] ?? '')
+                ),
 
-    'capturado_por_user_id' => auth()->id(),
+                'capturado_por_user_id' => auth()->id(),
 
-    'tipo_movimiento' => 'recargo',
-    'afecta_reportes' => true,
+                'tipo_movimiento' => 'recargo',
+                'afecta_reportes' => true,
 
-    'evidencia_path' => null,
-    'evidencia_disk' => null,
-    'evidencia_mime' => null,
-    'evidencia_size' => null,
-]);
+                'evidencia_path' => null,
+                'evidencia_disk' => null,
+                'evidencia_mime' => null,
+                'evidencia_size' => null,
+            ]);
 
             $reciboRecargo->pagosDetalle()->create([
                 'orden' => 1,
                 'forma_pago_id' => $data['recargo_forma_pago_id'],
                 'cuenta_bancaria_id' => $data['recargo_cuentas_bancarias_id'] ?? null,
                 'monto' => round((float) $data['recargo_monto'], 2),
-                'fecha_efectiva' => \Carbon\Carbon::parse($reciboRecargo->fecha)->toDateString(),
+                'fecha_efectiva' => Carbon::parse($reciboRecargo->fecha)->toDateString(),
                 'referencia' => $data['recargo_referencia'] ?? null,
             ]);
 
@@ -272,7 +285,7 @@ $reciboRecargo = $this->crearReciboConFolioSeguro([
         $this->redirectRoute('admin.recibos.index', navigate: true);
     }
 
- protected function crearReciboConFolioSeguro(array $data, int $maxIntentos = 10): Recibo
+    protected function crearReciboConFolioSeguro(array $data, int $maxIntentos = 10): Recibo
     {
         $anio = (int) $data['anio'];
 
@@ -282,7 +295,7 @@ $reciboRecargo = $this->crearReciboConFolioSeguro([
             try {
                 return Recibo::create($data);
             } catch (\Throwable $e) {
-                if (!$this->isDuplicateKeyException($e)) {
+                if (! $this->isDuplicateKeyException($e)) {
                     throw $e;
                 }
 
@@ -294,20 +307,20 @@ $reciboRecargo = $this->crearReciboConFolioSeguro([
             'folio' => 'No fue posible asignar un folio único. Intenta nuevamente.',
         ]);
     }
-    
-       protected function generarFolio(?int $anio = null): string
+
+    protected function generarFolio(?int $anio = null): string
     {
         $anio = $anio ?: now()->year;
 
         $ultimo = Recibo::withTrashed()
             ->where('anio', $anio)
-            ->where('folio', 'regexp', '^R-' . $anio . '-[0-9]{6}$')
+            ->where('folio', 'regexp', '^R-'.$anio.'-[0-9]{6}$')
             ->orderByDesc('folio')
             ->value('folio');
 
         $n = $ultimo ? ((int) substr($ultimo, -6)) + 1 : 1;
 
-        return 'R-' . $anio . '-' . str_pad($n, 6, '0', STR_PAD_LEFT);
+        return 'R-'.$anio.'-'.str_pad($n, 6, '0', STR_PAD_LEFT);
     }
 
     public function confirmarAnularRecibo(): void
@@ -321,19 +334,21 @@ $reciboRecargo = $this->crearReciboConFolioSeguro([
             'cliente',
             'contrato',
             'cuota',
-            'pagosDetalle' => fn($q) => $q
+            'pagosDetalle' => fn ($q) => $q
                 ->whereNull('anulado_at')
                 ->whereNull('deleted_at')
                 ->with(['formaPago', 'cuentaBancaria']),
         ]);
 
-        if (!empty($this->recibo->anulado_at) || $this->recibo->trashed()) {
+        if (! empty($this->recibo->anulado_at) || $this->recibo->trashed()) {
             $this->dispatch('toast', type: 'warning', message: 'Este recibo ya está anulado o eliminado.');
+
             return;
         }
 
-        if (!$this->recibo->contrato_id || !$this->recibo->cuota_id) {
+        if (! $this->recibo->contrato_id || ! $this->recibo->cuota_id) {
             $this->dispatch('toast', type: 'error', message: 'Este recibo no tiene contrato o cuota relacionada.');
+
             return;
         }
 
@@ -348,7 +363,7 @@ $reciboRecargo = $this->crearReciboConFolioSeguro([
             'concepto' => (string) ($this->recibo->tipoCobro?->nombre ?? '—'),
             'monto_recibo' => (float) ($this->recibo->monto ?? 0),
             'pagos_count' => (int) $pagos->count(),
-            'pagos_total' => (float) $pagos->sum(fn($p) => (float) ($p->monto ?? 0)),
+            'pagos_total' => (float) $pagos->sum(fn ($p) => (float) ($p->monto ?? 0)),
             'pagos' => $pagos->map(function ($p) {
                 return [
                     'id' => (int) $p->id,
@@ -363,24 +378,24 @@ $reciboRecargo = $this->crearReciboConFolioSeguro([
         $this->motivoAnulacion = 'Corrección de recibo';
         $this->showAnularRecibo = true;
     }
-    
+
     protected function formaPagoEsEfectivo(?int $formaPagoId): bool
-{
-    if (!$formaPagoId) {
-        return false;
+    {
+        if (! $formaPagoId) {
+            return false;
+        }
+
+        $forma = FormaPago::find($formaPagoId);
+
+        if (! $forma) {
+            return false;
+        }
+
+        return str_contains(
+            mb_strtolower($forma->nombre),
+            'efectivo'
+        );
     }
-
-    $forma = FormaPago::find($formaPagoId);
-
-    if (!$forma) {
-        return false;
-    }
-
-    return str_contains(
-        mb_strtolower($forma->nombre),
-        'efectivo'
-    );
-}
 
     public function anularReciboConfirmado(): void
     {
@@ -392,13 +407,15 @@ $reciboRecargo = $this->crearReciboConFolioSeguro([
 
         $this->recibo->refresh();
 
-        if (!empty($this->recibo->anulado_at) || $this->recibo->trashed()) {
+        if (! empty($this->recibo->anulado_at) || $this->recibo->trashed()) {
             $this->dispatch('toast', type: 'warning', message: 'Este recibo ya está anulado o eliminado.');
+
             return;
         }
 
-        if (!$this->recibo->contrato_id || !$this->recibo->cuota_id) {
+        if (! $this->recibo->contrato_id || ! $this->recibo->cuota_id) {
             $this->dispatch('toast', type: 'error', message: 'Este recibo no tiene contrato o cuota relacionada.');
+
             return;
         }
 
@@ -413,7 +430,7 @@ $reciboRecargo = $this->crearReciboConFolioSeguro([
         $recibos = Recibo::query()
             ->with([
                 'tipoCobro',
-                'pagosDetalle' => fn($q) => $q
+                'pagosDetalle' => fn ($q) => $q
                     ->whereNull('deleted_at')
                     ->whereNull('anulado_at')
                     ->with(['formaPago', 'cuentaBancaria']),
@@ -436,7 +453,7 @@ $reciboRecargo = $this->crearReciboConFolioSeguro([
             'pagado_total' => (float) ($cuota?->pagado_total ?? 0),
             'estatus' => (string) ($cuota?->estatus ?? ''),
             'recibos_count' => (int) $recibos->count(),
-            'recibos_total' => (float) $recibos->sum(fn($r) => (float) ($r->monto ?? 0)),
+            'recibos_total' => (float) $recibos->sum(fn ($r) => (float) ($r->monto ?? 0)),
         ];
 
         CuotaPagoRollbackService::anularPagoReciboDeCuota(
@@ -562,7 +579,7 @@ $reciboRecargo = $this->crearReciboConFolioSeguro([
         foreach ($this->pagos as $i => $pago) {
             $requiereCuenta = false;
 
-            if (!empty($pago['forma_pago_id'])) {
+            if (! empty($pago['forma_pago_id'])) {
                 $forma = FormaPago::find($pago['forma_pago_id']);
                 $requiereCuenta = (bool) ($forma?->requiere_cuenta);
             }
@@ -619,7 +636,7 @@ $reciboRecargo = $this->crearReciboConFolioSeguro([
                 })->values()->toArray(),
             ];
 
-            $totalNuevo = collect($data['pagos'])->sum(fn($p) => (float) $p['monto']);
+            $totalNuevo = collect($data['pagos'])->sum(fn ($p) => (float) $p['monto']);
             $primerPago = collect($data['pagos'])->first();
 
             $this->recibo->update([
