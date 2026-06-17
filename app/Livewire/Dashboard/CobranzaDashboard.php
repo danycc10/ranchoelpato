@@ -5,6 +5,7 @@ namespace App\Livewire\Dashboard;
 use App\Exports\CobranzaPendientesExport;
 use App\Models\Cuota;
 use App\Models\Notificacion;
+use App\Models\Propietario;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -17,25 +18,41 @@ class CobranzaDashboard extends Component
     use WithPagination;
 
     public string $hoy;
+
     public int $diasTolerancia = 0;
+
     public bool $soloConContacto = true;
 
     public ?string $search = null;
+
+    public ?int $propietarioId = null;
+
     public ?int $fraccionamientoId = null;
 
     public array $selectedHoy = [];
+
     public array $selectedAtrasadas = [];
-    
+
     public string $tipoCuota = 'todos'; // todos | terrenos | servicio
 
     public function mount(): void
     {
         $this->hoy = now()->toDateString();
+
+        $user = auth()->user();
+
+        if ($user?->propietario_id) {
+            $this->propietarioId = (int) $user->propietario_id;
+        }
     }
 
     public function updated($property): void
     {
-        if (in_array($property, ['hoy', 'diasTolerancia', 'soloConContacto', 'search', 'fraccionamientoId','tipoCuota'])) {
+        if ($property === 'propietarioId') {
+            $this->fraccionamientoId = null;
+        }
+
+        if (in_array($property, ['hoy', 'diasTolerancia', 'soloConContacto', 'search', 'propietarioId', 'fraccionamientoId', 'tipoCuota'])) {
             $this->resetPage('hoyPage');
             $this->resetPage('atrPage');
             $this->selectedHoy = [];
@@ -45,6 +62,12 @@ class CobranzaDashboard extends Component
 
     protected function aplicarFiltrosBase(Builder $q): Builder
     {
+        if ($this->propietarioId) {
+            $q->whereHas('contrato.lote.fraccionamiento', function ($qq) {
+                $qq->where('propietario_id', $this->propietarioId);
+            });
+        }
+
         if ($this->fraccionamientoId) {
             $q->whereHas('contrato.lote.fraccionamiento', function ($qq) {
                 $qq->where('id', $this->fraccionamientoId);
@@ -70,18 +93,18 @@ class CobranzaDashboard extends Component
                     });
             });
         }
-        
-if ($this->tipoCuota === 'terreno') {
-    $q->whereHas('contrato', function ($c) {
-        $c->where('tipo', 'terreno');
-    });
-}
 
-if ($this->tipoCuota === 'servicio') {
-    $q->whereHas('contrato', function ($c) {
-        $c->where('tipo', 'servicio');
-    });
-}
+        if ($this->tipoCuota === 'terreno') {
+            $q->whereHas('contrato', function ($c) {
+                $c->where('tipo', 'terreno');
+            });
+        }
+
+        if ($this->tipoCuota === 'servicio') {
+            $q->whereHas('contrato', function ($c) {
+                $c->where('tipo', 'servicio');
+            });
+        }
 
         return $q;
     }
@@ -158,9 +181,20 @@ if ($this->tipoCuota === 'servicio') {
     public function getFraccionamientosProperty()
     {
         return DB::table('fraccionamientos')
+            ->when(
+                $this->propietarioId,
+                fn ($q) => $q->where('propietario_id', $this->propietarioId)
+            )
             ->select('id', 'nombre')
             ->orderBy('nombre')
             ->get();
+    }
+
+    public function getPropietariosProperty()
+    {
+        return Propietario::query()
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
     }
 
     public function getNotificadasHoyMapProperty(): array
@@ -491,6 +525,7 @@ if ($this->tipoCuota === 'servicio') {
     {
         if (empty($ids)) {
             $this->dispatch('toast', type: 'warning', message: 'Selecciona al menos una cuota atrasada.');
+
             return;
         }
 
@@ -513,7 +548,7 @@ if ($this->tipoCuota === 'servicio') {
 
         return Excel::download(
             new CobranzaPendientesExport($cuotasHoy, $cuotasAtrasadas, $this->hoy),
-            'cobranza-pendientes-' . $this->hoy . '.xlsx'
+            'cobranza-pendientes-'.$this->hoy.'.xlsx'
         );
     }
 
@@ -523,6 +558,7 @@ if ($this->tipoCuota === 'servicio') {
 
         if (empty($ids)) {
             $this->dispatch('toast', type: 'warning', message: 'Selecciona al menos una cuota atrasada.');
+
             return;
         }
 
@@ -602,6 +638,7 @@ if ($this->tipoCuota === 'servicio') {
 
         if (empty($ids)) {
             $this->dispatch('toast', type: 'warning', message: 'No hay cuotas atrasadas.');
+
             return;
         }
 
@@ -645,14 +682,14 @@ if ($this->tipoCuota === 'servicio') {
 
             if (! empty($cliente->correo)) {
                 Notificacion::create([
-                    'canal'       => 'correo',
-                    'tipo'        => 'cuota_atrasada',
-                    'cliente_id'  => $cliente->id,
+                    'canal' => 'correo',
+                    'tipo' => 'cuota_atrasada',
+                    'cliente_id' => $cliente->id,
                     'contrato_id' => $cuota->contrato_id,
-                    'cuota_id'    => $cuota->id,
-                    'destino'     => $cliente->correo,
-                    'payload'     => $payload,
-                    'estatus'     => 'en_cola',
+                    'cuota_id' => $cuota->id,
+                    'destino' => $cliente->correo,
+                    'payload' => $payload,
+                    'estatus' => 'en_cola',
                 ]);
             }
         }
@@ -675,19 +712,19 @@ if ($this->tipoCuota === 'servicio') {
         $total = (float) $cuota->monto + (float) $recargo;
 
         return [
-            'cuota_id'        => $cuota->id,
-            'contrato'        => $cuota->contrato?->folio_contrato,
-            'cliente'         => trim(($cliente?->nombres ?? '') . ' ' . ($cliente?->apellidos ?? '')),
-            'lote'            => $loteTexto,
+            'cuota_id' => $cuota->id,
+            'contrato' => $cuota->contrato?->folio_contrato,
+            'cliente' => trim(($cliente?->nombres ?? '').' '.($cliente?->apellidos ?? '')),
+            'lote' => $loteTexto,
             'fraccionamiento' => $fraccionamiento,
-            'vencimiento'     => $cuota->fecha_vencimiento,
-            'monto'           => (float) $cuota->monto,
-            'recargo'         => (float) $recargo,
-            'total'           => (float) $total,
-            'mensaje'         => "Hola {$cliente?->nombres}, te recordamos que tienes una cuota pendiente. Lote: {$loteTexto}. Fraccionamiento: {$fraccionamiento}. Monto: $" .
-                number_format((float) $cuota->monto, 2) .
-                ". Recargo: $" . number_format((float) $recargo, 2) .
-                ". Total: $" . number_format($total, 2) . ".",
+            'vencimiento' => $cuota->fecha_vencimiento,
+            'monto' => (float) $cuota->monto,
+            'recargo' => (float) $recargo,
+            'total' => (float) $total,
+            'mensaje' => "Hola {$cliente?->nombres}, te recordamos que tienes una cuota pendiente. Lote: {$loteTexto}. Fraccionamiento: {$fraccionamiento}. Monto: $".
+                number_format((float) $cuota->monto, 2).
+                '. Recargo: $'.number_format((float) $recargo, 2).
+                '. Total: $'.number_format($total, 2).'.',
         ];
     }
 
@@ -704,6 +741,7 @@ if ($this->tipoCuota === 'servicio') {
 
         if (! $cliente || empty($cliente->telefono)) {
             $this->dispatch('toast', type: 'warning', message: 'El cliente no tiene teléfono registrado.');
+
             return;
         }
 
@@ -711,11 +749,12 @@ if ($this->tipoCuota === 'servicio') {
 
         if (! $telefono) {
             $this->dispatch('toast', type: 'warning', message: 'El teléfono no es válido.');
+
             return;
         }
 
         $payload = $this->payloadCuota($cuota);
-        $url = 'https://wa.me/' . $telefono . '?text=' . urlencode($payload['mensaje']);
+        $url = 'https://wa.me/'.$telefono.'?text='.urlencode($payload['mensaje']);
 
         $this->dispatch('open-url', url: $url);
     }
@@ -725,7 +764,7 @@ if ($this->tipoCuota === 'servicio') {
         $digits = preg_replace('/\D+/', '', (string) $telefono);
 
         if (strlen($digits) === 10) {
-            return '52' . $digits;
+            return '52'.$digits;
         }
 
         if (strlen($digits) === 12 && str_starts_with($digits, '52')) {
@@ -733,7 +772,7 @@ if ($this->tipoCuota === 'servicio') {
         }
 
         if (strlen($digits) === 13 && str_starts_with($digits, '521')) {
-            return '52' . substr($digits, 3);
+            return '52'.substr($digits, 3);
         }
 
         return null;
@@ -772,13 +811,13 @@ if ($this->tipoCuota === 'servicio') {
             }
 
             DB::table('recibos')->insert([
-                'contrato_id'    => $cuota->contrato_id,
-                'cliente_id'     => $cuota->contrato->cliente_id ?? null,
+                'contrato_id' => $cuota->contrato_id,
+                'cliente_id' => $cuota->contrato->cliente_id ?? null,
                 'tipos_cobro_id' => $tipoRecargoId,
-                'monto'          => $recargo,
-                'fecha'          => $this->hoy,
-                'created_at'     => now(),
-                'updated_at'     => now(),
+                'monto' => $recargo,
+                'fecha' => $this->hoy,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         });
 
@@ -788,11 +827,12 @@ if ($this->tipoCuota === 'servicio') {
     public function render()
     {
         return view('livewire.dashboard.cobranza-dashboard', [
-            'kpis'              => $this->kpis,
-            'cuotasHoy'         => $this->cuotasHoy,
-            'cuotasAtrasadas'   => $this->cuotasAtrasadas,
+            'kpis' => $this->kpis,
+            'cuotasHoy' => $this->cuotasHoy,
+            'cuotasAtrasadas' => $this->cuotasAtrasadas,
             'notificadasHoyMap' => $this->notificadasHoyMap,
-            'fraccionamientos'  => $this->fraccionamientos,
+            'propietarios' => $this->propietarios,
+            'fraccionamientos' => $this->fraccionamientos,
         ])->layout('layouts.app');
     }
 }

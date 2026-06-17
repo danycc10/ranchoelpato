@@ -28,15 +28,24 @@ class CobranzaTablaAtrasadas extends Component
     public ?string $search = null;
 
     #[Reactive]
-    public ?int $fraccionamientoId = null;
-    
+    public ?int $propietarioId = null;
+
     #[Reactive]
-public string $tipoCuota = 'todos';
+    public ?int $fraccionamientoId = null;
+
+    #[Reactive]
+    public string $tipoCuota = 'todos';
 
     public array $selectedAtrasadas = [];
 
     protected function aplicarFiltrosBase(Builder $q): Builder
     {
+        if ($this->propietarioId) {
+            $q->whereHas('contrato.lote.fraccionamiento', function ($qq) {
+                $qq->where('propietario_id', $this->propietarioId);
+            });
+        }
+
         if ($this->fraccionamientoId) {
             $q->whereHas('contrato.lote.fraccionamiento', function ($qq) {
                 $qq->where('id', $this->fraccionamientoId);
@@ -53,26 +62,26 @@ public string $tipoCuota = 'todos';
                         ->orWhere('telefono', 'like', "%{$search}%")
                         ->orWhere('correo', 'like', "%{$search}%");
                 })
-                ->orWhereHas('contrato', function ($c) use ($search) {
-                    $c->where('folio_contrato', 'like', "%{$search}%");
-                })
-                ->orWhereHas('contrato.lote', function ($l) use ($search) {
-                    $l->where('lote', 'like', "%{$search}%");
-                });
+                    ->orWhereHas('contrato', function ($c) use ($search) {
+                        $c->where('folio_contrato', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('contrato.lote', function ($l) use ($search) {
+                        $l->where('lote', 'like', "%{$search}%");
+                    });
             });
         }
-        
-if ($this->tipoCuota === 'terreno') {
-    $q->whereHas('contrato', function ($c) {
-        $c->where('tipo', 'terreno');
-    });
-}
 
-if ($this->tipoCuota === 'servicio') {
-    $q->whereHas('contrato', function ($c) {
-        $c->where('tipo', 'servicio');
-    });
-}
+        if ($this->tipoCuota === 'terreno') {
+            $q->whereHas('contrato', function ($c) {
+                $c->where('tipo', 'terreno');
+            });
+        }
+
+        if ($this->tipoCuota === 'servicio') {
+            $q->whereHas('contrato', function ($c) {
+                $c->where('tipo', 'servicio');
+            });
+        }
 
         return $q;
     }
@@ -154,6 +163,7 @@ if ($this->tipoCuota === 'servicio') {
 
         if (empty($ids)) {
             $this->dispatch('toast', type: 'warning', message: 'Selecciona al menos una cuota atrasada.');
+
             return;
         }
 
@@ -166,7 +176,7 @@ if ($this->tipoCuota === 'servicio') {
     public function render()
     {
         return view('livewire.dashboard.cobranza-tabla-atrasadas', [
-            'cuotasAtrasadas'   => $this->query()
+            'cuotasAtrasadas' => $this->query()
                 ->orderBy('fecha_vencimiento')
                 ->paginate(15, pageName: 'atrPage'),
             'notificadasHoyMap' => $this->notificadasHoyMap,

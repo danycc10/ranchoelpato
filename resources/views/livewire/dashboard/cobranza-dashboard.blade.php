@@ -45,8 +45,28 @@
     </div>
 
     {{-- Filtros --}}
-    <div class="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 items-end">
+    <div class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+        <div
+            wire:loading.flex
+            wire:target="hoy,diasTolerancia,soloConContacto,propietarioId,fraccionamientoId,tipoCuota,search"
+            class="absolute inset-x-0 top-0 z-10 hidden h-1 bg-slate-100"
+        >
+            <div class="h-full w-1/3 animate-pulse rounded-r-full bg-emerald-500"></div>
+        </div>
+
+        <div
+            wire:loading.flex
+            wire:target="hoy,diasTolerancia,soloConContacto,propietarioId,fraccionamientoId,tipoCuota,search"
+            class="absolute right-4 top-4 z-10 hidden items-center gap-2 rounded-full border border-emerald-100 bg-white/95 px-3 py-1.5 text-xs font-black text-emerald-700 shadow-sm"
+        >
+            <svg class="h-3.5 w-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            Actualizando
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 items-end">
 
             <div>
                 <label class="text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -69,6 +89,23 @@
                     wire:model.live="diasTolerancia"
                     class="mt-1 w-full rounded-2xl border-slate-300 px-3 py-2.5 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900"
                 >
+            </div>
+
+            <div>
+                <label class="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Propietario
+                </label>
+                <select
+                    wire:model.live="propietarioId"
+                    class="mt-1 w-full rounded-2xl border-slate-300 px-3 py-2.5 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900"
+                >
+                    <option value="">Todos</option>
+                    @foreach($propietarios as $propietario)
+                        <option value="{{ $propietario->id }}">
+                            {{ $propietario->nombre }}
+                        </option>
+                    @endforeach
+                </select>
             </div>
 
             <div>
@@ -185,9 +222,10 @@
 <livewire:dashboard.cobranza-tabla-hoy
     :hoy="$hoy"
     :search="$search"
+    :propietario-id="$propietarioId"
     :fraccionamiento-id="$fraccionamientoId"
     :tipo-cuota="$tipoCuota"
-    wire:key="tabla-hoy-{{ $hoy }}-{{ md5((string) $search) }}-{{ $fraccionamientoId ?? 'todos' }}-{{ $tipoCuota }}"
+    wire:key="tabla-hoy-{{ $hoy }}-{{ md5((string) $search) }}-{{ $propietarioId ?? 'todos' }}-{{ $fraccionamientoId ?? 'todos' }}-{{ $tipoCuota }}"
 />
 
 <livewire:dashboard.cobranza-tabla-atrasadas
@@ -195,9 +233,10 @@
     :dias-tolerancia="$diasTolerancia"
     :solo-con-contacto="$soloConContacto"
     :search="$search"
+    :propietario-id="$propietarioId"
     :fraccionamiento-id="$fraccionamientoId"
     :tipo-cuota="$tipoCuota"
-    wire:key="tabla-atrasadas-{{ $hoy }}-{{ $diasTolerancia }}-{{ $soloConContacto ? 1 : 0 }}-{{ md5((string) $search) }}-{{ $fraccionamientoId ?? 'todos' }}-{{ $tipoCuota }}"
+    wire:key="tabla-atrasadas-{{ $hoy }}-{{ $diasTolerancia }}-{{ $soloConContacto ? 1 : 0 }}-{{ md5((string) $search) }}-{{ $propietarioId ?? 'todos' }}-{{ $fraccionamientoId ?? 'todos' }}-{{ $tipoCuota }}"
 />
 
     {{-- Loading overlay --}}
