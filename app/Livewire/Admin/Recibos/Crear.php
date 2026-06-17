@@ -2,64 +2,73 @@
 
 namespace App\Livewire\Admin\Recibos;
 
-use Livewire\Component;
-use Livewire\WithFileUploads;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
-use Illuminate\Support\Str;
-
+use App\Jobs\SendReciboMail;
 use App\Models\Cliente;
 use App\Models\Contrato;
+use App\Models\CuentaBancaria;
 use App\Models\Cuota;
+use App\Models\FormaPago;
+use App\Models\Lote;
+use App\Models\Pago;
+use App\Models\Periodo;
 use App\Models\Recibo;
 use App\Models\ReciboPago;
-use App\Models\Pago;
 use App\Models\TipoCobro;
-use App\Models\FormaPago;
-use App\Models\CuentaBancaria;
-use App\Models\Periodo;
-
-use App\Jobs\SendReciboMail;
-use App\Services\ImageUploadService;
 use App\Services\Contabilidad\PropietarioContableResolver;
-
+use App\Services\ImageUploadService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
 class Crear extends Component
 {
     use WithFileUploads;
 
     public ?int $cuotaId = null; // solo compatibilidad para links viejos
+
     public array $cuotaIds = [];
 
     public ?int $cliente_id = null;
+
     public ?int $contrato_id = null;
+
     public ?int $lote_id = null;
 
     public ?int $tipos_cobro_id = null;
+
     public ?int $forma_pago_id = null;
+
     public ?int $cuentas_bancarias_id = null;
+
     public ?int $periodo_id = null;
 
     public array $pagos = [];
 
     public string $fecha = '';
+
     public string $folio = '';
 
     public float $monto = 0;
+
     public ?string $observaciones = null;
 
     public string $metodo = 'efectivo';
+
     public ?string $referencia = null;
 
     public array $contratosOptions = [];
+
     public array $lotesOptions = [];
 
     public bool $requiereCuentaBancaria = false;
 
     public array $cuotasOptions = [];
+
     public bool $asociarACuota = false;
 
     public bool $tipoEsServicio = false;
@@ -81,53 +90,81 @@ class Crear extends Component
     ];
 
     public string $clienteSearch = '';
+
     public array $clientesResultados = [];
+
     public bool $mostrarResultadosClientes = false;
 
     public ?int $mensualidadTipoCobroId = null;
+
     public ?int $anualidadTipoCobroId = null;
 
     // Compatibilidad con UI previa
     public bool $cuotaVencida = false;
+
     public bool $cuotaEnGracia = false;
+
     public int $diasAtraso = 0;
+
     public int $diasGraciaTotal = 0;
+
     public float $recargoMonto = 0.0;
+
     public float $recargoMontoOriginal = 0.0;
+
     public bool $recargoCondonado = false;
+
     public bool $recargoFueEditadoManualmente = false;
+
     public ?string $cuotaFechaVencimiento = null;
+
     public ?string $cuotaFechaLimite = null;
+
     public ?string $recargoMensaje = null;
 
     public string $recargoModo = 'auto';
+
     public ?float $recargoMontoManual = null;
 
     public array $cuotasSeleccionadasInfo = [];
+
     public float $montoTotalSeleccionado = 0.0;
+
     public float $recargoTotalSeleccionado = 0.0;
 
     public ?TemporaryUploadedFile $evidencia = null;
+
     public ?string $evidenciaPreviewUrl = null;
 
     public ?int $pagoEvidenciaIndex = null;
+
     public bool $showPagoEvidenciaModal = false;
+
     public ?string $pagoEvidenciaPreviewUrl = null;
 
     public bool $showConfirmRecargoModal = false;
+
     public bool $guardarConRecargoConfirmado = false;
+
     public bool $imprimirPendiente = false;
+
     public ?string $mensajeConfirmacionRecargo = null;
 
     // Pago independiente del recargo
     public ?int $recargo_forma_pago_id = null;
+
     public ?int $recargo_cuentas_bancarias_id = null;
+
     public string $recargo_metodo = 'efectivo';
+
     public ?string $recargo_referencia = null;
+
     public bool $recargoRequiereCuentaBancaria = false;
+
     public bool $showRecargoPagoBox = false;
 
     public ?TemporaryUploadedFile $recargo_evidencia = null;
+
     public ?string $recargoEvidenciaPreviewUrl = null;
 
     public function mount(): void
@@ -135,8 +172,6 @@ class Crear extends Component
         $this->fecha = now()->toDateString();
         $this->folio = $this->generarFolio();
         $this->pagos = [$this->nuevoPagoRow()];
-
-
 
         $this->mensualidadTipoCobroId = TipoCobro::query()
             ->where('nombre', 'MENSUALIDAD')
@@ -148,7 +183,7 @@ class Crear extends Component
             ->value('id');
 
         $incomingCuotaUuid = (string) request()->get('cuota', '');
-        $incomingCuotaId   = request()->integer('cuota_id') ?: null;
+        $incomingCuotaId = request()->integer('cuota_id') ?: null;
         $tcParam = (string) request()->get('tc', '');
 
         $incomingResolvedId = null;
@@ -165,8 +200,8 @@ class Crear extends Component
             $cuota = Cuota::with('contrato.cliente', 'contrato.lote.fraccionamiento')
                 ->findOrFail((int) $incomingResolvedId);
 
-            $cuotaEsAnualidad = (bool)($cuota->es_anualidad ?? false)
-                || (mb_strtoupper((string)($cuota->concepto ?? '')) === 'ANUALIDAD');
+            $cuotaEsAnualidad = (bool) ($cuota->es_anualidad ?? false)
+                || (mb_strtoupper((string) ($cuota->concepto ?? '')) === 'ANUALIDAD');
 
             if (trim($tcParam) === '' && $cuotaEsAnualidad) {
                 $tcParam = 'anualidad';
@@ -246,12 +281,12 @@ class Crear extends Component
             if (preg_match('/^pagos\.(\d+)\.forma_pago_id$/', $property, $matches)) {
                 $index = (int) $matches[1];
 
-                if (!$this->pagoRequiereCuenta($index)) {
+                if (! $this->pagoRequiereCuenta($index)) {
                     $this->pagos[$index]['cuentas_bancarias_id'] = null;
                     $this->pagos[$index]['evidencia'] = null;
                 }
 
-                if ($this->formaPagoEsEfectivo(data_get($this->pagos, $index . '.forma_pago_id'))) {
+                if ($this->formaPagoEsEfectivo(data_get($this->pagos, $index.'.forma_pago_id'))) {
                     $this->pagos[$index]['referencia'] = null;
                 }
 
@@ -267,17 +302,18 @@ class Crear extends Component
             $this->sincronizarDefaultsRecargoDesdePrincipal();
             $this->limpiarEvidenciaRecargoSiNoAplica();
             $this->recalcularResumenCuotasSeleccionadas();
+
             return;
         }
 
         if ($property === 'forma_pago_id') {
             $this->actualizarRequiereCuentaBancaria();
 
-            if (!$this->recargo_forma_pago_id) {
+            if (! $this->recargo_forma_pago_id) {
                 $this->recargo_forma_pago_id = $this->forma_pago_id;
             }
 
-            if (!$this->recargo_cuentas_bancarias_id) {
+            if (! $this->recargo_cuentas_bancarias_id) {
                 $this->recargo_cuentas_bancarias_id = $this->cuentas_bancarias_id;
             }
 
@@ -295,7 +331,7 @@ class Crear extends Component
             $this->recalcularResumenCuotasSeleccionadas();
         }
 
-        if ($property === 'cuentas_bancarias_id' && !$this->recargo_cuentas_bancarias_id) {
+        if ($property === 'cuentas_bancarias_id' && ! $this->recargo_cuentas_bancarias_id) {
             $this->recargo_cuentas_bancarias_id = $this->cuentas_bancarias_id;
             $this->actualizarRequiereCuentaBancariaRecargo();
             $this->limpiarEvidenciaRecargoSiNoAplica();
@@ -329,17 +365,18 @@ class Crear extends Component
             $this->tipoEsServicio = $this->tipoCobroEsServicio($this->tipos_cobro_id);
             $this->asociarACuota = $this->tipoCobroRequiereAsociarCuota($this->tipos_cobro_id);
 
-            if (!empty($this->cuotaIds)) {
+            if (! empty($this->cuotaIds)) {
                 $this->sincronizarPeriodoDesdeCuotasSeleccionadas();
             } elseif ($this->tipoEsServicio) {
                 $this->setPeriodoMesActualSiVacio();
             }
 
-            if (!$this->asociarACuota) {
+            if (! $this->asociarACuota) {
                 $this->cuotaId = null;
                 $this->cuotaIds = [];
                 $this->cuotasOptions = [];
                 $this->recalcularResumenCuotasSeleccionadas();
+
                 return;
             }
 
@@ -349,7 +386,7 @@ class Crear extends Component
 
             $this->sincronizarPeriodoDesdeCuotasSeleccionadas();
 
-            if (!$this->tipoCobroEsMensualidad($this->tipos_cobro_id)) {
+            if (! $this->tipoCobroEsMensualidad($this->tipos_cobro_id)) {
                 $this->recargoModo = 'auto';
                 $this->recargoMontoManual = null;
             }
@@ -408,7 +445,7 @@ class Crear extends Component
     {
         $this->cuotaIds = collect($this->cuotaIds ?? [])
             ->filter()
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -416,7 +453,7 @@ class Crear extends Component
         $seleccionMultiple = count($this->cuotaIds) > 1;
 
         // Si por cualquier motivo no hay pagos, siempre deja uno
-        if (empty($this->pagos) || !is_array($this->pagos) || count($this->pagos) === 0) {
+        if (empty($this->pagos) || ! is_array($this->pagos) || count($this->pagos) === 0) {
             $this->pagos = [$this->nuevoPagoRow()];
         }
 
@@ -426,7 +463,7 @@ class Crear extends Component
             $this->pagos = [$primerPago];
 
             // Si no tiene índice 0 válido, lo reconstruimos limpio
-            if (!isset($this->pagos[0]) || !is_array($this->pagos[0])) {
+            if (! isset($this->pagos[0]) || ! is_array($this->pagos[0])) {
                 $this->pagos = [$this->nuevoPagoRow()];
             }
 
@@ -464,12 +501,11 @@ class Crear extends Component
 
     protected function validarEvidenciaPago(int $index): void
     {
-        $this->validateOnly('pagos.' . $index . '.evidencia', [
-          'pagos.' . $index . '.evidencia' => data_get($this->pagos, $index . '.sin_evidencia')
+        $this->validateOnly('pagos.'.$index.'.evidencia', [
+            'pagos.'.$index.'.evidencia' => data_get($this->pagos, $index.'.sin_evidencia')
     ? 'nullable'
     : 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:10240',
-            
-            
+
         ]);
     }
 
@@ -481,9 +517,9 @@ class Crear extends Component
             return;
         }
 
-        $archivo = data_get($this->pagos, $this->pagoEvidenciaIndex . '.evidencia');
+        $archivo = data_get($this->pagos, $this->pagoEvidenciaIndex.'.evidencia');
 
-        if (!$archivo instanceof TemporaryUploadedFile) {
+        if (! $archivo instanceof TemporaryUploadedFile) {
             return;
         }
 
@@ -498,7 +534,7 @@ class Crear extends Component
 
     public function abrirModalEvidenciaPago(int $index): void
     {
-        if (!array_key_exists($index, $this->pagos)) {
+        if (! array_key_exists($index, $this->pagos)) {
             return;
         }
 
@@ -516,7 +552,7 @@ class Crear extends Component
 
     public function quitarEvidenciaPagoActual(): void
     {
-        if ($this->pagoEvidenciaIndex === null || !array_key_exists($this->pagoEvidenciaIndex, $this->pagos)) {
+        if ($this->pagoEvidenciaIndex === null || ! array_key_exists($this->pagoEvidenciaIndex, $this->pagos)) {
             return;
         }
 
@@ -524,29 +560,29 @@ class Crear extends Component
         $this->pagoEvidenciaPreviewUrl = null;
     }
 
-public function pagoTieneEvidencia(int $index): bool
-{
-    if (data_get($this->pagos, $index . '.sin_evidencia')) {
-        return true;
+    public function pagoTieneEvidencia(int $index): bool
+    {
+        if (data_get($this->pagos, $index.'.sin_evidencia')) {
+            return true;
+        }
+
+        return ! empty(data_get($this->pagos, $index.'.evidencia'));
     }
 
-    return !empty(data_get($this->pagos, $index . '.evidencia'));
-}
+    public function pagoNombreEvidencia(int $index): ?string
+    {
+        if (data_get($this->pagos, $index.'.sin_evidencia')) {
+            return 'Sin evidencia';
+        }
 
-public function pagoNombreEvidencia(int $index): ?string
-{
-    if (data_get($this->pagos, $index . '.sin_evidencia')) {
-        return 'Sin evidencia';
+        $archivo = data_get($this->pagos, $index.'.evidencia');
+
+        if ($archivo instanceof TemporaryUploadedFile) {
+            return $archivo->getClientOriginalName();
+        }
+
+        return null;
     }
-
-    $archivo = data_get($this->pagos, $index . '.evidencia');
-
-    if ($archivo instanceof TemporaryUploadedFile) {
-        return $archivo->getClientOriginalName();
-    }
-
-    return null;
-}
 
     public function pagoDebePedirEvidencia(int $index): bool
     {
@@ -559,7 +595,7 @@ public function pagoNombreEvidencia(int $index): ?string
         $this->contrato_id = null;
         $this->lote_id = null;
 
-        if (!$preservarCuota) {
+        if (! $preservarCuota) {
             $this->cuotaId = null;
             $this->cuotaIds = [];
         }
@@ -601,11 +637,13 @@ public function pagoNombreEvidencia(int $index): ?string
             $this->clientesResultados = [];
 
             $this->recalcularResumenCuotasSeleccionadas();
+
             return;
         }
 
         if (mb_strlen($term) < 2) {
             $this->clientesResultados = [];
+
             return;
         }
 
@@ -618,9 +656,9 @@ public function pagoNombreEvidencia(int $index): ?string
             ->orderBy('nombres')
             ->limit(15)
             ->get()
-            ->map(fn($c) => [
+            ->map(fn ($c) => [
                 'id' => $c->id,
-                'label' => trim($c->nombres . ' ' . $c->apellidos),
+                'label' => trim($c->nombres.' '.$c->apellidos),
             ])
             ->toArray();
     }
@@ -628,7 +666,7 @@ public function pagoNombreEvidencia(int $index): ?string
     public function seleccionarClienteDesdeBusqueda(int $clienteId): void
     {
         $cliente = Cliente::find($clienteId);
-        if (!$cliente) {
+        if (! $cliente) {
             return;
         }
 
@@ -657,65 +695,98 @@ public function pagoNombreEvidencia(int $index): ?string
 
     protected function tipoCobroEsMensualidad(?int $tipoCobroId): bool
     {
-        if (!$tipoCobroId) return false;
+        if (! $tipoCobroId) {
+            return false;
+        }
 
         $tipo = TipoCobro::find($tipoCobroId);
-        if (!$tipo) return false;
+        if (! $tipo) {
+            return false;
+        }
 
         $nombre = mb_strtoupper(trim((string) $tipo->nombre));
+
         return str_contains($nombre, 'MENSUAL');
     }
 
     protected function tipoCobroEsAnualidad(?int $tipoCobroId): bool
     {
-        if (!$tipoCobroId) return false;
+        if (! $tipoCobroId) {
+            return false;
+        }
 
         $tipo = TipoCobro::find($tipoCobroId);
-        if (!$tipo) return false;
+        if (! $tipo) {
+            return false;
+        }
 
         $nombre = mb_strtoupper(trim((string) $tipo->nombre));
+
         return str_contains($nombre, 'ANUAL');
     }
 
     protected function tipoCobroEsRecargo(?int $tipoCobroId): bool
     {
-        if (!$tipoCobroId) return false;
+        if (! $tipoCobroId) {
+            return false;
+        }
 
         $tipo = TipoCobro::find($tipoCobroId);
-        if (!$tipo) return false;
+        if (! $tipo) {
+            return false;
+        }
 
         $nombre = mb_strtoupper(trim((string) $tipo->nombre));
+
         return str_contains($nombre, 'RECARGO');
     }
 
     protected function tipoCobroEsServicio(?int $tipoCobroId): bool
     {
-        if (!$tipoCobroId) return false;
+        if (! $tipoCobroId) {
+            return false;
+        }
 
         $tipo = TipoCobro::find($tipoCobroId);
+
         return $tipo?->categoria === 'servicio';
     }
 
     protected function tipoCobroRequiereAsociarCuota(?int $tipoCobroId): bool
     {
-        if (!$tipoCobroId) return false;
+        if (! $tipoCobroId) {
+            return false;
+        }
 
-        if ($this->tipoCobroEsMensualidad($tipoCobroId)) return true;
-        if ($this->tipoCobroEsAnualidad($tipoCobroId)) return true;
-        if ($this->tipoCobroEsServicio($tipoCobroId)) return true;
-        if ($this->tipoCobroEsRecargo($tipoCobroId)) return true;
+        if ($this->tipoCobroEsMensualidad($tipoCobroId)) {
+            return true;
+        }
+        if ($this->tipoCobroEsAnualidad($tipoCobroId)) {
+            return true;
+        }
+        if ($this->tipoCobroEsServicio($tipoCobroId)) {
+            return true;
+        }
+        if ($this->tipoCobroEsRecargo($tipoCobroId)) {
+            return true;
+        }
 
         return false;
     }
 
     protected function tipoCobroAfectaSaldoContrato(?int $tipoCobroId): bool
     {
-        if (!$tipoCobroId) return false;
+        if (! $tipoCobroId) {
+            return false;
+        }
 
         $tc = TipoCobro::find($tipoCobroId);
-        if (!$tc) return false;
+        if (! $tc) {
+            return false;
+        }
 
         $nombre = mb_strtoupper(trim((string) $tc->nombre));
+
         return str_contains($nombre, 'ANUAL') || str_contains($nombre, 'ENGANCHE');
     }
 
@@ -742,7 +813,7 @@ public function pagoNombreEvidencia(int $index): ?string
     {
         $this->requiereCuentaBancaria = $this->formaPagoRequiereCuenta($this->forma_pago_id);
 
-        if (!$this->requiereCuentaBancaria) {
+        if (! $this->requiereCuentaBancaria) {
             $this->cuentas_bancarias_id = null;
         }
     }
@@ -751,7 +822,7 @@ public function pagoNombreEvidencia(int $index): ?string
     {
         $this->recargoRequiereCuentaBancaria = $this->formaPagoRequiereCuenta($this->recargo_forma_pago_id);
 
-        if (!$this->recargoRequiereCuentaBancaria || $this->formaPagoEsEfectivo($this->recargo_forma_pago_id)) {
+        if (! $this->recargoRequiereCuentaBancaria || $this->formaPagoEsEfectivo($this->recargo_forma_pago_id)) {
             $this->recargo_cuentas_bancarias_id = null;
             $this->recargo_referencia = null;
         }
@@ -761,6 +832,7 @@ public function pagoNombreEvidencia(int $index): ?string
     {
         if ($this->recargoFueEditadoManualmente) {
             $this->actualizarRequiereCuentaBancariaRecargo();
+
             return;
         }
 
@@ -782,20 +854,28 @@ public function pagoNombreEvidencia(int $index): ?string
 
     protected function formaPagoRequiereCuenta(?int $formaPagoId): bool
     {
-        if (!$formaPagoId) return false;
+        if (! $formaPagoId) {
+            return false;
+        }
 
         $fp = FormaPago::find($formaPagoId);
+
         return (bool) ($fp?->requiere_cuenta);
     }
 
     protected function formaPagoEsEfectivo(?int $formaPagoId): bool
     {
-        if (!$formaPagoId) return false;
+        if (! $formaPagoId) {
+            return false;
+        }
 
         $fp = FormaPago::find($formaPagoId);
-        if (!$fp) return false;
+        if (! $fp) {
+            return false;
+        }
 
         $nombre = mb_strtoupper(trim((string) $fp->nombre));
+
         return str_contains($nombre, 'EFECTIVO');
     }
 
@@ -818,143 +898,141 @@ public function pagoNombreEvidencia(int $index): ?string
         return 0;
     }
 
-protected function calcularRecargoDesdeContrato(Contrato $contrato, Cuota $cuota, int $diasAtraso = 0): float
-{
-    $guardado = (float) ($cuota->recargo_aplicado ?? 0);
-    if ($guardado > 0) {
-        return round($guardado, 2);
-    }
+    protected function calcularRecargoDesdeContrato(Contrato $contrato, Cuota $cuota, int $diasAtraso = 0): float
+    {
+        $guardado = (float) ($cuota->recargo_aplicado ?? 0);
+        if ($guardado > 0) {
+            return round($guardado, 2);
+        }
 
-    $get = function (array $campos) use ($contrato) {
-        foreach ($campos as $campo) {
-            if (isset($contrato->{$campo}) && $contrato->{$campo} !== '' && $contrato->{$campo} !== null) {
-                $raw = (string) $contrato->{$campo};
-                $raw = str_replace(['$', ',', ' '], '', $raw);
-                $raw = str_replace('%', '', $raw);
+        $get = function (array $campos) use ($contrato) {
+            foreach ($campos as $campo) {
+                if (isset($contrato->{$campo}) && $contrato->{$campo} !== '' && $contrato->{$campo} !== null) {
+                    $raw = (string) $contrato->{$campo};
+                    $raw = str_replace(['$', ',', ' '], '', $raw);
+                    $raw = str_replace('%', '', $raw);
 
-                if (is_numeric($raw)) {
-                    return (float) $raw;
+                    if (is_numeric($raw)) {
+                        return (float) $raw;
+                    }
                 }
+            }
+
+            return null;
+        };
+
+        $tipo = null;
+        foreach (['recargo_tipo', 'tipo_recargo', 'recargo_mode', 'recargo_modo'] as $campoTipo) {
+            if (isset($contrato->{$campoTipo}) && $contrato->{$campoTipo}) {
+                $tipo = mb_strtolower(trim((string) $contrato->{$campoTipo}));
+                break;
             }
         }
 
-        return null;
-    };
+        $valor = $get([
+            'recargo_valor',
+            'valor_recargo',
+            'recargo_amount',
+            'recargo_cantidad',
+        ]);
 
-    $tipo = null;
-    foreach (['recargo_tipo', 'tipo_recargo', 'recargo_mode', 'recargo_modo'] as $campoTipo) {
-        if (isset($contrato->{$campoTipo}) && $contrato->{$campoTipo}) {
-            $tipo = mb_strtolower(trim((string) $contrato->{$campoTipo}));
-            break;
-        }
-    }
+        /*
+            frecuencia_recargo_dias:
+            Controla cada cuántos días aumenta el recargo DESPUÉS del primer recargo.
 
-    $valor = $get([
-        'recargo_valor',
-        'valor_recargo',
-        'recargo_amount',
-        'recargo_cantidad',
-    ]);
+            Ejemplo A:
+            dias_gracia = 7
+            frecuencia_recargo_dias = 7
+            vence 23 abril
+            primer recargo 1 mayo
+            segundo recargo 8 mayo
+            tercer recargo 15 mayo
 
-    /*
-        frecuencia_recargo_dias:
-        Controla cada cuántos días aumenta el recargo DESPUÉS del primer recargo.
+            Ejemplo B:
+            dias_gracia = 3
+            frecuencia_recargo_dias = 4
+            vence 8 mayo
+            primer recargo 12 mayo
+            segundo recargo 16 mayo
+            tercer recargo 20 mayo
+        */
+        $frecuenciaDias = max(1, $this->getFrecuenciaRecargoDias($contrato));
 
-        Ejemplo A:
-        dias_gracia = 7
-        frecuencia_recargo_dias = 7
-        vence 23 abril
-        primer recargo 1 mayo
-        segundo recargo 8 mayo
-        tercer recargo 15 mayo
+        /*
+            $diasAtraso representa días desde el PRIMER día de recargo,
+            no desde la fecha de vencimiento.
 
-        Ejemplo B:
-        dias_gracia = 3
-        frecuencia_recargo_dias = 4
-        vence 8 mayo
-        primer recargo 12 mayo
-        segundo recargo 16 mayo
-        tercer recargo 20 mayo
-    */
-    $frecuenciaDias = max(1, $this->getFrecuenciaRecargoDias($contrato));
+            Si primer recargo es 12 mayo:
 
-    /*
-        $diasAtraso representa días desde el PRIMER día de recargo,
-        no desde la fecha de vencimiento.
+            12 mayo => diasAtraso = 0 => veces = 1
+            13 mayo => diasAtraso = 1 => veces = 1
+            14 mayo => diasAtraso = 2 => veces = 1
+            15 mayo => diasAtraso = 3 => veces = 1
+            16 mayo => diasAtraso = 4 => veces = 2
+        */
+        $veces = $diasAtraso >= 0
+            ? (int) floor($diasAtraso / $frecuenciaDias) + 1
+            : 0;
 
-        Si primer recargo es 12 mayo:
+        if ($tipo && $valor !== null && $valor > 0) {
+            if (str_contains($tipo, 'dia') || str_contains($tipo, 'diar')) {
+                return $diasAtraso >= 0 ? round($valor * ($diasAtraso + 1), 2) : 0.0;
+            }
 
-        12 mayo => diasAtraso = 0 => veces = 1
-        13 mayo => diasAtraso = 1 => veces = 1
-        14 mayo => diasAtraso = 2 => veces = 1
-        15 mayo => diasAtraso = 3 => veces = 1
-        16 mayo => diasAtraso = 4 => veces = 2
-    */
-    $veces = $diasAtraso >= 0
-        ? (int) floor($diasAtraso / $frecuenciaDias) + 1
-        : 0;
+            if (str_contains($tipo, 'por') || str_contains($tipo, 'pct') || str_contains($tipo, '%')) {
+                return $diasAtraso >= 0
+                    ? round(((float) $cuota->monto) * ($valor / 100) * $veces, 2)
+                    : 0.0;
+            }
 
-    if ($tipo && $valor !== null && $valor > 0) {
-        if (str_contains($tipo, 'dia') || str_contains($tipo, 'diar')) {
-            return $diasAtraso >= 0 ? round($valor * ($diasAtraso + 1), 2) : 0.0;
+            return $veces > 0 ? round($valor * $veces, 2) : 0.0;
         }
 
-        if (str_contains($tipo, 'por') || str_contains($tipo, 'pct') || str_contains($tipo, '%')) {
+        $porDia = $get([
+            'recargo_por_dia',
+            'monto_recargo_dia',
+            'recargo_diario',
+            'recargo_dia',
+            'monto_recargo_por_dia',
+            'recargo_x_dia',
+        ]);
+
+        if ($porDia !== null && $porDia > 0 && $diasAtraso >= 0) {
+            return round($porDia * ($diasAtraso + 1), 2);
+        }
+
+        $porcentaje = $get([
+            'recargo_porcentaje',
+            'porcentaje_recargo',
+            'recargo_pct',
+            'recargo_percent',
+            'porc_recargo',
+            'recargo_%',
+        ]);
+
+        if ($porcentaje !== null && $porcentaje > 0) {
             return $diasAtraso >= 0
-                ? round(((float) $cuota->monto) * ($valor / 100) * $veces, 2)
+                ? round((((float) $cuota->monto) * ($porcentaje / 100)) * $veces, 2)
                 : 0.0;
         }
 
-        return $veces > 0 ? round($valor * $veces, 2) : 0.0;
+        $fijo = $get([
+            'recargo_monto',
+            'monto_recargo',
+            'recargo_fijo',
+            'recargo',
+            'recargo_mensualidad',
+            'monto_recargo_mensualidad',
+            'recargo_importe',
+            'importe_recargo',
+        ]);
+
+        if ($fijo !== null && $fijo > 0) {
+            return $veces > 0 ? round($fijo * $veces, 2) : 0.0;
+        }
+
+        return 0.0;
     }
-
-    $porDia = $get([
-        'recargo_por_dia',
-        'monto_recargo_dia',
-        'recargo_diario',
-        'recargo_dia',
-        'monto_recargo_por_dia',
-        'recargo_x_dia',
-    ]);
-
-    if ($porDia !== null && $porDia > 0 && $diasAtraso >= 0) {
-        return round($porDia * ($diasAtraso + 1), 2);
-    }
-
-    $porcentaje = $get([
-        'recargo_porcentaje',
-        'porcentaje_recargo',
-        'recargo_pct',
-        'recargo_percent',
-        'porc_recargo',
-        'recargo_%',
-    ]);
-
-    if ($porcentaje !== null && $porcentaje > 0) {
-        return $diasAtraso >= 0
-            ? round((((float) $cuota->monto) * ($porcentaje / 100)) * $veces, 2)
-            : 0.0;
-    }
-
-    $fijo = $get([
-        'recargo_monto',
-        'monto_recargo',
-        'recargo_fijo',
-        'recargo',
-        'recargo_mensualidad',
-        'monto_recargo_mensualidad',
-        'recargo_importe',
-        'importe_recargo',
-    ]);
-
-    if ($fijo !== null && $fijo > 0) {
-        return $veces > 0 ? round($fijo * $veces, 2) : 0.0;
-    }
-
-    return 0.0;
-}
-
-
 
     protected function getRecargoFinal(): float
     {
@@ -964,6 +1042,7 @@ protected function calcularRecargoDesdeContrato(Contrato $contrato, Cuota $cuota
 
         if ($this->recargoModo === 'manual') {
             $m = (float) ($this->recargoMontoManual ?? 0);
+
             return round(max(0, $m), 2);
         }
 
@@ -975,6 +1054,7 @@ protected function calcularRecargoDesdeContrato(Contrato $contrato, Cuota $cuota
         if ((float) $this->recargoMonto <= 0) {
             $this->recargoModo = 'auto';
             $this->recargoMontoManual = null;
+
             return;
         }
 
@@ -983,122 +1063,122 @@ protected function calcularRecargoDesdeContrato(Contrato $contrato, Cuota $cuota
         }
     }
 
-protected function calcularEstadoRecargoCuota(Cuota $cuota): array
-{
-    $contrato = $cuota->contrato;
-    $contrato->loadMissing('lote.fraccionamiento');
+    protected function calcularEstadoRecargoCuota(Cuota $cuota): array
+    {
+        $contrato = $cuota->contrato;
+        $contrato->loadMissing('lote.fraccionamiento');
 
-    $vence = Carbon::parse($cuota->fecha_vencimiento)->startOfDay();
-    $hoy = Carbon::now()->startOfDay();
+        $vence = Carbon::parse($cuota->fecha_vencimiento)->startOfDay();
+        $hoy = Carbon::now()->startOfDay();
 
-    $diasGracia = max(0, (int) $this->getDiasGraciaContrato($contrato));
+        $diasGracia = max(0, (int) $this->getDiasGraciaContrato($contrato));
 
-    $formaPagoParaRecargo = $this->recargo_forma_pago_id ?: $this->forma_pago_id;
-    $esEfectivo = $this->formaPagoEsEfectivo($formaPagoParaRecargo);
+        $formaPagoParaRecargo = $this->recargo_forma_pago_id ?: $this->forma_pago_id;
+        $esEfectivo = $this->formaPagoEsEfectivo($formaPagoParaRecargo);
 
-    $fraccionamientoNombre = mb_strtoupper(trim((string) ($contrato->lote?->fraccionamiento?->nombre ?? '')));
-    $diaVence = (int) $vence->dayOfWeekIso;
+        $fraccionamientoNombre = mb_strtoupper(trim((string) ($contrato->lote?->fraccionamiento?->nombre ?? '')));
+        $diaVence = (int) $vence->dayOfWeekIso;
 
-    $aplicaDiaExtraPorFraccionamiento = false;
+        $aplicaDiaExtraPorFraccionamiento = false;
 
-    if (
-        $fraccionamientoNombre === 'DEL NORTE' ||
-        $fraccionamientoNombre === 'DEL NORTE LUNES'
-    ) {
-        $aplicaDiaExtraPorFraccionamiento = in_array($diaVence, [1, 3], true);
-    } elseif ($fraccionamientoNombre === 'REYES') {
-        $aplicaDiaExtraPorFraccionamiento = ($diaVence === 4);
-    }
+        if (
+            $fraccionamientoNombre === 'DEL NORTE' ||
+            $fraccionamientoNombre === 'DEL NORTE LUNES'
+        ) {
+            $aplicaDiaExtraPorFraccionamiento = in_array($diaVence, [1, 3], true);
+        } elseif ($fraccionamientoNombre === 'REYES') {
+            $aplicaDiaExtraPorFraccionamiento = ($diaVence === 4);
+        }
 
-    $aplicaDiaExtraEfectivo = $esEfectivo && $aplicaDiaExtraPorFraccionamiento;
+        $aplicaDiaExtraEfectivo = $esEfectivo && $aplicaDiaExtraPorFraccionamiento;
 
-    $primerDiaRecargo = $vence->copy()->addDays($diasGracia + 1);
+        $primerDiaRecargo = $vence->copy()->addDays($diasGracia + 1);
 
-    $primerDiaRecargoConDiaExtra = $aplicaDiaExtraEfectivo
-        ? $primerDiaRecargo->copy()->addDay()
-        : $primerDiaRecargo->copy();
+        $primerDiaRecargoConDiaExtra = $aplicaDiaExtraEfectivo
+            ? $primerDiaRecargo->copy()->addDay()
+            : $primerDiaRecargo->copy();
 
-    $cuotaEnGracia = $hoy->lt($primerDiaRecargo);
-    $cuotaVencida = $hoy->greaterThanOrEqualTo($primerDiaRecargo);
+        $cuotaEnGracia = $hoy->lt($primerDiaRecargo);
+        $cuotaVencida = $hoy->greaterThanOrEqualTo($primerDiaRecargo);
 
-    $estaDentroDelDiaExtra = $aplicaDiaExtraEfectivo
-        && $hoy->greaterThanOrEqualTo($primerDiaRecargo)
-        && $hoy->lt($primerDiaRecargoConDiaExtra);
+        $estaDentroDelDiaExtra = $aplicaDiaExtraEfectivo
+            && $hoy->greaterThanOrEqualTo($primerDiaRecargo)
+            && $hoy->lt($primerDiaRecargoConDiaExtra);
 
-    $diasDesdePrimerRecargo = $hoy->greaterThanOrEqualTo($primerDiaRecargo)
-        ? $primerDiaRecargo->diffInDays($hoy)
-        : -1;
+        $diasDesdePrimerRecargo = $hoy->greaterThanOrEqualTo($primerDiaRecargo)
+            ? $primerDiaRecargo->diffInDays($hoy)
+            : -1;
 
-    $diasAtrasoParaMostrar = $diasDesdePrimerRecargo >= 0
-        ? $diasDesdePrimerRecargo + 1
-        : 0;
+        $diasAtrasoParaMostrar = $diasDesdePrimerRecargo >= 0
+            ? $diasDesdePrimerRecargo + 1
+            : 0;
 
-    $recargoCalculado = $this->calcularRecargoDesdeContrato(
-        $contrato,
-        $cuota,
-        $diasDesdePrimerRecargo
-    );
+        $recargoCalculado = $this->calcularRecargoDesdeContrato(
+            $contrato,
+            $cuota,
+            $diasDesdePrimerRecargo
+        );
 
-    $recargoOriginal = $recargoCalculado;
-    $recargoFinal = 0.0;
-    $recargoCondonado = false;
-    $mensaje = null;
+        $recargoOriginal = $recargoCalculado;
+        $recargoFinal = 0.0;
+        $recargoCondonado = false;
+        $mensaje = null;
 
-    if ($esEfectivo) {
-        if ($cuotaEnGracia) {
-            $recargoFinal = 0.0;
-            $mensaje = 'Cuota aún dentro del periodo sin recargo.';
-        } elseif ($estaDentroDelDiaExtra) {
-            $recargoFinal = 0.0;
-            $recargoCondonado = true;
+        if ($esEfectivo) {
+            if ($cuotaEnGracia) {
+                $recargoFinal = 0.0;
+                $mensaje = 'Cuota aún dentro del periodo sin recargo.';
+            } elseif ($estaDentroDelDiaExtra) {
+                $recargoFinal = 0.0;
+                $recargoCondonado = true;
 
-            if ($fraccionamientoNombre === 'DEL NORTE') {
-                $mensaje = 'Cuota vencida: por pago en efectivo se otorga 1 día extra antes del primer recargo para Del Norte.';
-            } elseif ($fraccionamientoNombre === 'REYES') {
-                $mensaje = 'Cuota vencida: por pago en efectivo se otorga 1 día extra antes del primer recargo para Reyes.';
+                if ($fraccionamientoNombre === 'DEL NORTE') {
+                    $mensaje = 'Cuota vencida: por pago en efectivo se otorga 1 día extra antes del primer recargo para Del Norte.';
+                } elseif ($fraccionamientoNombre === 'REYES') {
+                    $mensaje = 'Cuota vencida: por pago en efectivo se otorga 1 día extra antes del primer recargo para Reyes.';
+                } else {
+                    $mensaje = 'Cuota vencida: se otorgó 1 día extra por pago en efectivo.';
+                }
             } else {
-                $mensaje = 'Cuota vencida: se otorgó 1 día extra por pago en efectivo.';
+                $recargoFinal = $recargoCalculado;
+                $mensaje = 'Cuota vencida: se cobrará recargo según las reglas del contrato.';
             }
         } else {
-            $recargoFinal = $recargoCalculado;
-            $mensaje = 'Cuota vencida: se cobrará recargo según las reglas del contrato.';
-        }
-    } else {
-        $recargoFinal = $cuotaVencida ? $recargoCalculado : 0.0;
+            $recargoFinal = $cuotaVencida ? $recargoCalculado : 0.0;
 
-        if ($cuotaVencida && $recargoCalculado > 0) {
-            $mensaje = 'Cuota vencida: se cobrará recargo según el contrato.';
-        } elseif ($cuotaEnGracia) {
-            $mensaje = 'Cuota aún dentro del periodo sin recargo.';
+            if ($cuotaVencida && $recargoCalculado > 0) {
+                $mensaje = 'Cuota vencida: se cobrará recargo según el contrato.';
+            } elseif ($cuotaEnGracia) {
+                $mensaje = 'Cuota aún dentro del periodo sin recargo.';
+            }
         }
+
+        $esSeleccionUnica = count($this->cuotaIds) <= 1;
+
+        if ($esSeleccionUnica && $this->tipoCobroEsMensualidad($this->tipos_cobro_id)) {
+            if ($this->recargoModo === 'condonar') {
+                $recargoFinal = 0.0;
+                $recargoCondonado = true;
+            } elseif ($this->recargoModo === 'manual') {
+                $recargoFinal = round(max(0, (float) ($this->recargoMontoManual ?? 0)), 2);
+                $recargoCondonado = $recargoFinal <= 0;
+            }
+        }
+
+        return [
+            'cuota_vencida' => $cuotaVencida,
+            'cuota_en_gracia' => $cuotaEnGracia,
+            'dias_atraso' => $diasAtrasoParaMostrar,
+            'dias_gracia_total' => $diasGracia,
+            'recargo_monto' => round($recargoFinal, 2),
+            'recargo_monto_original' => round($recargoOriginal, 2),
+            'recargo_condonado' => $recargoCondonado,
+            'cuota_fecha_vencimiento' => $vence->format('Y-m-d'),
+            'cuota_fecha_limite' => $primerDiaRecargo->copy()->subDay()->format('Y-m-d'),
+            'cuota_fecha_limite_condonada' => $primerDiaRecargoConDiaExtra->format('Y-m-d'),
+            'recargo_mensaje' => $mensaje,
+        ];
     }
-
-    $esSeleccionUnica = count($this->cuotaIds) <= 1;
-
-    if ($esSeleccionUnica && $this->tipoCobroEsMensualidad($this->tipos_cobro_id)) {
-        if ($this->recargoModo === 'condonar') {
-            $recargoFinal = 0.0;
-            $recargoCondonado = true;
-        } elseif ($this->recargoModo === 'manual') {
-            $recargoFinal = round(max(0, (float) ($this->recargoMontoManual ?? 0)), 2);
-            $recargoCondonado = $recargoFinal <= 0;
-        }
-    }
-
-    return [
-        'cuota_vencida' => $cuotaVencida,
-        'cuota_en_gracia' => $cuotaEnGracia,
-        'dias_atraso' => $diasAtrasoParaMostrar,
-        'dias_gracia_total' => $diasGracia,
-        'recargo_monto' => round($recargoFinal, 2),
-        'recargo_monto_original' => round($recargoOriginal, 2),
-        'recargo_condonado' => $recargoCondonado,
-        'cuota_fecha_vencimiento' => $vence->format('Y-m-d'),
-        'cuota_fecha_limite' => $primerDiaRecargo->copy()->subDay()->format('Y-m-d'),
-        'cuota_fecha_limite_condonada' => $primerDiaRecargoConDiaExtra->format('Y-m-d'),
-        'recargo_mensaje' => $mensaje,
-    ];
-}
 
     protected function recalcularResumenCuotasSeleccionadas(): void
     {
@@ -1120,13 +1200,13 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
         $this->cuotaFechaLimite = null;
         $this->recargoMensaje = null;
 
-        if (!$this->asociarACuota || empty($this->cuotaIds) || !$this->contrato_id) {
+        if (! $this->asociarACuota || empty($this->cuotaIds) || ! $this->contrato_id) {
             return;
         }
 
         $ids = collect($this->cuotaIds)
             ->filter()
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -1218,16 +1298,20 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
             $this->recargoMontoManual = null;
         }
     }
+
     protected function cargarInfoDesdeContrato(): void
     {
-        if (!$this->contrato_id) {
+        if (! $this->contrato_id) {
             $this->lote_id = null;
             $this->resetInfoContratoYLote();
+
             return;
         }
 
         $contrato = Contrato::with(['lote.fraccionamiento'])->find($this->contrato_id);
-        if (!$contrato) return;
+        if (! $contrato) {
+            return;
+        }
 
         $this->infoContrato = [
             'folio' => $contrato->folio_contrato ?? null,
@@ -1250,7 +1334,9 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
     protected function resolverTipoCobroDefaultDesdeTc(string $tc): ?int
     {
         $tc = mb_strtolower(trim($tc));
-        if ($tc === '') return null;
+        if ($tc === '') {
+            return null;
+        }
 
         if ($tc === 'mensualidad') {
             return TipoCobro::query()->where('nombre', 'MENSUALIDAD')->value('id') ?: null;
@@ -1258,7 +1344,9 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
 
         if ($tc === 'anualidad') {
             $id = TipoCobro::query()->where('nombre', 'ANUALIDAD')->value('id');
-            if ($id) return (int) $id;
+            if ($id) {
+                return (int) $id;
+            }
 
             $id = TipoCobro::query()
                 ->whereRaw('UPPER(nombre) LIKE ?', ['%ANUAL%'])
@@ -1275,7 +1363,9 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
             'limpieza' => 'LIMPIEZA',
         ];
 
-        if (!isset($map[$tc])) return null;
+        if (! isset($map[$tc])) {
+            return null;
+        }
 
         return TipoCobro::query()
             ->where('nombre', $map[$tc])
@@ -1284,7 +1374,9 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
 
     protected function setPeriodoMesActualSiVacio(): void
     {
-        if ($this->periodo_id) return;
+        if ($this->periodo_id) {
+            return;
+        }
 
         $this->periodo_id = Periodo::query()
             ->where('tipo', 'mensual')
@@ -1297,8 +1389,9 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
     {
         $this->cuotasOptions = [];
 
-        if (!$this->contrato_id) {
+        if (! $this->contrato_id) {
             $this->cuotaIds = [];
+
             return;
         }
 
@@ -1314,15 +1407,15 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
         $this->cuotasOptions = $cuotas->mapWithKeys(function ($c) {
             $pendientePrincipal = max(0, (float) $c->monto - (float) ($c->pagado_total ?? 0));
 
-            $label = 'Cuota #' . $c->numero
-                . ' | Vence: ' . Carbon::parse($c->fecha_vencimiento)->format('d/m/Y')
-                . ' | Pendiente: $' . number_format($pendientePrincipal, 2);
+            $label = 'Cuota #'.$c->numero
+                .' | Vence: '.Carbon::parse($c->fecha_vencimiento)->format('d/m/Y')
+                .' | Pendiente: $'.number_format($pendientePrincipal, 2);
 
             $esAnual = (bool) ($c->es_anualidad ?? false)
                 || (mb_strtoupper((string) ($c->concepto ?? '')) === 'ANUALIDAD');
 
             if ($esAnual) {
-                $label = 'ANUALIDAD — ' . $label;
+                $label = 'ANUALIDAD — '.$label;
             }
 
             return [$c->id => $label];
@@ -1330,7 +1423,7 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
 
         $this->cuotaIds = array_values(array_filter(
             $this->cuotaIds,
-            fn($id) => array_key_exists((int) $id, $this->cuotasOptions)
+            fn ($id) => array_key_exists((int) $id, $this->cuotasOptions)
         ));
 
         if (count($this->cuotaIds) === 1) {
@@ -1345,13 +1438,19 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
 
     protected function autoseleccionarCuotaPorPeriodo(): void
     {
-        if (!$this->contrato_id || !$this->periodo_id) return;
+        if (! $this->contrato_id || ! $this->periodo_id) {
+            return;
+        }
 
         $periodo = Periodo::find($this->periodo_id);
-        if (!$periodo?->nombre) return;
+        if (! $periodo?->nombre) {
+            return;
+        }
 
         [$mesNum, $anioNum] = $this->parsePeriodoNombre($periodo->nombre);
-        if (!$mesNum || !$anioNum) return;
+        if (! $mesNum || ! $anioNum) {
+            return;
+        }
 
         $query = Cuota::query()
             ->where('contrato_id', $this->contrato_id)
@@ -1360,7 +1459,7 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
 
         $query = $this->scopeCuotasSegunTipoCobro($query);
 
-        if (!$this->tipoCobroEsAnualidad($this->tipos_cobro_id)) {
+        if (! $this->tipoCobroEsAnualidad($this->tipos_cobro_id)) {
             $query->whereYear('fecha_vencimiento', $anioNum)
                 ->whereMonth('fecha_vencimiento', $mesNum);
         }
@@ -1413,7 +1512,9 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
         $this->contratosOptions = [];
         $this->lotesOptions = [];
 
-        if (!$this->cliente_id) return;
+        if (! $this->cliente_id) {
+            return;
+        }
 
         $contratos = Contrato::with('lote.fraccionamiento')
             ->where('cliente_id', $this->cliente_id)
@@ -1423,10 +1524,10 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
         $this->contratosOptions = $contratos->mapWithKeys(function ($c) {
             $l = $c->lote;
             $txtLote = $l
-                ? ($l->fraccionamiento?->nombre . ' | MZ ' . $l->manzana . ' LT ' . $l->lote . ' | ' . $l->clave)
+                ? ($l->fraccionamiento?->nombre.' | MZ '.$l->manzana.' LT '.$l->lote.' | '.$l->clave)
                 : 'Sin lote';
 
-            return [$c->id => $c->folio_contrato . ' — ' . $txtLote];
+            return [$c->id => $c->folio_contrato.' — '.$txtLote];
         })->toArray();
     }
 
@@ -1435,10 +1536,14 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
         $this->lotesOptions = [];
         $this->lote_id = null;
 
-        if (!$this->contrato_id) return;
+        if (! $this->contrato_id) {
+            return;
+        }
 
         $contrato = Contrato::with('lote.fraccionamiento')->find($this->contrato_id);
-        if (!$contrato) return;
+        if (! $contrato) {
+            return;
+        }
 
         if ($contrato->lote) {
             $this->lotesOptions = [
@@ -1450,7 +1555,7 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
 
     protected function puedeUsarMultiplesFormasPago(): bool
     {
-        if (!$this->asociarACuota) {
+        if (! $this->asociarACuota) {
             return true;
         }
 
@@ -1470,14 +1575,15 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
             'monto' => null,
             'referencia' => null,
             'evidencia' => null,
-             'sin_evidencia' => false,
+            'sin_evidencia' => false,
         ];
     }
 
     public function agregarPago(): void
     {
-        if (!$this->puedeUsarMultiplesFormasPago()) {
+        if (! $this->puedeUsarMultiplesFormasPago()) {
             $this->dispatch('toast', type: 'warning', message: 'Para usar múltiples formas de pago, debes seleccionar solo una cuota.');
+
             return;
         }
 
@@ -1512,7 +1618,7 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
         foreach ($this->pagos as $i => $pago) {
             $formaPagoId = isset($pago['forma_pago_id']) ? (int) $pago['forma_pago_id'] : null;
 
-            if (!$this->formaPagoRequiereCuenta($formaPagoId)) {
+            if (! $this->formaPagoRequiereCuenta($formaPagoId)) {
                 $this->pagos[$i]['cuentas_bancarias_id'] = null;
             }
         }
@@ -1531,7 +1637,7 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
 
     public function pagoRequiereCuenta(int $index): bool
     {
-        $formaPagoId = data_get($this->pagos, $index . '.forma_pago_id');
+        $formaPagoId = data_get($this->pagos, $index.'.forma_pago_id');
 
         return $this->formaPagoRequiereCuenta($formaPagoId ? (int) $formaPagoId : null);
     }
@@ -1554,7 +1660,7 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
 
         $this->metodo = $this->resolverMetodoDesdeFormaPago($this->forma_pago_id);
 
-        if (!$this->requiereCuentaBancaria) {
+        if (! $this->requiereCuentaBancaria) {
             $this->cuentas_bancarias_id = null;
         }
     }
@@ -1580,7 +1686,7 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
                     'orden' => $index + 1,
                 ];
             })
-            ->filter(fn($pago) => $pago['forma_pago_id'] && $pago['monto'] > 0)
+            ->filter(fn ($pago) => $pago['forma_pago_id'] && $pago['monto'] > 0)
             ->values()
             ->all();
 
@@ -1593,17 +1699,17 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
         foreach ($pagos as $index => $pago) {
             if ($this->formaPagoRequiereCuenta($pago['forma_pago_id']) && empty($pago['cuentas_bancarias_id'])) {
                 throw ValidationException::withMessages([
-                    'pagos.' . $index . '.cuentas_bancarias_id' => 'La cuenta bancaria es obligatoria para esta forma de pago.',
+                    'pagos.'.$index.'.cuentas_bancarias_id' => 'La cuenta bancaria es obligatoria para esta forma de pago.',
                 ]);
             }
 
-        if ($this->formaPagoRequiereCuenta($pago['forma_pago_id'])
-            && empty($pago['evidencia'])
-            && empty($pago['sin_evidencia'])
+            if ($this->formaPagoRequiereCuenta($pago['forma_pago_id'])
+                && empty($pago['evidencia'])
+                && empty($pago['sin_evidencia'])
             ) {
-            throw ValidationException::withMessages([
-                'pagos.' . $index . '.evidencia' => 'Debes adjuntar la evidencia para esta forma de pago.',
-            ]);
+                throw ValidationException::withMessages([
+                    'pagos.'.$index.'.evidencia' => 'Debes adjuntar la evidencia para esta forma de pago.',
+                ]);
             }
         }
 
@@ -1620,7 +1726,7 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
 
     protected function resolverMetodoDesdeFormaPago(?int $formaPagoId): string
     {
-        if (!$formaPagoId) {
+        if (! $formaPagoId) {
             return 'efectivo';
         }
 
@@ -1643,14 +1749,14 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
         foreach ($pagos as $index => $pago) {
             $evidenciaData = null;
 
-            if (!empty($pago['evidencia'])) {
+            if (! empty($pago['evidencia'])) {
                 $evidenciaData = $imageUploadService->saveOptimized(
                     file: $pago['evidencia'],
                     folder: 'recibos/evidencias',
                     maxWidth: 1600,
                     maxHeight: 1600,
                     quality: 72,
-                    referenceFolder: $recibo->folio . '/pago-' . ($index + 1)
+                    referenceFolder: $recibo->folio.'/pago-'.($index + 1)
                 );
             }
 
@@ -1731,7 +1837,7 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
     {
         return $this->tipoCobroEsMensualidad($this->tipos_cobro_id)
             && $this->asociarACuota
-            && !empty($this->cuotaIds)
+            && ! empty($this->cuotaIds)
             && (float) $this->recargoTotalSeleccionado > 0;
     }
 
@@ -1741,24 +1847,30 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
 
         $ultimo = Recibo::withTrashed()
             ->where('anio', $anio)
-            ->where('folio', 'regexp', '^R-' . $anio . '-[0-9]{6}$')
+            ->where('folio', 'regexp', '^R-'.$anio.'-[0-9]{6}$')
             ->orderByDesc('folio')
             ->value('folio');
 
         $n = $ultimo ? ((int) substr($ultimo, -6)) + 1 : 1;
 
-        return 'R-' . $anio . '-' . str_pad($n, 6, '0', STR_PAD_LEFT);
+        return 'R-'.$anio.'-'.str_pad($n, 6, '0', STR_PAD_LEFT);
     }
 
     protected function restarSaldoContrato(float $monto): void
     {
-        if (!$this->contrato_id) return;
+        if (! $this->contrato_id) {
+            return;
+        }
 
         $contrato = Contrato::find($this->contrato_id);
-        if (!$contrato) return;
+        if (! $contrato) {
+            return;
+        }
 
         $campo = isset($contrato->saldo_actual) ? 'saldo_actual' : 'saldo';
-        if (!isset($contrato->{$campo})) return;
+        if (! isset($contrato->{$campo})) {
+            return;
+        }
 
         $contrato->{$campo} = max(0, (float) $contrato->{$campo} - (float) $monto);
         $contrato->save();
@@ -1769,7 +1881,7 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
     protected function actualizarEstatusContratoSiEstaLiquidado(int $contratoId): void
     {
         $contrato = Contrato::find($contratoId);
-        if (!$contrato) {
+        if (! $contrato) {
             return;
         }
 
@@ -1790,9 +1902,7 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
             $contrato->saldo = 0;
         }
 
-        if (isset($contrato->fecha_liquidacion)) {
-            $contrato->fecha_liquidacion = now()->toDateString();
-        }
+        $contrato->liquidado_at ??= now();
 
         $contrato->save();
 
@@ -1851,7 +1961,7 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
             try {
                 return Recibo::create($data);
             } catch (\Throwable $e) {
-                if (!$this->isDuplicateKeyException($e)) {
+                if (! $this->isDuplicateKeyException($e)) {
                     throw $e;
                 }
 
@@ -1864,12 +1974,12 @@ protected function calcularEstadoRecargoCuota(Cuota $cuota): array
         ]);
     }
 
-protected function getFrecuenciaRecargoDias(Contrato $contrato): int
-{
-    $frecuencia = (int) ($contrato->frecuencia_recargo_dias ?? 7);
+    protected function getFrecuenciaRecargoDias(Contrato $contrato): int
+    {
+        $frecuencia = (int) ($contrato->frecuencia_recargo_dias ?? 7);
 
-    return max(1, $frecuencia);
-}
+        return max(1, $frecuencia);
+    }
 
     protected function getConteoRecibosEsperados(): array
     {
@@ -1880,7 +1990,7 @@ protected function getFrecuenciaRecargoDias(Contrato $contrato): int
             $principal = (float) ($item['principal'] ?? 0);
             $recargo = (float) ($item['recargo'] ?? 0);
 
-            if (!$this->tipoCobroEsRecargo($this->tipos_cobro_id) && $principal > 0) {
+            if (! $this->tipoCobroEsRecargo($this->tipos_cobro_id) && $principal > 0) {
                 $principales++;
             }
 
@@ -1899,16 +2009,17 @@ protected function getFrecuenciaRecargoDias(Contrato $contrato): int
         ];
     }
 
-    public function guardar(bool $imprimir = false, ImageUploadService $imageUploadService = null): void
+    public function guardar(bool $imprimir = false, ?ImageUploadService $imageUploadService = null): void
     {
         if (
-            !$this->guardarConRecargoConfirmado &&
+            ! $this->guardarConRecargoConfirmado &&
             $this->recargoModo !== 'condonar' &&
             $this->debeConfirmarRecargoAntesDeGuardar()
         ) {
             $this->imprimirPendiente = $imprimir;
             $this->mensajeConfirmacionRecargo = $this->construirMensajeConfirmacionRecargo();
             $this->showConfirmRecargoModal = true;
+
             return;
         }
 
@@ -1916,7 +2027,7 @@ protected function getFrecuenciaRecargoDias(Contrato $contrato): int
 
         $this->validate();
 
-        $montoEsperadoPagos = !$this->asociarACuota
+        $montoEsperadoPagos = ! $this->asociarACuota
             ? (float) $this->monto
             : (
                 $this->tipoCobroEsRecargo($this->tipos_cobro_id)
@@ -1928,7 +2039,7 @@ protected function getFrecuenciaRecargoDias(Contrato $contrato): int
 
         $cuotaIdsSeleccionadas = collect($this->cuotaIds)
             ->filter()
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->unique()
             ->values();
 
@@ -1949,7 +2060,7 @@ protected function getFrecuenciaRecargoDias(Contrato $contrato): int
         $recibosParaEnviar = [];
         $recibosParaImprimir = [];
 
-        DB::transaction(function () use ($imprimir, &$recibosParaEnviar, &$recibosParaImprimir, $imageUploadService, $pagosPrincipales) {
+        DB::transaction(function () use (&$recibosParaEnviar, &$recibosParaImprimir, $imageUploadService, $pagosPrincipales) {
             $fecha = Carbon::parse($this->fecha);
 
             $obtenerSaldoContrato = function (int $contratoId): float {
@@ -1968,7 +2079,7 @@ protected function getFrecuenciaRecargoDias(Contrato $contrato): int
                 $recibo->save();
             };
 
-            if (!$this->asociarACuota) {
+            if (! $this->asociarACuota) {
                 $afectaSaldoContrato = $this->tipoCobroAfectaSaldoContrato($this->tipos_cobro_id);
 
                 $saldoAnterior = $afectaSaldoContrato
@@ -2053,12 +2164,13 @@ protected function getFrecuenciaRecargoDias(Contrato $contrato): int
                 $this->dispatch('toast', type: 'success', message: 'Recibo creado correctamente.');
 
                 $this->limpiarFormularioDespuesDeGuardar();
+
                 return;
             }
 
             $cuotaIds = collect($this->cuotaIds)
                 ->filter()
-                ->map(fn($id) => (int) $id)
+                ->map(fn ($id) => (int) $id)
                 ->unique()
                 ->values();
 
@@ -2087,7 +2199,7 @@ protected function getFrecuenciaRecargoDias(Contrato $contrato): int
                 $recargoFinal = (float) ($estadoRecargo['recargo_monto'] ?? 0);
                 $recargoCondonado = (bool) ($estadoRecargo['recargo_condonado'] ?? false);
 
-                if (!$this->tipoCobroEsRecargo($this->tipos_cobro_id) && $pendientePrincipal > 0) {
+                if (! $this->tipoCobroEsRecargo($this->tipos_cobro_id) && $pendientePrincipal > 0) {
                     $saldoAnterior = $obtenerSaldoContrato((int) $this->contrato_id);
                     $periodoIdCuota = $this->resolverPeriodoIdDesdeFecha($cuota->fecha_vencimiento);
 
@@ -2128,23 +2240,23 @@ protected function getFrecuenciaRecargoDias(Contrato $contrato): int
                         'evidencia_size' => null,
                     ]);
 
-          if ($cuotaIds->count() > 1) {
-    $pagoBase = $pagosPrincipales[0];
+                    if ($cuotaIds->count() > 1) {
+                        $pagoBase = $pagosPrincipales[0];
 
-    $pagosDelRecibo = [[
-        'forma_pago_id' => $pagoBase['forma_pago_id'] ?? null,
-        'cuentas_bancarias_id' => $pagoBase['cuentas_bancarias_id'] ?? null,
-        'monto' => round((float) $pendientePrincipal, 2),
-        'referencia' => $pagoBase['referencia'] ?? null,
-        'evidencia' => $pagoBase['evidencia'] ?? null,
-        'sin_evidencia' => $pagoBase['sin_evidencia'] ?? false,
-        'orden' => 1,
-    ]];
-} else {
-    $pagosDelRecibo = $pagosPrincipales;
-}
+                        $pagosDelRecibo = [[
+                            'forma_pago_id' => $pagoBase['forma_pago_id'] ?? null,
+                            'cuentas_bancarias_id' => $pagoBase['cuentas_bancarias_id'] ?? null,
+                            'monto' => round((float) $pendientePrincipal, 2),
+                            'referencia' => $pagoBase['referencia'] ?? null,
+                            'evidencia' => $pagoBase['evidencia'] ?? null,
+                            'sin_evidencia' => $pagoBase['sin_evidencia'] ?? false,
+                            'orden' => 1,
+                        ]];
+                    } else {
+                        $pagosDelRecibo = $pagosPrincipales;
+                    }
 
-$this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
+                    $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
 
                     $recibosParaEnviar[] = $recibo->id;
                     $recibosParaImprimir[] = $recibo->id;
@@ -2185,9 +2297,9 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
                 $debeCrearRecargo = false;
 
                 if ($this->tipoCobroEsRecargo($this->tipos_cobro_id)) {
-                    $debeCrearRecargo = !$recargoCondonado && $recargoFinal > 0;
+                    $debeCrearRecargo = ! $recargoCondonado && $recargoFinal > 0;
                 } elseif ($this->tipoCobroEsMensualidad($this->tipos_cobro_id)) {
-                    $debeCrearRecargo = !$recargoCondonado && $recargoFinal > 0;
+                    $debeCrearRecargo = ! $recargoCondonado && $recargoFinal > 0;
                 }
 
                 if ($debeCrearRecargo) {
@@ -2230,7 +2342,7 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
                         'saldo_anterior' => null,
                         'saldo_posterior' => null,
 
-                        'observaciones' => trim('RECARGO de cuota #' . $cuota->numero . ' — ' . ($this->observaciones ?? '')),
+                        'observaciones' => trim('RECARGO de cuota #'.$cuota->numero.' — '.($this->observaciones ?? '')),
                         'capturado_por_user_id' => auth()->id(),
 
                         'evidencia_path' => null,
@@ -2250,7 +2362,7 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
                         'orden' => 1,
                     ]];
 
-                    if (!$this->debeCapturarPagoRecargoSeparado()) {
+                    if (! $this->debeCapturarPagoRecargoSeparado()) {
                         $pagosRecargo = [[
                             'forma_pago_id' => $pagosPrincipales[0]['forma_pago_id'] ?? null,
                             'cuentas_bancarias_id' => $pagosPrincipales[0]['cuentas_bancarias_id'] ?? null,
@@ -2399,12 +2511,12 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
         $recargos = $conteo['recargos'];
 
         if ($this->tipoCobroEsRecargo($this->tipos_cobro_id)) {
-            return "Esta operación generará {$recargos} recibo(s) de RECARGO por un total de $" . number_format((float) $this->recargoTotalSeleccionado, 2) . ". ¿Desea continuar?";
+            return "Esta operación generará {$recargos} recibo(s) de RECARGO por un total de $".number_format((float) $this->recargoTotalSeleccionado, 2).'. ¿Desea continuar?';
         }
 
         if ($this->tipoCobroEsMensualidad($this->tipos_cobro_id)) {
-            return "Esta operación generará {$principales} recibo(s) principal(es) por $" . number_format((float) $this->montoTotalSeleccionado, 2) .
-                " y {$recargos} recibo(s) de recargo por $" . number_format((float) $this->recargoTotalSeleccionado, 2) . ". ¿Desea continuar?";
+            return "Esta operación generará {$principales} recibo(s) principal(es) por $".number_format((float) $this->montoTotalSeleccionado, 2).
+                " y {$recargos} recibo(s) de recargo por $".number_format((float) $this->recargoTotalSeleccionado, 2).'. ¿Desea continuar?';
         }
 
         return "Esta operación generará {$principales} recibo(s). ¿Desea continuar?";
@@ -2421,7 +2533,7 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
             'tipo_cobro' => $this->tipos_cobro_id,
         ]);
 
-        if (!$this->guardarConRecargoConfirmado && $this->debeConfirmarRecargoAntesDeGuardar()) {
+        if (! $this->guardarConRecargoConfirmado && $this->debeConfirmarRecargoAntesDeGuardar()) {
             Log::info('ABRIENDO MODAL DE RECARGO');
 
             $this->imprimirPendiente = $imprimir;
@@ -2465,7 +2577,7 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
 
     protected function tieneRecargoPendientePorConfirmar(): bool
     {
-        if (!$this->asociarACuota || empty($this->cuotaIds)) {
+        if (! $this->asociarACuota || empty($this->cuotaIds)) {
             return false;
         }
 
@@ -2492,7 +2604,7 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
 
     public function toggleRecargoPagoBox(): void
     {
-        $this->showRecargoPagoBox = !$this->showRecargoPagoBox;
+        $this->showRecargoPagoBox = ! $this->showRecargoPagoBox;
     }
 
     public function getMostrarCampoEvidenciaRecargoProperty(): bool
@@ -2502,13 +2614,13 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
 
     protected function debePedirEvidenciaRecargo(): bool
     {
-        if (!$this->debeCapturarPagoRecargoSeparado()) {
+        if (! $this->debeCapturarPagoRecargoSeparado()) {
             return false;
         }
 
         $formaRecargoId = $this->recargo_forma_pago_id ?: $this->forma_pago_id;
 
-        if (!$formaRecargoId) {
+        if (! $formaRecargoId) {
             return false;
         }
 
@@ -2537,15 +2649,20 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
 
         $total = (float) $total;
 
-        if ($total <= 0) return;
+        if ($total <= 0) {
+            return;
+        }
 
         $count = count($this->pagos);
 
-        if ($count === 0) return;
+        if ($count === 0) {
+            return;
+        }
 
         // Si solo hay uno → se pone todo
         if ($count === 1) {
             $this->pagos[0]['monto'] = $total;
+
             return;
         }
 
@@ -2553,7 +2670,9 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
         $sumaSinUltimo = 0;
 
         foreach ($this->pagos as $i => $pago) {
-            if ($i === $count - 1) continue;
+            if ($i === $count - 1) {
+                continue;
+            }
             $sumaSinUltimo += (float) ($pago['monto'] ?? 0);
         }
 
@@ -2584,14 +2703,14 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
 
     protected function obtenerSaldoActualContrato(int $contratoId): float
     {
-        return (float) \App\Models\Contrato::query()
+        return (float) Contrato::query()
             ->whereKey($contratoId)
             ->lockForUpdate()
             ->value('saldo_actual');
     }
 
     protected function ponerSnapshotSaldoEnRecibo(
-        \App\Models\Recibo $recibo,
+        Recibo $recibo,
         float $saldoAnterior,
         float $montoAplicado,
         ?float $saldoPosterior = null
@@ -2608,16 +2727,16 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
 
     protected function sincronizarPeriodoDesdeCuotasSeleccionadas(): void
     {
-        if (!$this->asociarACuota || empty($this->cuotaIds)) {
+        if (! $this->asociarACuota || empty($this->cuotaIds)) {
             return;
         }
 
         $cuotaId = collect($this->cuotaIds)
             ->filter()
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->first();
 
-        if (!$cuotaId) {
+        if (! $cuotaId) {
             return;
         }
 
@@ -2625,7 +2744,7 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
             ->select('id', 'fecha_vencimiento')
             ->find($cuotaId);
 
-        if (!$cuota || !$cuota->fecha_vencimiento) {
+        if (! $cuota || ! $cuota->fecha_vencimiento) {
             return;
         }
 
@@ -2645,12 +2764,13 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
         // Mantener también sincronizado el monto general
         $this->monto = $total;
 
-        if (empty($this->pagos) || !is_array($this->pagos)) {
+        if (empty($this->pagos) || ! is_array($this->pagos)) {
             $this->pagos = [$this->nuevoPagoRow()];
         }
 
         if (count($this->pagos) <= 1) {
             $this->pagos[0]['monto'] = $total;
+
             return;
         }
 
@@ -2661,19 +2781,19 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
         ?int $tipoCobroId,
         ?int $formaPagoId = null
     ): ?int {
-        if (!$tipoCobroId) {
+        if (! $tipoCobroId) {
             return null;
         }
 
         $fraccionamientoId = null;
 
         if ($this->lote_id) {
-            $fraccionamientoId = \App\Models\Lote::query()
+            $fraccionamientoId = Lote::query()
                 ->whereKey($this->lote_id)
                 ->value('fraccionamiento_id');
         }
 
-        if (!$fraccionamientoId && $this->contrato_id) {
+        if (! $fraccionamientoId && $this->contrato_id) {
             $contrato = Contrato::with('lote')->find($this->contrato_id);
             $fraccionamientoId = $contrato?->lote?->fraccionamiento_id;
         }
@@ -2687,7 +2807,7 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
 
     protected function resolverPeriodoIdDesdeFecha(?string $fechaVencimiento): ?int
     {
-        if (!$fechaVencimiento) {
+        if (! $fechaVencimiento) {
             return null;
         }
 
@@ -2704,13 +2824,12 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
             ->value('id');
     }
 
-
     protected function openPrintBatchTab(array $reciboIds): void
     {
         $token = Str::uuid()->toString();
 
         cache()->put(
-            'print_batch:' . $token,
+            'print_batch:'.$token,
             [
                 'user_id' => auth()->id(),
                 'recibo_ids' => array_values($reciboIds),
@@ -2727,7 +2846,7 @@ $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
     {
         $this->actualizarRequiereCuentaBancaria();
         $this->actualizarRequiereCuentaBancariaRecargo();
-        if (empty($this->pagos) || !is_array($this->pagos) || count($this->pagos) === 0) {
+        if (empty($this->pagos) || ! is_array($this->pagos) || count($this->pagos) === 0) {
             $this->pagos = [$this->nuevoPagoRow()];
         }
 

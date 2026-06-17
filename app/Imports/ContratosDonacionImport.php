@@ -15,7 +15,7 @@ use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Row;
 
-class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReading
+class ContratosDonacionImport implements OnEachRow, WithChunkReading, WithStartRow
 {
     public function __construct(
         private readonly int $propietarioId,
@@ -28,7 +28,9 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
     ) {}
 
     private array $cacheFracc = [];
+
     private array $cacheLote = [];
+
     private array $cacheCliente = [];
 
     public function startRow(): int
@@ -58,6 +60,7 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
             Log::info('IMPORT DONACION: header detectado, se omite', [
                 'excel_row' => $excelRow,
             ]);
+
             return;
         }
 
@@ -91,17 +94,16 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
          *
          * Para donación realmente usaremos sólo lo necesario.
          */
-
-        $apellidos   = $this->normUpper($r[0] ?? '');
-        $nombres     = $this->normUpper($r[1] ?? '');
+        $apellidos = $this->normUpper($r[0] ?? '');
+        $nombres = $this->normUpper($r[1] ?? '');
         $residencial = $this->normUpper($r[2] ?? '');
-        $manzana     = trim((string) ($r[3] ?? ''));
-        $loteNum     = trim((string) ($r[4] ?? ''));
-        $telefono    = $this->normPhone($r[5] ?? '');
-        $fecha       = $this->parseFecha($r[6] ?? null);
+        $manzana = trim((string) ($r[3] ?? ''));
+        $loteNum = trim((string) ($r[4] ?? ''));
+        $telefono = $this->normPhone($r[5] ?? '');
+        $fecha = $this->parseFecha($r[6] ?? null);
 
-        $precio      = $this->parseMoney($r[7] ?? 0);
-        $estatusRaw  = (string) ($r[14] ?? '');
+        $precio = $this->parseMoney($r[7] ?? 0);
+        $estatusRaw = (string) ($r[14] ?? '');
         $estatusNorm = $this->normalizeEstatus($estatusRaw);
 
         if ($residencial === '' || $loteNum === '') {
@@ -112,6 +114,7 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
                 'lote' => $loteNum,
                 'cliente' => trim("$apellidos $nombres"),
             ]);
+
             return;
         }
 
@@ -180,6 +183,7 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
                         'excel_row' => $excelRow,
                         'lote_id' => $loteId,
                     ]);
+
                     return;
                 }
 
@@ -206,7 +210,7 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
                     ->first();
 
                 if (! $contrato) {
-                    $contrato = new Contrato();
+                    $contrato = new Contrato;
                     $contrato->uuid = (string) Str::uuid();
                     $contrato->folio_contrato = $this->generarFolioSeguro();
                 }
@@ -241,6 +245,7 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
                     'anualidad_monto' => null,
 
                     'estatus' => $this->contratoEstatusActivo,
+                    'liquidado_at' => $fechaContrato->copy()->startOfDay(),
                 ];
 
                 $contrato->fill($payload);
@@ -280,7 +285,7 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
 
     private function generarFolioSeguro(): string
     {
-        return 'DON-' . now()->format('YmdHis') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+        return 'DON-'.now()->format('YmdHis').'-'.strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
     }
 
     private function resolveFraccionamiento(string $nombre, ?int $excelRow = null): ?int
@@ -332,7 +337,7 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
             return null;
         }
 
-        $key = "{$fraccId}|" . mb_strtolower($manzana) . "|" . mb_strtolower($lote);
+        $key = "{$fraccId}|".mb_strtolower($manzana).'|'.mb_strtolower($lote);
         if (array_key_exists($key, $this->cacheLote)) {
             return $this->cacheLote[$key];
         }
@@ -379,7 +384,7 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
 
     private function buildClaveLote(int $fraccId, string $manzana, string $lote): string
     {
-        $base = "F{$fraccId}-M" . ($manzana !== '' ? $manzana : '0') . "-L{$lote}";
+        $base = "F{$fraccId}-M".($manzana !== '' ? $manzana : '0')."-L{$lote}";
         $clave = $base;
         $i = 1;
 
@@ -396,7 +401,7 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
         $nombres = trim($nombres);
         $apellidos = trim($apellidos);
 
-        $key = mb_strtolower($apellidos . '|' . $nombres);
+        $key = mb_strtolower($apellidos.'|'.$nombres);
         if ($key === '|') {
             $key = 'sin-nombre';
         }
@@ -436,6 +441,7 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
 
         if (is_numeric($value)) {
             $v = (float) $value;
+
             return Carbon::createFromTimestampUTC(((int) round($v) - 25569) * 86400)->startOfDay();
         }
 
@@ -505,6 +511,7 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
     {
         $s = trim((string) $s);
         $s = preg_replace('/\s+/', ' ', $s);
+
         return mb_strtoupper($s);
     }
 
@@ -540,12 +547,14 @@ class ContratosDonacionImport implements OnEachRow, WithStartRow, WithChunkReadi
     {
         $s = trim((string) $s);
         $s = preg_replace('/\s+/', ' ', $s);
+
         return mb_strtoupper($s);
     }
 
     private function normPhone($s): string
     {
         $s = preg_replace('/\D+/', '', (string) $s);
+
         return $s ?: '';
     }
 

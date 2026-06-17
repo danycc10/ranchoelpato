@@ -7,6 +7,7 @@ use App\Exports\Sheets\MonthlyIncomeAdvanceDetailSheet;
 use App\Exports\Sheets\MonthlyIncomeDetailSheet;
 use App\Exports\Sheets\MonthlyIncomeHistoricDetailSheet;
 use App\Exports\Sheets\MonthlyIncomeLateDetailSheet;
+use App\Exports\Sheets\MonthlyIncomeLiquidatedContractsSheet;
 use App\Exports\Sheets\MonthlyIncomePendingSheet;
 use App\Exports\Sheets\MonthlyIncomeSummarySheet;
 use Illuminate\Support\Collection;
@@ -68,6 +69,12 @@ class MonthlyIncomeExport implements WithMultipleSheets
                 propietarioId: $this->propietarioId,
             );
         }
+
+        $sheets[] = new MonthlyIncomeLiquidatedContractsSheet(
+            anio: $this->anio,
+            mes: $this->mes,
+            propietarioId: $this->propietarioId,
+        );
 
         $sheets[] = new MonthlyIncomeActiveContractsSheet(
             anio: $this->anio,

@@ -244,9 +244,16 @@ class Edit extends Component
             ];
 
             $saldoAnterior = (float) ($this->contrato->saldo_actual ?? 0);
+            $estatusAnterior = (string) ($this->contrato->estatus ?? 'activo');
 
             $this->contrato->cliente_id = (int) $this->cliente_id;
             $this->contrato->estatus = $this->nuevo_estatus;
+            $this->contrato->liquidado_at = match (true) {
+                in_array($this->nuevo_estatus, ['liquidado', 'donacion'], true)
+                    && ! in_array($estatusAnterior, ['liquidado', 'donacion'], true) => now(),
+                in_array($this->nuevo_estatus, ['liquidado', 'donacion'], true) => $this->contrato->liquidado_at,
+                default => null,
+            };
 
             if (isset($this->contrato->fecha_inicio)) {
                 $this->contrato->fecha_inicio = $this->nueva_fecha_inicio

@@ -17,7 +17,7 @@ use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Row;
 
-class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkReading
+class ContratosServiciosImport implements OnEachRow, WithChunkReading, WithStartRow
 {
     public function __construct(
         private readonly int $propietarioId,
@@ -77,19 +77,18 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
          * 10 DIA_SEMANA
          * 11 FOLIO_CONTRATO_BASE
          */
-
-        $nombreCompleto     = trim((string) ($r[0] ?? ''));
-        $fechaInicio        = $this->parseFecha($r[1] ?? null) ?: now()->startOfDay();
-        $precioTotal        = $this->parseMoney($r[2] ?? 0);
-        $abonoSemanal       = $this->parseMoney($r[3] ?? 0);
-        $abonoMensual       = $this->parseMoney($r[4] ?? 0);
-        $loteExcel          = trim((string) ($r[5] ?? ''));
-        $fincaExcel         = $this->normUpper($r[6] ?? '');
-        $estatusExcel       = $this->normalizeEstatusServicio((string) ($r[7] ?? ''));
-        $frecuencia         = $this->normalizeFrecuencia($r[8] ?? '');
-        $diaMesExcel        = $this->parseIntOrNull($r[9] ?? null);
-        $diaSemanaExcel     = $this->parseDiaSemanaIso($r[10] ?? null);
-        $folioContratoBase  = trim((string) ($r[11] ?? ''));
+        $nombreCompleto = trim((string) ($r[0] ?? ''));
+        $fechaInicio = $this->parseFecha($r[1] ?? null) ?: now()->startOfDay();
+        $precioTotal = $this->parseMoney($r[2] ?? 0);
+        $abonoSemanal = $this->parseMoney($r[3] ?? 0);
+        $abonoMensual = $this->parseMoney($r[4] ?? 0);
+        $loteExcel = trim((string) ($r[5] ?? ''));
+        $fincaExcel = $this->normUpper($r[6] ?? '');
+        $estatusExcel = $this->normalizeEstatusServicio((string) ($r[7] ?? ''));
+        $frecuencia = $this->normalizeFrecuencia($r[8] ?? '');
+        $diaMesExcel = $this->parseIntOrNull($r[9] ?? null);
+        $diaSemanaExcel = $this->parseDiaSemanaIso($r[10] ?? null);
+        $folioContratoBase = trim((string) ($r[11] ?? ''));
 
         if ($nombreCompleto === '' || $folioContratoBase === '') {
             Log::warning('IMPORT SERVICIOS: fila omitida por datos mínimos faltantes', [
@@ -97,6 +96,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                 'nombre' => $nombreCompleto,
                 'folio_contrato_base' => $folioContratoBase,
             ]);
+
             return;
         }
 
@@ -112,6 +112,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                     'folio_contrato_base' => $folioContratoBase,
                     'abono_semanal' => $abonoSemanal,
                 ]);
+
                 return;
             }
         } elseif ($frecuencia === 'mensual') {
@@ -122,6 +123,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                     'folio_contrato_base' => $folioContratoBase,
                     'abono_mensual' => $abonoMensual,
                 ]);
+
                 return;
             }
         } else {
@@ -130,6 +132,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                 'frecuencia_raw' => $r[8] ?? null,
                 'folio_contrato_base' => $folioContratoBase,
             ]);
+
             return;
         }
 
@@ -139,6 +142,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                 'precio_total' => $precioTotal,
                 'folio_contrato_base' => $folioContratoBase,
             ]);
+
             return;
         }
 
@@ -152,6 +156,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                     'dia_mes' => $diaMesExcel,
                     'folio_contrato_base' => $folioContratoBase,
                 ]);
+
                 return;
             }
             $dia_mes = (int) $diaMesExcel;
@@ -164,6 +169,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                     'dia_semana' => $diaSemanaExcel,
                     'folio_contrato_base' => $folioContratoBase,
                 ]);
+
                 return;
             }
             $dia_semana = (int) $diaSemanaExcel;
@@ -203,8 +209,6 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
         try {
             DB::transaction(function () use (
                 $excelRow,
-                $nombres,
-                $apellidos,
                 $fechaInicio,
                 $precioTotal,
                 $montoPago,
@@ -227,6 +231,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                         'excel_row' => $excelRow,
                         'folio_contrato_base' => $folioContratoBase,
                     ]);
+
                     return;
                 }
 
@@ -240,6 +245,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                         'cliente_id' => $clienteId,
                         'lote_id' => $loteId,
                     ]);
+
                     return;
                 }
 
@@ -250,6 +256,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                         'contrato_base_id' => $contratoBase->id,
                         'cliente_id' => $clienteId,
                     ]);
+
                     return;
                 }
 
@@ -261,7 +268,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                     ->first();
 
                 if (! $contratoServicio) {
-                    $contratoServicio = new Contrato();
+                    $contratoServicio = new Contrato;
                     $contratoServicio->uuid = (string) Str::uuid();
                     $contratoServicio->folio_contrato = $this->generarFolioServicioSeguro();
                 }
@@ -393,7 +400,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
             ->where('folio_contrato', $folioContratoBase)
             ->where(function ($q) {
                 $q->whereNull('tipo')
-                  ->orWhere('tipo', 'terreno');
+                    ->orWhere('tipo', 'terreno');
             })
             ->first();
 
@@ -421,6 +428,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                     $cuota->estatus = $this->cuotaEstatusPagada;
                     $cuota->save();
                 }
+
                 continue;
             }
 
@@ -447,9 +455,9 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                 'periodo_id' => null,
 
                 'monto' => (float) $cuota->monto,
-                'observaciones' => 'Backfill por import servicio (<= ' . $cutoff->toDateString() . ')',
+                'observaciones' => 'Backfill por import servicio (<= '.$cutoff->toDateString().')',
                 'capturado_por_user_id' => $this->capturadoPorUserId,
-                        'afecta_reportes' => false,
+                'afecta_reportes' => false,
                 'tipo_movimiento' => 'historico',
                 'es_historico' => true,
             ]);
@@ -461,7 +469,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                 'recibo_id' => $recibo->id,
                 'monto' => (float) $cuota->monto,
                 'metodo' => $this->pagoMetodoDefault,
-                'referencia' => 'IMPORT-SERVICIO-BACKFILL-' . $cutoff->format('Y'),
+                'referencia' => 'IMPORT-SERVICIO-BACKFILL-'.$cutoff->format('Y'),
                 'estatus' => 'confirmado',
                 'fecha_pago' => $fecha->copy()->setTime(12, 0, 0),
             ]);
@@ -486,6 +494,13 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
         $contrato->estatus = ($saldo <= 0.00001)
             ? $this->contratoEstatusLiquidado
             : ($contrato->estatus === $this->contratoEstatusCancelado ? $this->contratoEstatusCancelado : $this->contratoEstatusActivo);
+        $contrato->liquidado_at = ($saldo <= 0.00001)
+            ? (Pago::query()
+                ->where('contrato_id', $contrato->id)
+                ->where('estatus', 'confirmado')
+                ->whereNotNull('cuota_id')
+                ->max('fecha_pago') ?: $contrato->liquidado_at)
+            : null;
 
         $contrato->save();
     }
@@ -510,6 +525,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                     $cuota->estatus = $this->cuotaEstatusPagada;
                     $cuota->save();
                 }
+
                 continue;
             }
 
@@ -538,7 +554,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                 'monto' => (float) $cuota->monto,
                 'observaciones' => 'Generado por importación servicio (PAGADO)',
                 'capturado_por_user_id' => $this->capturadoPorUserId,
-                        'afecta_reportes' => false,
+                'afecta_reportes' => false,
                 'tipo_movimiento' => 'historico',
                 'es_historico' => true,
             ]);
@@ -563,12 +579,12 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
 
     private function generarFolioServicioSeguro(): string
     {
-        return 'CS-' . now()->format('YmdHis') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+        return 'CS-'.now()->format('YmdHis').'-'.strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
     }
 
     private function generarFolioReciboSeguro(): string
     {
-        return 'R-' . now()->format('YmdHis') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+        return 'R-'.now()->format('YmdHis').'-'.strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
     }
 
     private function splitNombreCompleto(string $nombreCompleto): array
@@ -603,6 +619,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
 
         if (is_numeric($value)) {
             $v = (float) $value;
+
             return Carbon::createFromTimestampUTC(((int) round($v) - 25569) * 86400)->startOfDay();
         }
 
@@ -677,11 +694,21 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
     {
         $s = $this->normalizeCatalog($value);
 
-        if ($s === '') return null;
-        if (str_contains($s, 'MENS')) return 'mensual';
-        if (str_contains($s, 'SEMAN')) return 'semanal';
-        if (in_array($s, ['MES', 'M'], true)) return 'mensual';
-        if (in_array($s, ['SEM', 'S'], true)) return 'semanal';
+        if ($s === '') {
+            return null;
+        }
+        if (str_contains($s, 'MENS')) {
+            return 'mensual';
+        }
+        if (str_contains($s, 'SEMAN')) {
+            return 'semanal';
+        }
+        if (in_array($s, ['MES', 'M'], true)) {
+            return 'mensual';
+        }
+        if (in_array($s, ['SEM', 'S'], true)) {
+            return 'semanal';
+        }
 
         return null;
     }
@@ -699,24 +726,42 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
         $s = preg_replace('/\s+/', ' ', $s);
         $s = trim($s);
 
-        if (str_contains($s, 'PAGAD')) return 'PAGADO';
-        if (str_contains($s, 'LIQUID')) return 'LIQUIDADO';
-        if (str_contains($s, 'CANCEL')) return 'CANCELADO';
-        if (str_contains($s, 'MOROS')) return 'MOROSO';
-        if (str_contains($s, 'ACTIV')) return 'ACTIVO';
+        if (str_contains($s, 'PAGAD')) {
+            return 'PAGADO';
+        }
+        if (str_contains($s, 'LIQUID')) {
+            return 'LIQUIDADO';
+        }
+        if (str_contains($s, 'CANCEL')) {
+            return 'CANCELADO';
+        }
+        if (str_contains($s, 'MOROS')) {
+            return 'MOROSO';
+        }
+        if (str_contains($s, 'ACTIV')) {
+            return 'ACTIVO';
+        }
 
         return $s !== '' ? $s : 'ACTIVO';
     }
 
     private function parseIntOrNull($value): ?int
     {
-        if ($value === null) return null;
+        if ($value === null) {
+            return null;
+        }
 
         $s = trim((string) $value);
-        if ($s === '') return null;
+        if ($s === '') {
+            return null;
+        }
 
-        if (is_numeric($s)) return (int) round((float) $s);
-        if (! preg_match('/^-?\d+$/', $s)) return null;
+        if (is_numeric($s)) {
+            return (int) round((float) $s);
+        }
+        if (! preg_match('/^-?\d+$/', $s)) {
+            return null;
+        }
 
         return (int) $s;
     }
@@ -746,13 +791,27 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
 
         $s = str_replace(['Á', 'É', 'Í', 'Ó', 'Ú'], ['A', 'E', 'I', 'O', 'U'], $s);
 
-        if (str_starts_with($s, 'LUN')) $s = 'LUNES';
-        if (str_starts_with($s, 'MAR')) $s = 'MARTES';
-        if (str_starts_with($s, 'MIE')) $s = 'MIERCOLES';
-        if (str_starts_with($s, 'JUE')) $s = 'JUEVES';
-        if (str_starts_with($s, 'VIE')) $s = 'VIERNES';
-        if (str_starts_with($s, 'SAB')) $s = 'SABADO';
-        if (str_starts_with($s, 'DOM')) $s = 'DOMINGO';
+        if (str_starts_with($s, 'LUN')) {
+            $s = 'LUNES';
+        }
+        if (str_starts_with($s, 'MAR')) {
+            $s = 'MARTES';
+        }
+        if (str_starts_with($s, 'MIE')) {
+            $s = 'MIERCOLES';
+        }
+        if (str_starts_with($s, 'JUE')) {
+            $s = 'JUEVES';
+        }
+        if (str_starts_with($s, 'VIE')) {
+            $s = 'VIERNES';
+        }
+        if (str_starts_with($s, 'SAB')) {
+            $s = 'SABADO';
+        }
+        if (str_starts_with($s, 'DOM')) {
+            $s = 'DOMINGO';
+        }
 
         $map = [
             'LUNES' => 1,
@@ -778,6 +837,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
     {
         $s = trim((string) $s);
         $s = preg_replace('/\s+/', ' ', $s);
+
         return mb_strtoupper($s);
     }
 
@@ -785,6 +845,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
     {
         $s = trim((string) $s);
         $s = preg_replace('/\s+/', ' ', $s);
+
         return mb_strtoupper($s);
     }
 
@@ -795,6 +856,7 @@ class ContratosServiciosImport implements OnEachRow, WithStartRow, WithChunkRead
                 return false;
             }
         }
+
         return true;
     }
 }

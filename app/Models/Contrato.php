@@ -37,6 +37,7 @@ class Contrato extends Model
         'dias_gracia',
         'frecuencia_recargo_dias',
         'estatus',        // activo|moroso|liquidado|cancelado
+        'liquidado_at',
         'archivo_contrato',
         'tipo',
         'servicio_tipo',
@@ -84,6 +85,7 @@ class Contrato extends Model
         'valor_recargo' => 'decimal:2',
         'dias_gracia' => 'integer',
         'frecuencia_recargo_dias' => 'integer',
+        'liquidado_at' => 'datetime',
         'dia_semana' => 'integer',
         'dia_mes' => 'integer',
         'es_financiamiento_instalacion' => 'boolean',

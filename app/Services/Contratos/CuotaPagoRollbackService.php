@@ -112,6 +112,9 @@ class CuotaPagoRollbackService
 
             $contrato->saldo_actual = $saldo;
             $contrato->estatus = ($saldo <= 0.00001) ? 'liquidado' : 'activo';
+            $contrato->liquidado_at = ($saldo <= 0.00001)
+                ? ($contrato->liquidado_at ?: now())
+                : null;
             $contrato->save();
         });
     }

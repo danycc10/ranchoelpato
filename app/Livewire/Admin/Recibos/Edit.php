@@ -552,11 +552,9 @@ class Edit extends Component
             $data['saldo_actual'] = $this->recalcularSaldoContrato($contrato->id);
         }
 
-        if (isset($contrato->fecha_liquidacion)) {
-            $data['fecha_liquidacion'] = $tieneCuotasPendientes
-                ? null
-                : now()->toDateString();
-        }
+        $data['liquidado_at'] = $tieneCuotasPendientes
+            ? null
+            : ($contrato->liquidado_at ?: now());
 
         $contrato->update($data);
     }

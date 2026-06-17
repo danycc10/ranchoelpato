@@ -4,24 +4,22 @@ namespace App\Imports;
 
 use App\Models\Cliente;
 use App\Models\Contrato;
+use App\Models\Cuota;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
-use App\Models\Cuota;
-use App\Models\Recibo;
 use App\Models\Pago;
+use App\Models\Recibo;
 use App\Services\Contratos\ContratoPlanService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\OnEachRow;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Row;
 
-
-class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
+class ContratosImport implements OnEachRow, WithChunkReading, WithStartRow
 {
     public function __construct(
         private readonly int $propietarioId,
@@ -60,7 +58,9 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
     ) {}
 
     private array $cacheFracc = [];
+
     private array $cacheLote = [];
+
     private array $cacheCliente = [];
 
     /**
@@ -83,7 +83,9 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
         $excelRow = method_exists($row, 'getIndex') ? (int) $row->getIndex() : null;
         $r = $row->toArray();
 
-        if ($this->allEmpty($r)) return;
+        if ($this->allEmpty($r)) {
+            return;
+        }
 
         /**
          * ✅ CORRECCIÓN:
@@ -94,6 +96,7 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
         $col2 = $this->normalizeCatalog($r[2] ?? '');
         if ($col0 === 'APELLIDO' && $col1 === 'NOMBRE' && $col2 === 'RESIDENCIAL') {
             Log::info('IMPORT: header detectado, se omite', ['excel_row' => $excelRow]);
+
             return;
         }
 
@@ -130,38 +133,37 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
          * 19 anualidad_fecha
          * 20 anualidad_monto
          */
-
-        $apellidos   = $this->normUpper($r[0] ?? '');
-        $nombres     = $this->normUpper($r[1] ?? '');
+        $apellidos = $this->normUpper($r[0] ?? '');
+        $nombres = $this->normUpper($r[1] ?? '');
         $residencial = $this->normUpper($r[2] ?? '');
-        $manzana     = trim((string) ($r[3] ?? ''));
-        $loteNum     = trim((string) ($r[4] ?? ''));
+        $manzana = trim((string) ($r[3] ?? ''));
+        $loteNum = trim((string) ($r[4] ?? ''));
 
         // Si viene "DONACION" en teléfono → se limpia a ''
-        $telefono    = $this->normPhone($r[5] ?? '');
-        $fecha       = $this->parseFecha($r[6] ?? null);
+        $telefono = $this->normPhone($r[5] ?? '');
+        $fecha = $this->parseFecha($r[6] ?? null);
 
-        $precio   = $this->parseMoney($r[7] ?? 0);
+        $precio = $this->parseMoney($r[7] ?? 0);
         $enganche = $this->parseMoney($r[8] ?? 0);
-        $restan   = $this->parseMoney($r[9] ?? 0);
+        $restan = $this->parseMoney($r[9] ?? 0);
 
         $mensualidadRaw = $r[10] ?? '';
-        $mensTxt        = $this->normalizeCatalog($mensualidadRaw);
+        $mensTxt = $this->normalizeCatalog($mensualidadRaw);
 
-        $recargoTxt     = $this->normalizeCatalog($r[11] ?? '');
-        $aplicaRecargo  = in_array($recargoTxt, ['SI', 'SÍ', 'YES', 'Y'], true);
+        $recargoTxt = $this->normalizeCatalog($r[11] ?? '');
+        $aplicaRecargo = in_array($recargoTxt, ['SI', 'SÍ', 'YES', 'Y'], true);
 
         $montoRecargoExcel = $this->parseMoney($r[12] ?? null);
-        $diasGraciaExcel   = (int) ($r[13] ?? $this->diasGraciaDefault);
+        $diasGraciaExcel = (int) ($r[13] ?? $this->diasGraciaDefault);
 
         $estatusExcelRaw = (string) ($r[14] ?? '');
-        $estatusExcel    = $this->normalizeEstatus($estatusExcelRaw);
+        $estatusExcel = $this->normalizeEstatus($estatusExcelRaw);
 
         // ✅ NUEVO: FRECUENCIA + DIAS
         $frecuenciaRaw = $r[15] ?? '';
-        $frecuencia    = $this->normalizeFrecuencia($frecuenciaRaw); // 'mensual' | 'semanal' | null
+        $frecuencia = $this->normalizeFrecuencia($frecuenciaRaw); // 'mensual' | 'semanal' | null
 
-        $diaMesExcel    = $this->parseIntOrNull($r[16] ?? null);
+        $diaMesExcel = $this->parseIntOrNull($r[16] ?? null);
         $diaSemanaExcel = $this->parseDiaSemanaIso($r[17] ?? null); // 1..7 o null
 
         // ✅ NUEVO: ANUALIDAD
@@ -201,9 +203,9 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
             'propietario_id' => $this->propietarioId,
         ]);
 
-        $tipoRecargo  = 'fijo';
+        $tipoRecargo = 'fijo';
         $valorRecargo = $aplicaRecargo
-            ? (float)(($montoRecargoExcel > 0) ? $montoRecargoExcel : $this->recargoFijoDefault)
+            ? (float) (($montoRecargoExcel > 0) ? $montoRecargoExcel : $this->recargoFijoDefault)
             : 0.0;
 
         $diasGracia = ($diasGraciaExcel >= 0) ? $diasGraciaExcel : $this->diasGraciaDefault;
@@ -212,6 +214,7 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
         if ($soloCrearLote) {
             if ($loteNum === '') {
                 Log::warning('SOLO LOTE omitido: lote vacío', ['excel_row' => $excelRow]);
+
                 return;
             }
 
@@ -225,7 +228,9 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                     $precio
                 ) {
                     $fraccId = $this->resolveFraccionamiento($residencial, $excelRow);
-                    if (! $fraccId) return;
+                    if (! $fraccId) {
+                        return;
+                    }
 
                     $nuevoEstatus = str_contains($estatusExcel, 'DONACION')
                         ? $this->loteEstatusDonacion
@@ -240,16 +245,18 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                         $precio
                     );
 
-                    if (! $loteId) return;
+                    if (! $loteId) {
+                        return;
+                    }
 
                     $update = [
                         'estatus' => $nuevoEstatus,
                         'updated_at' => now(),
                     ];
 
-                    if ((float)$precio > 0) {
+                    if ((float) $precio > 0) {
                         $lot = Lote::find($loteId);
-                        if ($lot && ((float)($lot->precio_lista ?? 0) <= 0)) {
+                        if ($lot && ((float) ($lot->precio_lista ?? 0) <= 0)) {
                             $update['precio_lista'] = (float) $precio;
                         }
                     }
@@ -289,13 +296,16 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                 'precio' => $precio,
                 'cliente' => trim("$apellidos $nombres"),
             ]);
+
             return;
         }
 
         $fechaInicio = ($fecha ?: now())->startOfDay();
 
         $saldoInicial = max(0, $precio - $enganche);
-        if ($restan <= 0) $restan = $saldoInicial;
+        if ($restan <= 0) {
+            $restan = $saldoInicial;
+        }
 
         // monto pago
         $montoPago = $this->parseMoney($mensualidadRaw);
@@ -362,7 +372,9 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                 $anualidadMonto
             ) {
                 $fraccId = $this->resolveFraccionamiento($residencial, $excelRow);
-                if (! $fraccId) return;
+                if (! $fraccId) {
+                    return;
+                }
 
                 $loteId = $this->resolveLote(
                     $fraccId,
@@ -372,19 +384,23 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                     null,
                     $precio
                 );
-                if (! $loteId) return;
+                if (! $loteId) {
+                    return;
+                }
 
                 // backfill precio_lista si faltaba
-                if ((float)$precio > 0) {
+                if ((float) $precio > 0) {
                     $lot = Lote::find($loteId);
-                    if ($lot && ((float)($lot->precio_lista ?? 0) <= 0)) {
+                    if ($lot && ((float) ($lot->precio_lista ?? 0) <= 0)) {
                         $lot->precio_lista = (float) $precio;
                         $lot->save();
                     }
                 }
 
                 $clienteId = $this->resolveCliente($nombres, $apellidos, $excelRow);
-                if (! $clienteId) return;
+                if (! $clienteId) {
+                    return;
+                }
 
                 if ($telefono !== '') {
                     $c = Cliente::find($clienteId);
@@ -400,7 +416,7 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                     ->first();
 
                 if (! $contrato) {
-                    $contrato = new Contrato();
+                    $contrato = new Contrato;
                     $contrato->uuid = (string) Str::uuid();
                     $contrato->folio_contrato = $this->generarFolioSeguro();
                 }
@@ -439,7 +455,7 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                 $loteActual = Lote::find($loteId);
                 $esDonacionLote = $loteActual && $loteActual->estatus === $this->loteEstatusDonacion;
 
-                if (!($this->blindarDonacion && $esDonacionLote)) {
+                if (! ($this->blindarDonacion && $esDonacionLote)) {
                     Lote::where('id', $loteId)->update([
                         'estatus' => $this->loteEstatusVendido,
                         'updated_at' => now(),
@@ -535,25 +551,44 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
     {
         $s = $this->normalizeCatalog($value);
 
-        if ($s === '') return null;
-        if (str_contains($s, 'MENS')) return 'mensual';
-        if (str_contains($s, 'SEMAN')) return 'semanal';
-        if (in_array($s, ['MES', 'M'], true)) return 'mensual';
-        if (in_array($s, ['SEM', 'S'], true)) return 'semanal';
+        if ($s === '') {
+            return null;
+        }
+        if (str_contains($s, 'MENS')) {
+            return 'mensual';
+        }
+        if (str_contains($s, 'SEMAN')) {
+            return 'semanal';
+        }
+        if (in_array($s, ['MES', 'M'], true)) {
+            return 'mensual';
+        }
+        if (in_array($s, ['SEM', 'S'], true)) {
+            return 'semanal';
+        }
 
         return null;
     }
 
     private function parseIntOrNull($value): ?int
     {
-        if ($value === null) return null;
+        if ($value === null) {
+            return null;
+        }
         $s = trim((string) $value);
-        if ($s === '') return null;
+        if ($s === '') {
+            return null;
+        }
 
         // soporta "15.0" (a veces Excel lo manda así)
-        if (is_numeric($s)) return (int) round((float) $s);
+        if (is_numeric($s)) {
+            return (int) round((float) $s);
+        }
 
-        if (!preg_match('/^-?\d+$/', $s)) return null;
+        if (! preg_match('/^-?\d+$/', $s)) {
+            return null;
+        }
+
         return (int) $s;
     }
 
@@ -565,32 +600,54 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
      */
     private function parseDiaSemanaIso($value): ?int
     {
-        if ($value === null) return null;
+        if ($value === null) {
+            return null;
+        }
 
         // numérico directo
         if (is_numeric($value)) {
             $n = (int) round((float) $value);
-            if ($n >= 1 && $n <= 7) return $n;
+            if ($n >= 1 && $n <= 7) {
+                return $n;
+            }
         }
 
         $s = $this->normalizeCatalog($value);
-        if ($s === '') return null;
+        if ($s === '') {
+            return null;
+        }
 
         // quitar acentos
         $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
-        if (is_string($ascii) && $ascii !== '') $s = $this->normalizeCatalog($ascii);
+        if (is_string($ascii) && $ascii !== '') {
+            $s = $this->normalizeCatalog($ascii);
+        }
 
         // normalizar vocales acentuadas a ASCII
         $s = str_replace(['Á', 'É', 'Í', 'Ó', 'Ú'], ['A', 'E', 'I', 'O', 'U'], $s);
 
         // soportar abreviaciones
-        if (str_starts_with($s, 'LUN')) $s = 'LUNES';
-        if (str_starts_with($s, 'MAR')) $s = 'MARTES';
-        if (str_starts_with($s, 'MIE')) $s = 'MIERCOLES';
-        if (str_starts_with($s, 'JUE')) $s = 'JUEVES';
-        if (str_starts_with($s, 'VIE')) $s = 'VIERNES';
-        if (str_starts_with($s, 'SAB')) $s = 'SABADO';
-        if (str_starts_with($s, 'DOM')) $s = 'DOMINGO';
+        if (str_starts_with($s, 'LUN')) {
+            $s = 'LUNES';
+        }
+        if (str_starts_with($s, 'MAR')) {
+            $s = 'MARTES';
+        }
+        if (str_starts_with($s, 'MIE')) {
+            $s = 'MIERCOLES';
+        }
+        if (str_starts_with($s, 'JUE')) {
+            $s = 'JUEVES';
+        }
+        if (str_starts_with($s, 'VIE')) {
+            $s = 'VIERNES';
+        }
+        if (str_starts_with($s, 'SAB')) {
+            $s = 'SABADO';
+        }
+        if (str_starts_with($s, 'DOM')) {
+            $s = 'DOMINGO';
+        }
 
         $map = [
             'LUNES' => 1,
@@ -615,7 +672,10 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
     private function parseBool($value): bool
     {
         $s = $this->normalizeCatalog($value);
-        if ($s === '') return false;
+        if ($s === '') {
+            return false;
+        }
+
         return in_array($s, ['1', 'SI', 'SÍ', 'YES', 'Y', 'TRUE', 'VERDADERO'], true);
     }
 
@@ -634,10 +694,14 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
             ->where('referencia', 'IMPORT-ENGANCHE')
             ->exists();
 
-        if ($existe) return;
+        if ($existe) {
+            return;
+        }
 
         $monto = (float) $contrato->enganche;
-        if ($monto <= 0) return;
+        if ($monto <= 0) {
+            return;
+        }
 
         $fecha = $fechaInicio->copy()->startOfDay();
 
@@ -663,9 +727,9 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
             'monto' => $monto,
             'observaciones' => 'Enganche (generado por importación)',
             'capturado_por_user_id' => $this->capturadoPorUserId,
-                    'afecta_reportes' => false,
-                'tipo_movimiento' => 'historico',
-                'es_historico' => true,
+            'afecta_reportes' => false,
+            'tipo_movimiento' => 'historico',
+            'es_historico' => true,
         ]);
 
         Pago::create([
@@ -709,6 +773,7 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                     $cuota->estatus = $this->cuotaEstatusPagada;
                     $cuota->save();
                 }
+
                 continue;
             }
 
@@ -735,9 +800,9 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                 'periodo_id' => null,
 
                 'monto' => (float) $cuota->monto,
-                'observaciones' => 'Backfill por import (<= ' . $cutoff->toDateString() . ')',
+                'observaciones' => 'Backfill por import (<= '.$cutoff->toDateString().')',
                 'capturado_por_user_id' => $this->capturadoPorUserId,
-                        'afecta_reportes' => false,
+                'afecta_reportes' => false,
                 'tipo_movimiento' => 'historico',
                 'es_historico' => true,
             ]);
@@ -749,7 +814,7 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                 'recibo_id' => $recibo->id,
                 'monto' => (float) $cuota->monto,
                 'metodo' => $this->pagoMetodoDefault,
-                'referencia' => 'IMPORT-BACKFILL-' . $cutoff->format('Y'),
+                'referencia' => 'IMPORT-BACKFILL-'.$cutoff->format('Y'),
                 'estatus' => 'confirmado',
                 'fecha_pago' => $fecha->copy()->setTime(12, 0, 0),
             ]);
@@ -772,6 +837,13 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
 
         $contrato->saldo_actual = $saldo;
         $contrato->estatus = ($saldo <= 0.00001) ? $this->contratoEstatusLiquidado : $this->contratoEstatusActivo;
+        $contrato->liquidado_at = ($saldo <= 0.00001)
+            ? (Pago::query()
+                ->where('contrato_id', $contrato->id)
+                ->where('estatus', 'confirmado')
+                ->whereNotNull('cuota_id')
+                ->max('fecha_pago') ?: $contrato->liquidado_at)
+            : null;
         $contrato->save();
     }
 
@@ -795,6 +867,7 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                     $cuota->estatus = $this->cuotaEstatusPagada;
                     $cuota->save();
                 }
+
                 continue;
             }
 
@@ -823,7 +896,7 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                 'monto' => (float) $cuota->monto,
                 'observaciones' => 'Generado por importación (PAGADO)',
                 'capturado_por_user_id' => $this->capturadoPorUserId,
-                        'afecta_reportes' => false,
+                'afecta_reportes' => false,
                 'tipo_movimiento' => 'historico',
                 'es_historico' => true,
             ]);
@@ -850,21 +923,25 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
 
     private function generarFolioSeguro(): string
     {
-        return 'CT-' . now()->format('YmdHis') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+        return 'CT-'.now()->format('YmdHis').'-'.strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
     }
 
     private function generarFolioReciboSeguro(): string
     {
-        return 'R-' . now()->format('YmdHis') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+        return 'R-'.now()->format('YmdHis').'-'.strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
     }
 
     private function resolveFraccionamiento(string $nombre, ?int $excelRow = null): ?int
     {
         $nombre = trim($nombre);
-        if ($nombre === '') $nombre = 'SIN NOMBRE';
+        if ($nombre === '') {
+            $nombre = 'SIN NOMBRE';
+        }
 
         $key = mb_strtolower($nombre);
-        if (array_key_exists($key, $this->cacheFracc)) return $this->cacheFracc[$key];
+        if (array_key_exists($key, $this->cacheFracc)) {
+            return $this->cacheFracc[$key];
+        }
 
         $q = Fraccionamiento::query()
             ->where('propietario_id', $this->propietarioId)
@@ -898,17 +975,21 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
     ): ?int {
         $manzana = trim($manzana);
         $lote = trim($lote);
-        if ($lote === '') return null;
+        if ($lote === '') {
+            return null;
+        }
 
-        $key = "{$fraccId}|" . mb_strtolower($manzana) . "|" . mb_strtolower($lote);
-        if (array_key_exists($key, $this->cacheLote)) return $this->cacheLote[$key];
+        $key = "{$fraccId}|".mb_strtolower($manzana).'|'.mb_strtolower($lote);
+        if (array_key_exists($key, $this->cacheLote)) {
+            return $this->cacheLote[$key];
+        }
 
         $q = Lote::query()
             ->where('fraccionamiento_id', $fraccId)
             ->when(
                 $manzana !== '',
-                fn($qq) => $qq->where('manzana', $manzana),
-                fn($qq) => $qq->whereNull('manzana')
+                fn ($qq) => $qq->where('manzana', $manzana),
+                fn ($qq) => $qq->whereNull('manzana')
             )
             ->where('lote', $lote)
             ->first();
@@ -922,7 +1003,7 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
                 'estatus' => $estatusOnCreate ?: $this->loteEstatusDisponible,
             ];
 
-            if ($precioListaOnCreate !== null && (float)$precioListaOnCreate > 0) {
+            if ($precioListaOnCreate !== null && (float) $precioListaOnCreate > 0) {
                 $payload['precio_lista'] = (float) $precioListaOnCreate;
             }
 
@@ -945,7 +1026,7 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
 
     private function buildClaveLote(int $fraccId, string $manzana, string $lote): string
     {
-        $base = "F{$fraccId}-M" . ($manzana !== '' ? $manzana : '0') . "-L{$lote}";
+        $base = "F{$fraccId}-M".($manzana !== '' ? $manzana : '0')."-L{$lote}";
         $clave = $base;
         $i = 1;
 
@@ -962,10 +1043,14 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
         $nombres = trim($nombres);
         $apellidos = trim($apellidos);
 
-        $key = mb_strtolower($apellidos . '|' . $nombres);
-        if ($key === '|') $key = 'sin-nombre';
+        $key = mb_strtolower($apellidos.'|'.$nombres);
+        if ($key === '|') {
+            $key = 'sin-nombre';
+        }
 
-        if (array_key_exists($key, $this->cacheCliente)) return $this->cacheCliente[$key];
+        if (array_key_exists($key, $this->cacheCliente)) {
+            return $this->cacheCliente[$key];
+        }
 
         $q = Cliente::query()
             ->whereRaw('LOWER(nombres) = ?', [mb_strtolower($nombres)])
@@ -987,10 +1072,13 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
 
     private function parseFecha($value): ?Carbon
     {
-        if ($value === null || $value === '') return null;
+        if ($value === null || $value === '') {
+            return null;
+        }
 
         if (is_numeric($value)) {
             $v = (float) $value;
+
             return Carbon::createFromTimestampUTC(((int) round($v) - 25569) * 86400)->startOfDay();
         }
 
@@ -1015,10 +1103,14 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
     private function parseMoney($value): float
     {
         $s = trim((string) $value);
-        if ($s === '') return 0.0;
+        if ($s === '') {
+            return 0.0;
+        }
 
         // DONACION / texto => 0
-        if (! preg_match('/\d/', $s)) return 0.0;
+        if (! preg_match('/\d/', $s)) {
+            return 0.0;
+        }
 
         $s = str_replace(['$', ' '], '', $s);
 
@@ -1055,6 +1147,7 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
     {
         $s = trim((string) $s);
         $s = preg_replace('/\s+/', ' ', $s);
+
         return mb_strtoupper($s);
     }
 
@@ -1063,15 +1156,23 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
         $s = $this->normalizeCatalog($value);
 
         $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
-        if (is_string($ascii) && $ascii !== '') $s = $this->normalizeCatalog($ascii);
+        if (is_string($ascii) && $ascii !== '') {
+            $s = $this->normalizeCatalog($ascii);
+        }
 
         $s = preg_replace('/[^A-Z0-9\s]/', ' ', $s);
         $s = preg_replace('/\s+/', ' ', $s);
         $s = trim($s);
 
-        if (str_contains($s, 'DONAC') || str_contains($s, 'DONAT') || str_contains($s, 'DONADO')) return 'DONACION';
-        if (str_contains($s, 'LIBRE')) return 'LIBRE';
-        if (str_contains($s, 'PAGAD')) return 'PAGADO';
+        if (str_contains($s, 'DONAC') || str_contains($s, 'DONAT') || str_contains($s, 'DONADO')) {
+            return 'DONACION';
+        }
+        if (str_contains($s, 'LIBRE')) {
+            return 'LIBRE';
+        }
+        if (str_contains($s, 'PAGAD')) {
+            return 'PAGADO';
+        }
 
         return $s;
     }
@@ -1080,12 +1181,14 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
     {
         $s = trim((string) $s);
         $s = preg_replace('/\s+/', ' ', $s);
+
         return mb_strtoupper($s);
     }
 
     private function normPhone($s): string
     {
         $s = preg_replace('/\D+/', '', (string) $s);
+
         return $s ?: '';
     }
 
@@ -1095,14 +1198,17 @@ class ContratosImport implements OnEachRow, WithStartRow, WithChunkReading
         $n = $this->normalizeCatalog($nombres);
         $r = $this->normalizeCatalog($residencial);
 
-        return ($a === 'LIBRE' || $n === 'LIBRE' || $r === 'LIBRE');
+        return $a === 'LIBRE' || $n === 'LIBRE' || $r === 'LIBRE';
     }
 
     private function allEmpty(array $row): bool
     {
         foreach ($row as $v) {
-            if (trim((string) $v) !== '') return false;
+            if (trim((string) $v) !== '') {
+                return false;
+            }
         }
+
         return true;
     }
 }

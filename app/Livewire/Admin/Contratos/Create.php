@@ -1079,6 +1079,7 @@ class Create extends Component
                     'frecuencia_recargo_dias' => $this->esDonacion ? 1 : $data['frecuencia_recargo_dias'],
 
                     'estatus' => $this->es_donacion ? 'donacion' : 'activo',
+                    'liquidado_at' => $this->es_donacion ? now() : null,
 
                     'tiene_anualidad' => $this->esDonacion ? false : (bool) $data['tiene_anualidad'],
                     'anualidad_fecha' => $this->esDonacion ? null : $data['anualidad_fecha'],
