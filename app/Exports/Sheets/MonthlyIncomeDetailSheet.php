@@ -4,22 +4,15 @@ namespace App\Exports\Sheets;
 
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
-use Maatwebsite\Excel\Concerns\WithEvents;
-use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Events\AfterSheet;
-
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
-class MonthlyIncomeDetailSheet implements
-    FromCollection,
-    WithHeadings,
-    WithTitle,
-    WithColumnFormatting,
-    WithEvents
+class MonthlyIncomeDetailSheet implements FromCollection, WithColumnFormatting, WithEvents, WithHeadings, WithTitle
 {
     public function __construct(
         public int $anio,
@@ -30,13 +23,13 @@ class MonthlyIncomeDetailSheet implements
 
     public function title(): string
     {
-        return "Detalle";
+        return 'Detalle';
     }
 
     protected function monthRange(): array
     {
         $start = now()->setDate($this->anio, $this->mes, 1)->startOfDay();
-        $end   = (clone $start)->endOfMonth()->endOfDay();
+        $end = (clone $start)->endOfMonth()->endOfDay();
 
         return [$start->toDateString(), $end->toDateString()];
     }
@@ -52,7 +45,9 @@ class MonthlyIncomeDetailSheet implements
     {
         return [
             'FOLIO',
-            'FECHA',
+            'FECHA_PAGO',
+            'FECHA_HORA_PAGO',
+            'FECHA_RECIBO',
             'SEMANA_PAGO',
             'FRACCIONAMIENTO',
             'MANZANA',
@@ -70,66 +65,76 @@ class MonthlyIncomeDetailSheet implements
     {
         [$start, $end] = $this->monthRange();
 
-        $q = DB::table('recibos')
+        $q = DB::table('recibos_pagos')
+            ->join('recibos', 'recibos.id', '=', 'recibos_pagos.recibo_id')
             ->leftJoin('contratos', 'contratos.id', '=', 'recibos.contrato_id')
             ->leftJoin('clientes', 'clientes.id', '=', 'recibos.cliente_id')
-            ->leftJoin('lotes', 'lotes.id', '=', 'recibos.lote_id')
+            ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
             ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
-            ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos.forma_pago_id')
-            ->leftJoin('cuentas_bancarias', 'cuentas_bancarias.id', '=', 'recibos.cuentas_bancarias_id')
+            ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos_pagos.forma_pago_id')
+            ->leftJoin('cuentas_bancarias', 'cuentas_bancarias.id', '=', 'recibos_pagos.cuenta_bancaria_id')
             ->leftJoin('periodos', 'periodos.id', '=', 'recibos.periodo_id')
             ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
 
+            ->whereNull('recibos_pagos.deleted_at')
             ->whereNull('recibos.deleted_at')
             ->whereNull('recibos.anulado_at')
-            ->where('recibos.es_historico', false)
+            ->where(function ($qq) {
+                $qq->whereNull('recibos.es_historico')
+                    ->orWhere('recibos.es_historico', false);
+            })
+            ->where('recibos.afecta_reportes', true)
+            ->where('recibos.folio', 'not like', 'REC%')
+            ->where('contratos.estatus', 'activo')
 
             ->when(
                 $this->propietarioId,
-                fn ($qq) => $qq->where('fraccionamientos.propietario_id', $this->propietarioId)
+                fn ($qq) => $qq->where('recibos.propietario_contable_id', $this->propietarioId)
             );
 
         // ===== CAMBIO CLAVE: RESPETAR SWITCH =====
-     if ($this->modoVista === 'flujo_real') {
+        if ($this->modoVista === 'flujo_real') {
 
-    $q->where(function ($main) use ($start, $end) {
-        $main->where(function ($sub) use ($start, $end) {
-            $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
-                ->whereBetween('cuotas.fecha_vencimiento', [$start, $end])
-                ->whereBetween('recibos.fecha', [$start, $end]);
-        })->orWhere(function ($sub) use ($start, $end) {
-            $sub->where(function ($x) {
-                $x->whereNull('tipos_cobro.nombre')
-                  ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
-            })
-            ->whereBetween('recibos.fecha', [$start, $end]);
-        });
-    });
+            $q->where(function ($main) use ($start, $end) {
+                $main->where(function ($sub) use ($start, $end) {
+                    $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
+                        ->whereBetween('cuotas.fecha_vencimiento', [$start, $end])
+                        ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
+                })->orWhere(function ($sub) use ($start, $end) {
+                    $sub->where(function ($x) {
+                        $x->whereNull('tipos_cobro.nombre')
+                            ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
+                    })
+                        ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
+                });
+            });
 
-} else {
+        } else {
 
-    $q->where(function ($main) use ($start, $end) {
-        $main->where(function ($sub) use ($start, $end) {
-            $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
-                ->whereBetween('cuotas.fecha_vencimiento', [$start, $end]);
-        })->orWhere(function ($sub) use ($start, $end) {
-            $sub->where(function ($x) {
-                $x->whereNull('tipos_cobro.nombre')
-                  ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
-            })
-            ->whereBetween('recibos.fecha', [$start, $end]);
-        });
-    });
+            $q->where(function ($main) use ($start, $end) {
+                $main->where(function ($sub) use ($start, $end) {
+                    $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
+                        ->whereBetween('cuotas.fecha_vencimiento', [$start, $end]);
+                })->orWhere(function ($sub) use ($start, $end) {
+                    $sub->where(function ($x) {
+                        $x->whereNull('tipos_cobro.nombre')
+                            ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
+                    })
+                        ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
+                });
+            });
 
-}
+        }
 
-        $q->orderBy('recibos.fecha')
-          ->orderBy('recibos.id')
-
-          ->select([
+        $q->orderBy('recibos_pagos.fecha_efectiva')
+            ->orderBy('recibos.id')
+            ->orderBy('recibos_pagos.id')
+            ->select([
                 'recibos.folio',
-                'recibos.fecha',
+                DB::raw('DATE(recibos_pagos.fecha_efectiva) as fecha_pago'),
+                'recibos_pagos.fecha_efectiva as fecha_hora_pago',
+                'recibos.fecha as fecha_recibo',
                 'recibos.semana_pago',
 
                 DB::raw('COALESCE(fraccionamientos.nombre, "Sin finca") as fraccionamiento'),
@@ -158,13 +163,15 @@ class MonthlyIncomeDetailSheet implements
 
                 DB::raw('COALESCE(periodos.nombre, "SIN PERIODO") as periodo'),
 
-                'recibos.monto',
-          ]);
+                'recibos_pagos.monto',
+            ]);
 
         return $q->get()->map(function ($r) {
             return [
                 (string) ($r->folio ?? ''),
-                (string) ($r->fecha ?? ''),
+                (string) ($r->fecha_pago ?? ''),
+                (string) ($r->fecha_hora_pago ?? ''),
+                (string) ($r->fecha_recibo ?? ''),
                 (string) ($r->semana_pago ?? ''),
                 (string) ($r->fraccionamiento ?? ''),
                 (string) ($r->manzana ?? ''),
@@ -182,7 +189,7 @@ class MonthlyIncomeDetailSheet implements
     public function columnFormats(): array
     {
         return [
-            'L' => '"$"#,##0.00',
+            'N' => '"$"#,##0.00',
         ];
     }
 
@@ -203,7 +210,7 @@ class MonthlyIncomeDetailSheet implements
                 $sheet->mergeCells("A2:{$highestCol}2");
 
                 $sheet->setCellValue('A1', 'DETALLE DE INGRESOS');
-                $sheet->setCellValue('A2', 'MODO: ' . $this->modoVistaLabel());
+                $sheet->setCellValue('A2', 'MODO: '.$this->modoVistaLabel());
 
                 $sheet->getStyle("A1:{$highestCol}1")->applyFromArray([
                     'font' => [
@@ -272,23 +279,25 @@ class MonthlyIncomeDetailSheet implements
                     }
                 }
 
-                $sheet->getStyle("L4:L{$highestRow}")
+                $sheet->getStyle("N4:N{$highestRow}")
                     ->getAlignment()
                     ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
                 // ===== ANCHOS =====
                 $sheet->getColumnDimension('A')->setWidth(14);
                 $sheet->getColumnDimension('B')->setWidth(12);
-                $sheet->getColumnDimension('C')->setWidth(14);
-                $sheet->getColumnDimension('D')->setWidth(28);
-                $sheet->getColumnDimension('E')->setWidth(12);
-                $sheet->getColumnDimension('F')->setWidth(12);
-                $sheet->getColumnDimension('G')->setWidth(28);
-                $sheet->getColumnDimension('H')->setWidth(18);
-                $sheet->getColumnDimension('I')->setWidth(16);
-                $sheet->getColumnDimension('J')->setWidth(24);
-                $sheet->getColumnDimension('K')->setWidth(18);
-                $sheet->getColumnDimension('L')->setWidth(14);
+                $sheet->getColumnDimension('C')->setWidth(20);
+                $sheet->getColumnDimension('D')->setWidth(12);
+                $sheet->getColumnDimension('E')->setWidth(14);
+                $sheet->getColumnDimension('F')->setWidth(28);
+                $sheet->getColumnDimension('G')->setWidth(12);
+                $sheet->getColumnDimension('H')->setWidth(12);
+                $sheet->getColumnDimension('I')->setWidth(28);
+                $sheet->getColumnDimension('J')->setWidth(18);
+                $sheet->getColumnDimension('K')->setWidth(16);
+                $sheet->getColumnDimension('L')->setWidth(24);
+                $sheet->getColumnDimension('M')->setWidth(18);
+                $sheet->getColumnDimension('N')->setWidth(14);
 
                 $sheet->setShowGridlines(false);
             },
