@@ -122,22 +122,22 @@
     {{-- TABLA --}}
     <div class="bg-white border rounded-2xl overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm table-fixed">
+            <table class="min-w-[1500px] w-full text-sm table-auto">
                 <thead class="bg-gray-100 text-xs uppercase text-gray-600">
                     <tr>
-                        <th class="p-2.5 text-left w-[130px]">Folio</th>
-                        <th class="p-2.5 text-left">Nombre</th>
-                        <th class="p-2.5 text-left w-[70px]">Lote</th>
-                        <th class="p-2.5 text-left w-[150px]">Fraccionamiento</th>
-                        <th class="p-2.5 text-left w-[70px]">Cuota</th>
-                        <th class="p-2.5 text-left w-[110px]">Fecha</th>
-                        <th class="p-2.5 text-left w-[110px]">Monto</th>
-                        <th class="p-2.5 text-left w-[120px]">Tipo cobro</th>
-                        <th class="p-2.5 text-left w-[180px]">Pagos</th>
-                        <th class="p-2.5 text-left w-[90px]">Ev.</th>
-                        <th class="p-2.5 text-left w-[80px]">Firma</th>
-                        <th class="p-2.5 text-left w-[80px]">Estado</th>
-                        <th class="p-2.5 text-center w-[140px]">Acc.</th>
+                        <th class="p-2.5 text-left w-[150px] whitespace-nowrap">Folio</th>
+                        <th class="p-2.5 text-left w-[240px] whitespace-nowrap">Nombre</th>
+                        <th class="p-2.5 text-left w-[90px] whitespace-nowrap">Lote</th>
+                        <th class="p-2.5 text-left w-[220px] whitespace-nowrap">Fraccionamiento</th>
+                        <th class="p-2.5 text-left w-[80px] whitespace-nowrap">Cuota</th>
+                        <th class="p-2.5 text-left w-[120px] whitespace-nowrap">Fecha</th>
+                        <th class="p-2.5 text-left w-[120px] whitespace-nowrap">Monto</th>
+                        <th class="p-2.5 text-left w-[150px] whitespace-nowrap">Tipo cobro</th>
+                        <th class="p-2.5 text-left w-[220px] whitespace-nowrap">Pagos</th>
+                        <th class="p-2.5 text-left w-[90px] whitespace-nowrap">Ev.</th>
+                        <th class="p-2.5 text-left w-[90px] whitespace-nowrap">Firma</th>
+                        <th class="p-2.5 text-left w-[90px] whitespace-nowrap">Estado</th>
+                        <th class="p-2.5 text-center w-[150px] whitespace-nowrap">Acc.</th>
                     </tr>
                 </thead>
 
