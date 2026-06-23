@@ -5,6 +5,7 @@ namespace App\Exports;
 use App\Exports\Sheets\MonthlyIncomeActiveContractsSheet;
 use App\Exports\Sheets\MonthlyIncomeAdvanceDetailSheet;
 use App\Exports\Sheets\MonthlyIncomeDetailSheet;
+use App\Exports\Sheets\MonthlyIncomeExpectedDetailSheet;
 use App\Exports\Sheets\MonthlyIncomeHistoricDetailSheet;
 use App\Exports\Sheets\MonthlyIncomeLateDetailSheet;
 use App\Exports\Sheets\MonthlyIncomeLiquidatedContractsSheet;
@@ -40,6 +41,12 @@ class MonthlyIncomeExport implements WithMultipleSheets
                 totales: $this->totales,
                 headerConceptos: $this->headerConceptos,
                 mesNombre: mb_strtoupper(now()->setMonth($this->mes)->translatedFormat('F')),
+            ),
+
+            new MonthlyIncomeExpectedDetailSheet(
+                anio: $this->anio,
+                mes: $this->mes,
+                propietarioId: $this->propietarioId,
             ),
 
             new MonthlyIncomeDetailSheet(
