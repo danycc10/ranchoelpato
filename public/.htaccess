@@ -26,3 +26,22 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# === Seguridad: bloquear archivos sensibles (logs de PHP/servidor) ===
+<FilesMatch "(^error_log$|\.log$)">
+    Require all denied
+</FilesMatch>
+
+# === Cabeceras de seguridad ===
+<IfModule mod_headers.c>
+    # HSTS (1 año). Sin includeSubDomains/preload por cPanel/webmail. Solo se honra sobre HTTPS.
+    Header always set Strict-Transport-Security "max-age=31536000"
+    # Anti-clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+    # Evitar MIME sniffing
+    Header always set X-Content-Type-Options "nosniff"
+    # Limitar el Referer enviado a terceros
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    # Desactivar APIs del navegador no usadas
+    Header always set Permissions-Policy "geolocation=(), camera=(), microphone=()"
+</IfModule>

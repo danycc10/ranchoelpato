@@ -6,6 +6,7 @@ use App\Models\Contrato;
 use App\Models\Recibo;
 use App\Models\ReciboPago;
 use App\Services\Contratos\ContratoWordService;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -195,19 +196,37 @@ class PrivateFileController extends Controller
 
     public function show(Request $request)
     {
-        $disk = $request->get('disk', 'private');
-        $path = decrypt($request->get('path'));
+        abort_unless(auth()->check(), 403);
+
+        // El disco SIEMPRE es 'private'. Nunca confiar en el parámetro del cliente
+        // para evitar que se pueda leer de otros discos configurados.
+        $disk = 'private';
+
+        try {
+            $path = decrypt((string) $request->input('path'));
+        } catch (DecryptException) {
+            abort(404);
+        }
+
+        // Defensa en profundidad contra path traversal / rutas absolutas.
+        $path = ltrim(str_replace('\\', '/', (string) $path), '/');
+
+        if ($path === '' || str_contains($path, '..')) {
+            abort(404);
+        }
 
         if (! Storage::disk($disk)->exists($path)) {
             abort(404);
         }
 
-        $file = Storage::disk($disk)->path($path);
-
-        return response()->file($file, [
-            'Cache-Control' => 'no-store, no-cache, must-revalidate',
-            'Pragma' => 'no-cache',
-        ]);
+        return response()->file(
+            Storage::disk($disk)->path($path),
+            [
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => '0',
+            ]
+        );
     }
 
     public function showContratoCredencial(string $uuid, string $lado, string $persona)
