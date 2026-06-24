@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(php artisan tinker storage\\\\app\\\\private\\\\tmp\\\\_fmt.php)"
+    ]
+  }
+}

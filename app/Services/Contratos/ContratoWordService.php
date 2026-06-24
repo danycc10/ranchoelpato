@@ -31,7 +31,11 @@ class ContratoWordService
         ],
         'convenio_pago' => [
             'label' => 'Convenio de pago',
-            'template' => 'plantillas/CONVENIO_DE_PAGO.docx',
+            'template' => 'plantillas/CONVENIO_DE_PAGO_Mensual.docx',
+            'templates_por_frecuencia' => [
+                'semanal' => 'plantillas/CONVENIO_DE_PAGO_Semanal.docx',
+                'mensual' => 'plantillas/CONVENIO_DE_PAGO_Mensual.docx',
+            ],
             'docx_field' => 'archivo_convenio_pago_docx',
             'scan_field' => 'archivo_convenio_pago',
             'filename_slug' => 'convenio-pago',
@@ -176,6 +180,16 @@ class ContratoWordService
         );
 
         $template->setValue('fecha_actual', now()->format('d/m/Y'));
+
+        $template->setValue(
+            'fecha_completa',
+            now()->day.' del mes de '.now()->translatedFormat('F').' del año '.now()->year
+        );
+
+        $template->setValue(
+            'fecha_hoy',
+            now()->day.' de '.now()->translatedFormat('F').' del '.now()->year
+        );
     }
 
     protected function buildRelativePath(Contrato $contrato, array $documento): string
@@ -216,6 +230,12 @@ class ContratoWordService
         }
 
         $template = (string) ($documento['template'] ?? '');
+
+        // Algunos documentos tienen plantilla distinta por frecuencia (semanal/mensual).
+        if (! empty($documento['templates_por_frecuencia'])) {
+            $frecuencia = $contrato->frecuencia === 'semanal' ? 'semanal' : 'mensual';
+            $template = (string) ($documento['templates_por_frecuencia'][$frecuencia] ?? $template);
+        }
 
         if ($template === '' || ! Storage::disk('private')->exists($template)) {
             throw new RuntimeException('No se encontró la plantilla para '.($documento['label'] ?? 'el documento').'.');
