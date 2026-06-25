@@ -76,10 +76,10 @@ class MonthlyIncomeLateDetailSheet implements FromCollection, WithColumnFormatti
             ->where('tipos_cobro.nombre', 'MENSUALIDAD')
 
             // Pagado en el mes seleccionado
-            ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end])
+            ->whereBetween('recibos_pagos.fecha_efectiva', [$start, $end])
 
-            // Atrasado / desfasado: cuota vencía antes del inicio del mes
-            ->whereDate('cuotas.fecha_vencimiento', '<', $start)
+            // Atrasado / desfasado: cuota vencÃ­a antes del inicio del mes
+            ->where('cuotas.fecha_vencimiento', '<', $start)
 
             ->when(
                 $this->propietarioId,
@@ -93,7 +93,7 @@ class MonthlyIncomeLateDetailSheet implements FromCollection, WithColumnFormatti
 
             ->select([
                 'recibos.folio',
-                DB::raw('DATE(recibos_pagos.fecha_efectiva) as fecha_pago'),
+                'recibos_pagos.fecha_efectiva as fecha_pago',
                 'recibos.fecha as fecha_recibo',
                 'cuotas.fecha_vencimiento',
                 DB::raw('COALESCE(fraccionamientos.nombre, "Sin finca") as fraccionamiento'),

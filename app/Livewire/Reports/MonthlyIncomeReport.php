@@ -4,6 +4,7 @@ namespace App\Livewire\Reports;
 
 use App\Exports\MonthlyIncomeExport;
 use App\Models\Propietario;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -18,6 +19,16 @@ class MonthlyIncomeReport extends Component
     public ?int $propietarioId = null;
 
     public string $modoVista = 'flujo_real';
+
+    protected ?Collection $metodosPagoCache = null;
+
+    protected ?Collection $filasCache = null;
+
+    protected ?object $totalesConceptosHeaderCache = null;
+
+    protected ?object $conceptosPorFincaCache = null;
+
+    protected ?object $totalesCache = null;
 
     public function mount(): void
     {
@@ -77,18 +88,17 @@ class MonthlyIncomeReport extends Component
             ->where('recibos.afecta_reportes', true)
             ->where('recibos.folio', 'not like', 'REC%')
             ->where('contratos.estatus', 'activo')
-            ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end])
+            ->whereBetween('recibos_pagos.fecha_efectiva', [$start, $end])
             ->where(function ($q) use ($start, $end) {
                 $q->where(function ($sub) use ($start, $end) {
                     $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
                         ->whereBetween('cuotas.fecha_vencimiento', [$start, $end]);
                 })
-                    ->orWhere(function ($sub) use ($start, $end) {
+                    ->orWhere(function ($sub) {
                         $sub->where(function ($x) {
                             $x->whereNull('tipos_cobro.nombre')
                                 ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
-                        })
-                            ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
+                        });
                     });
             })
             ->when(
@@ -127,7 +137,7 @@ class MonthlyIncomeReport extends Component
                             $x->whereNull('tipos_cobro.nombre')
                                 ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
                         })
-                            ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
+                            ->whereBetween('recibos_pagos.fecha_efectiva', [$start, $end]);
                     });
             })
             ->when(
@@ -190,7 +200,7 @@ class MonthlyIncomeReport extends Component
             ->where('contratos.estatus', 'activo')
             ->where('tipos_cobro.nombre', 'MENSUALIDAD')
             ->where('contratos.tipo', 'terreno')
-            ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end])
+            ->whereBetween('recibos_pagos.fecha_efectiva', [$start, $end])
             ->when(
                 $this->propietarioId,
                 fn ($q) => $q->where('recibos.propietario_contable_id', $this->propietarioId)
@@ -202,7 +212,7 @@ class MonthlyIncomeReport extends Component
         [, $end] = $this->monthRange();
 
         return $this->baseJoinRecibosMensualidadPorFechaPago()
-            ->whereDate('cuotas.fecha_vencimiento', '>', $end);
+            ->where('cuotas.fecha_vencimiento', '>', $end);
     }
 
     protected function baseJoinRecibosAtrasado()
@@ -210,12 +220,16 @@ class MonthlyIncomeReport extends Component
         [$start] = $this->monthRange();
 
         return $this->baseJoinRecibosMensualidadPorFechaPago()
-            ->whereDate('cuotas.fecha_vencimiento', '<', $start);
+            ->where('cuotas.fecha_vencimiento', '<', $start);
     }
 
     public function getMetodosPagoProperty()
     {
-        return $this->baseJoinRecibos()
+        if ($this->metodosPagoCache !== null) {
+            return $this->metodosPagoCache;
+        }
+
+        return $this->metodosPagoCache = $this->baseJoinRecibos()
             ->selectRaw('COALESCE(formas_pago.nombre, "SIN FORMA") as metodo')
             ->distinct()
             ->orderBy('metodo')
@@ -225,7 +239,11 @@ class MonthlyIncomeReport extends Component
 
     public function getFilasProperty()
     {
-        $metodos = $this->metodosPago;
+        if ($this->filasCache !== null) {
+            return $this->filasCache;
+        }
+
+        $metodos = $this->metodosPago->values();
         [$start, $end] = $this->monthRange();
 
         $esperado = DB::table('cuotas')
@@ -386,11 +404,15 @@ class MonthlyIncomeReport extends Component
             ];
         });
 
-        return $rows->sortBy('finca', SORT_NATURAL | SORT_FLAG_CASE)->values();
+        return $this->filasCache = $rows->sortBy('finca', SORT_NATURAL | SORT_FLAG_CASE)->values();
     }
 
     public function getTotalesConceptosHeaderProperty()
     {
+        if ($this->totalesConceptosHeaderCache !== null) {
+            return $this->totalesConceptosHeaderCache;
+        }
+
         $targets = [
             'RECARGO' => 'Recargo',
             'CAMBIO DE CONTRATO' => 'Cambio de contrato',
@@ -420,11 +442,15 @@ class MonthlyIncomeReport extends Component
             }
         }
 
-        return (object) $out;
+        return $this->totalesConceptosHeaderCache = (object) $out;
     }
 
     public function getConceptosPorFincaProperty()
     {
+        if ($this->conceptosPorFincaCache !== null) {
+            return $this->conceptosPorFincaCache;
+        }
+
         $conceptos = [
             'PAGO ELECTRICIDAD' => ['ELECTRICIDAD'],
             'ENGANCHE' => ['ENGANCHE'],
@@ -497,7 +523,7 @@ class MonthlyIncomeReport extends Component
             }
         }
 
-        return (object) [
+        return $this->conceptosPorFincaCache = (object) [
             'fincas' => $catalogoNombres,
             'filas' => collect($out)->values(),
         ];
@@ -505,6 +531,10 @@ class MonthlyIncomeReport extends Component
 
     public function getTotalesProperty()
     {
+        if ($this->totalesCache !== null) {
+            return $this->totalesCache;
+        }
+
         $metodos = $this->metodosPago;
 
         $sumEsperado = 0.0;
@@ -524,7 +554,7 @@ class MonthlyIncomeReport extends Component
             }
         }
 
-        return (object) [
+        return $this->totalesCache = (object) [
             'esperado' => $sumEsperado,
             'recibido' => $sumRecibido,
             'adelantado' => $sumAdelantado,

@@ -124,10 +124,10 @@ class MonthlyIncomeAdvanceDetailSheet implements FromCollection, WithColumnForma
             ->where('tipos_cobro.nombre', 'MENSUALIDAD')
 
             // dinero recibido en el mes seleccionado
-            ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end])
+            ->whereBetween('recibos_pagos.fecha_efectiva', [$start, $end])
 
             // cuota de meses futuros = adelantado
-            ->whereDate('cuotas.fecha_vencimiento', '>', $end)
+            ->where('cuotas.fecha_vencimiento', '>', $end)
 
             ->when($this->propietarioId, function ($q) {
                 if ($this->esFiltroOsvaldo()) {
@@ -155,7 +155,7 @@ class MonthlyIncomeAdvanceDetailSheet implements FromCollection, WithColumnForma
 
             ->select([
                 'recibos.folio',
-                DB::raw('DATE(recibos_pagos.fecha_efectiva) as fecha_pago'),
+                'recibos_pagos.fecha_efectiva as fecha_pago',
                 'recibos_pagos.fecha_efectiva as fecha_hora_pago',
                 'recibos.fecha as fecha_recibo',
                 'cuotas.fecha_vencimiento',

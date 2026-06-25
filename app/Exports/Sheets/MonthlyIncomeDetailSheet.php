@@ -100,13 +100,13 @@ class MonthlyIncomeDetailSheet implements FromCollection, WithColumnFormatting, 
                 $main->where(function ($sub) use ($start, $end) {
                     $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
                         ->whereBetween('cuotas.fecha_vencimiento', [$start, $end])
-                        ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
+                        ->whereBetween('recibos_pagos.fecha_efectiva', [$start, $end]);
                 })->orWhere(function ($sub) use ($start, $end) {
                     $sub->where(function ($x) {
                         $x->whereNull('tipos_cobro.nombre')
                             ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
                     })
-                        ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
+                        ->whereBetween('recibos_pagos.fecha_efectiva', [$start, $end]);
                 });
             });
 
@@ -121,7 +121,7 @@ class MonthlyIncomeDetailSheet implements FromCollection, WithColumnFormatting, 
                         $x->whereNull('tipos_cobro.nombre')
                             ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
                     })
-                        ->whereBetween(DB::raw('DATE(recibos_pagos.fecha_efectiva)'), [$start, $end]);
+                        ->whereBetween('recibos_pagos.fecha_efectiva', [$start, $end]);
                 });
             });
 
@@ -132,7 +132,7 @@ class MonthlyIncomeDetailSheet implements FromCollection, WithColumnFormatting, 
             ->orderBy('recibos_pagos.id')
             ->select([
                 'recibos.folio',
-                DB::raw('DATE(recibos_pagos.fecha_efectiva) as fecha_pago'),
+                'recibos_pagos.fecha_efectiva as fecha_pago',
                 'recibos_pagos.fecha_efectiva as fecha_hora_pago',
                 'recibos.fecha as fecha_recibo',
                 'recibos.semana_pago',

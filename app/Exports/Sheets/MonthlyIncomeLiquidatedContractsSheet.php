@@ -68,7 +68,7 @@ class MonthlyIncomeLiquidatedContractsSheet implements FromCollection, WithColum
             ->whereNull('recibos_pagos.deleted_at')
             ->whereNotNull('recibos.contrato_id')
             ->groupBy('recibos.contrato_id')
-            ->selectRaw('recibos.contrato_id, MAX(DATE(recibos_pagos.fecha_efectiva)) as fecha_liquidado');
+            ->selectRaw('recibos.contrato_id, MAX(recibos_pagos.fecha_efectiva) as fecha_liquidado');
 
         $recibosHistoricos = DB::table('recibos')
             ->whereNull('recibos.deleted_at')

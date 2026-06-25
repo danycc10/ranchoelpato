@@ -71,7 +71,7 @@ class DailyReceiptsReport extends Component
             ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
             ->leftJoin('propietarios as propietarios_contables', 'propietarios_contables.id', '=', 'recibos.propietario_contable_id')
-            ->whereDate('recibos_pagos.fecha_efectiva', $this->fecha)
+            ->where('recibos_pagos.fecha_efectiva', $this->fecha)
             ->whereNull('recibos_pagos.deleted_at')
             ->where('recibos.afecta_reportes', true)
             ->whereNull('recibos.anulado_at')

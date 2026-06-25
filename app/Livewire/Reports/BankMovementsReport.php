@@ -128,8 +128,8 @@ class BankMovementsReport extends Component
                 fn ($q) => $q->whereIn('cuenta_bancaria_id', $this->cuentaBancariaIds)
             )
 
-            ->whereDate('fecha_efectiva', '>=', $this->desde)
-            ->whereDate('fecha_efectiva', '<=', $this->hasta);
+            ->where('fecha_efectiva', '>=', $this->desde)
+            ->where('fecha_efectiva', '<=', $this->hasta);
     }
 
     public function getMovimientosProperty()
