@@ -17,6 +17,7 @@ use App\Models\TipoCobro;
 use App\Services\Contabilidad\PropietarioContableResolver;
 use App\Services\ImageUploadService;
 use App\Services\Recibos\RecargoCuotaCalculator;
+use App\Services\Recibos\ReciboFolioService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -1583,17 +1584,7 @@ class Crear extends Component
 
     protected function generarFolio(?int $anio = null): string
     {
-        $anio = $anio ?: now()->year;
-
-        $ultimo = Recibo::withTrashed()
-            ->where('anio', $anio)
-            ->where('folio', 'regexp', '^R-'.$anio.'-[0-9]{6}$')
-            ->orderByDesc('folio')
-            ->value('folio');
-
-        $n = $ultimo ? ((int) substr($ultimo, -6)) + 1 : 1;
-
-        return 'R-'.$anio.'-'.str_pad($n, 6, '0', STR_PAD_LEFT);
+        return app(ReciboFolioService::class)->generar($anio);
     }
 
     protected function restarSaldoContrato(float $monto): void
@@ -1681,37 +1672,9 @@ class Crear extends Component
         return $id ?: null;
     }
 
-    protected function isDuplicateKeyException(\Throwable $e): bool
-    {
-        $message = mb_strtolower($e->getMessage());
-
-        return str_contains($message, 'duplicate')
-            || str_contains($message, 'duplicada')
-            || str_contains($message, 'unique')
-            || str_contains($message, '1062');
-    }
-
     protected function crearReciboConFolioSeguro(array $data, int $maxIntentos = 10): Recibo
     {
-        $anio = (int) $data['anio'];
-
-        for ($i = 0; $i < $maxIntentos; $i++) {
-            $data['folio'] = $this->generarFolio($anio);
-
-            try {
-                return Recibo::create($data);
-            } catch (\Throwable $e) {
-                if (! $this->isDuplicateKeyException($e)) {
-                    throw $e;
-                }
-
-                usleep(50000);
-            }
-        }
-
-        throw ValidationException::withMessages([
-            'folio' => 'No fue posible asignar un folio único. Intenta nuevamente.',
-        ]);
+        return app(ReciboFolioService::class)->crearRecibo($data, $maxIntentos);
     }
 
     protected function getConteoRecibosEsperados(): array
