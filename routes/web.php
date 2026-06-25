@@ -105,17 +105,7 @@ Route::middleware(['auth', 'verified', 'permission:reportes.ver'])->group(functi
         Route::get('/ingresos-mensuales', MonthlyIncomeReport::class)
             ->name('ingresos.mensuales')
             ->middleware('permission:reportes.ingresos_mensuales');
-            
-Route::get('/print-demo-data', function () {
-    return response()->json([
-        'ok' => true,
-        'text' => "HOLA DESDE LARAVEL\nPRUEBA DE IMPRESION\n",
-    ]);
-});
 
-Route::get('/print-demo', function () {
-    return view('print-demo');
-});
         Route::get('/movimientos-bancarios', BankMovementsReport::class)
             ->name('movimientos.bancarios')
             ->middleware('permission:reportes.movimientos_bancarios');
@@ -249,13 +239,6 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
 
         Route::get('/contratos-servicios/{uuid}/edit', ContratosServiciosEdit::class)
             ->name('contratos-servicios.edit');
-            
-            
-        Route::get('/private/contratos/{uuid}/pdf', [PrivateFileController::class, 'showContratoPdf'])
-            ->name('private.contratos.pdf')
-            ->middleware('permission:contratos.ver_detalle');
-            
-            
 
         /*
         | Cobranza / Recibos
