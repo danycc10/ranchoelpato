@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Contrato;
-use Barryvdh\DomPDF\Facade\Pdf;
 use App\Services\Contratos\ContratoPlanService;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ContratosPdfController extends Controller
 {

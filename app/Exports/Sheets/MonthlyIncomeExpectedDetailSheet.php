@@ -13,12 +13,7 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
-class MonthlyIncomeExpectedDetailSheet implements
-    FromCollection,
-    WithColumnFormatting,
-    WithEvents,
-    WithHeadings,
-    WithTitle
+class MonthlyIncomeExpectedDetailSheet implements FromCollection, WithColumnFormatting, WithEvents, WithHeadings, WithTitle
 {
     public function __construct(
         public int $anio,

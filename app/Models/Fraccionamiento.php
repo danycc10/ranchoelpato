@@ -36,8 +36,11 @@ class Fraccionamiento extends Model
     // ✅ URL lista para <img src="">
     public function getLogoUrlAttribute(): ?string
     {
-        if (! $this->logo_path) return null;
-        return asset('storage/' . ltrim($this->logo_path, '/'));
+        if (! $this->logo_path) {
+            return null;
+        }
+
+        return asset('storage/'.ltrim($this->logo_path, '/'));
     }
 
     public function getContratoBaseNombreAttribute(): ?string
@@ -53,6 +56,7 @@ class Fraccionamiento extends Model
     {
         return 'uuid';
     }
+
     protected static function booted()
     {
         static::creating(function ($model) {

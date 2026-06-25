@@ -2,22 +2,24 @@
 
 namespace App\Livewire\Admin\Promociones;
 
+use App\Models\Promocion;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Str;
-
-use App\Models\Promocion;
 
 class Index extends Component
 {
     use WithPagination;
 
     public string $q = '';
+
     public string $sortBy = 'nombre';
+
     public string $sortDir = 'asc';
 
     public bool $modal = false;
+
     public ?int $editId = null;
 
     /** @var array<string,mixed> */
@@ -49,6 +51,7 @@ class Index extends Component
     {
         if ($this->sortBy === $field) {
             $this->sortDir = $this->sortDir === 'asc' ? 'desc' : 'asc';
+
             return;
         }
 
@@ -101,7 +104,7 @@ class Index extends Component
     public function updatedFormNombre(): void
     {
         // si no han escrito código, lo generamos en vivo
-        if (!filled($this->form['codigo'] ?? null)) {
+        if (! filled($this->form['codigo'] ?? null)) {
             $this->form['codigo'] = Str::slug($this->form['nombre'] ?? '');
         }
     }
@@ -159,19 +162,19 @@ class Index extends Component
     {
         $tipo = $this->form['tipo'] ?? '';
 
-        if ($tipo === 'diferir_primer_pago' && !filled($this->form['dias_diferidos'])) {
+        if ($tipo === 'diferir_primer_pago' && ! filled($this->form['dias_diferidos'])) {
             $this->addError('form.dias_diferidos', 'Requerido para diferir primer pago.');
         }
 
-        if ($tipo === 'cuotas_fijas' && !filled($this->form['numero_cuotas'])) {
+        if ($tipo === 'cuotas_fijas' && ! filled($this->form['numero_cuotas'])) {
             $this->addError('form.numero_cuotas', 'Requerido para cuotas fijas.');
         }
 
-        if ($tipo === 'descuento_porcentaje' && !filled($this->form['porcentaje'])) {
+        if ($tipo === 'descuento_porcentaje' && ! filled($this->form['porcentaje'])) {
             $this->addError('form.porcentaje', 'Requerido para descuento por porcentaje.');
         }
 
-        if ($tipo === 'descuento_fijo' && !filled($this->form['monto_fijo'])) {
+        if ($tipo === 'descuento_fijo' && ! filled($this->form['monto_fijo'])) {
             $this->addError('form.monto_fijo', 'Requerido para descuento fijo.');
         }
     }
@@ -179,9 +182,9 @@ class Index extends Component
     public function guardar(): void
     {
         // ✅ si viene vacío, lo generamos SÍ o SÍ para evitar tu error
-        $this->form['codigo'] = trim((string)($this->form['codigo'] ?? ''));
+        $this->form['codigo'] = trim((string) ($this->form['codigo'] ?? ''));
         if ($this->form['codigo'] === '') {
-            $this->form['codigo'] = Str::slug((string)($this->form['nombre'] ?? ''));
+            $this->form['codigo'] = Str::slug((string) ($this->form['nombre'] ?? ''));
         }
 
         $this->validate();
@@ -198,12 +201,12 @@ class Index extends Component
                 'codigo' => $this->form['codigo'],
                 'tipo' => $this->form['tipo'],
 
-                'dias_diferidos' => $this->form['tipo'] === 'diferir_primer_pago' ? (int)$this->form['dias_diferidos'] : null,
-                'numero_cuotas' => $this->form['tipo'] === 'cuotas_fijas' ? (int)$this->form['numero_cuotas'] : null,
-                'porcentaje' => $this->form['tipo'] === 'descuento_porcentaje' ? (float)$this->form['porcentaje'] : null,
-                'monto_fijo' => $this->form['tipo'] === 'descuento_fijo' ? (float)$this->form['monto_fijo'] : null,
+                'dias_diferidos' => $this->form['tipo'] === 'diferir_primer_pago' ? (int) $this->form['dias_diferidos'] : null,
+                'numero_cuotas' => $this->form['tipo'] === 'cuotas_fijas' ? (int) $this->form['numero_cuotas'] : null,
+                'porcentaje' => $this->form['tipo'] === 'descuento_porcentaje' ? (float) $this->form['porcentaje'] : null,
+                'monto_fijo' => $this->form['tipo'] === 'descuento_fijo' ? (float) $this->form['monto_fijo'] : null,
 
-                'activa' => (bool)($this->form['activa'] ?? true),
+                'activa' => (bool) ($this->form['activa'] ?? true),
                 'fecha_inicio' => $this->form['fecha_inicio'] ?: null,
                 'fecha_fin' => $this->form['fecha_fin'] ?: null,
             ]
@@ -225,10 +228,10 @@ class Index extends Component
     {
         $rows = Promocion::query()
             ->when($this->q !== '', function ($q) {
-                $term = '%' . $this->q . '%';
+                $term = '%'.$this->q.'%';
                 $q->where('nombre', 'like', $term)
-                  ->orWhere('codigo', 'like', $term)
-                  ->orWhere('tipo', 'like', $term);
+                    ->orWhere('codigo', 'like', $term)
+                    ->orWhere('tipo', 'like', $term);
             })
             ->orderBy($this->sortBy, $this->sortDir)
             ->paginate(12);

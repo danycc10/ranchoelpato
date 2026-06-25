@@ -2,45 +2,48 @@
 
 namespace App\Livewire\Admin\Fraccionamientos;
 
-use Livewire\Component;
-use Livewire\WithPagination;
-use Livewire\WithFileUploads;
-
 use App\Models\Fraccionamiento;
 use App\Models\Propietario;
-
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-
-use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
+use Livewire\Component;
+use Livewire\WithFileUploads;
+use Livewire\WithPagination;
 
 class Index extends Component
 {
-    use WithPagination;
     use WithFileUploads;
+    use WithPagination;
 
     // Tabla
     public string $q = '';
+
     public string $sortBy = 'nombre';
+
     public string $sortDir = 'asc';
 
     // Modal / edición
     public bool $modal = false;
+
     public ?int $editId = null;
 
     // Campos
     public ?int $propietario_id = null;
+
     public string $nombre = '';
+
     public ?string $ubicacion = null;
 
     // Logo
     public $logo = null;
+
     public bool $removeLogo = false;
 
     // ✅ Contrato base DOCX por fraccionamiento
     public $contrato_base = null;
+
     public bool $removeContratoBase = false;
 
     protected $queryString = [
@@ -197,6 +200,7 @@ class Index extends Component
 
         if (($it->lotes_count ?? 0) > 0) {
             $this->dispatch('toast', type: 'error', message: 'No se puede eliminar: el fraccionamiento ya tiene lotes.');
+
             return;
         }
 
@@ -271,7 +275,7 @@ class Index extends Component
      */
     protected function storeFraccionamientoLogo(int $id, $uploadedFile): string
     {
-        $manager = new ImageManager(new Driver());
+        $manager = new ImageManager(new Driver);
 
         $img = $manager->read($uploadedFile->getRealPath());
         $encoded = $img->toWebp(75);

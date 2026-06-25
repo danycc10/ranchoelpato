@@ -11,14 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-Schema::create('tipos_cobro', function (Blueprint $table) {
-    $table->id();
-    $table->string('nombre');
-    $table->string('categoria')->nullable();
-    $table->boolean('requiere_periodo')->default(false);
-    $table->boolean('activa')->default(true);
-    $table->timestamps();
-});
+        Schema::create('tipos_cobro', function (Blueprint $table) {
+            $table->id();
+            $table->string('nombre');
+            $table->string('categoria')->nullable();
+            $table->boolean('requiere_periodo')->default(false);
+            $table->boolean('activa')->default(true);
+            $table->timestamps();
+        });
 
     }
 

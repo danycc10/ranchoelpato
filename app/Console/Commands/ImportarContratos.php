@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Imports\ContratosImport;
 use Illuminate\Console\Command;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Imports\ContratosImport;
 
 class ImportarContratos extends Command
 {
@@ -21,10 +21,11 @@ class ImportarContratos extends Command
 
         if (! file_exists($archivo)) {
             $this->error("❌ El archivo no existe: {$archivo}");
+
             return 1;
         }
 
-        $this->info("📥 Analizando archivo...");
+        $this->info('📥 Analizando archivo...');
 
         // ⚠️ Esto lee el sheet en memoria para contar. Si tu Excel es MUY grande, dímelo y te paso versión streaming.
         $sheet = Excel::toCollection(null, $archivo)[0];
@@ -34,7 +35,7 @@ class ImportarContratos extends Command
         $this->newLine();
 
         $bar = $this->output->createProgressBar($totalRows);
-        $bar->setFormat(" %current%/%max% [%bar%] %percent:3s%%");
+        $bar->setFormat(' %current%/%max% [%bar%] %percent:3s%%');
         $bar->start();
 
         $import = new ContratosImport(
@@ -50,7 +51,8 @@ class ImportarContratos extends Command
         $bar->finish();
         $this->newLine(2);
 
-        $this->info("✅ Importación finalizada.");
+        $this->info('✅ Importación finalizada.');
+
         return 0;
     }
 }

@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Admin\Sistema;
 
-use Livewire\Component;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Component;
 
 class Index extends Component
 {
@@ -32,11 +32,11 @@ class Index extends Component
         $this->authorize('logs.ver');
         $this->redirectRoute('admin.logs.index');
     }
-    
-        public function goPermisos()
-{
-    return redirect()->route('admin.permisos.index');
-}
+
+    public function goPermisos()
+    {
+        return redirect()->route('admin.permisos.index');
+    }
 
     public function render()
     {

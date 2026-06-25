@@ -2,16 +2,17 @@
 
 namespace App\Livewire\Admin\ContratosServicios;
 
-use Livewire\Component;
-use Livewire\WithPagination;
 use App\Models\Contrato;
 use Illuminate\Database\Eloquent\Builder;
+use Livewire\Component;
+use Livewire\WithPagination;
 
 class Index extends Component
 {
     use WithPagination;
 
     public string $q = '';
+
     public string $servicio = ''; // agua|electricidad|''
 
     protected $queryString = [
@@ -19,13 +20,20 @@ class Index extends Component
         'servicio' => ['except' => ''],
     ];
 
-    public function updatingQ(): void { $this->resetPage(); }
-    public function updatingServicio(): void { $this->resetPage(); }
+    public function updatingQ(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingServicio(): void
+    {
+        $this->resetPage();
+    }
 
     public function render()
     {
         $query = Contrato::query()
-            ->with(['cliente','lote','contratoBase'])
+            ->with(['cliente', 'lote', 'contratoBase'])
             ->where('tipo', 'servicio')
             ->orderByDesc('id');
 
@@ -35,7 +43,7 @@ class Index extends Component
                 $qq->where('folio_contrato', 'like', "%{$term}%")
                     ->orWhereHas('cliente', function (Builder $c) use ($term) {
                         $c->where('nombres', 'like', "%{$term}%")
-                          ->orWhere('apellidos', 'like', "%{$term}%");
+                            ->orWhere('apellidos', 'like', "%{$term}%");
                     })
                     ->orWhereHas('contratoBase', function (Builder $b) use ($term) {
                         $b->where('folio_contrato', 'like', "%{$term}%");

@@ -31,10 +31,15 @@ return new class extends Migration
         Schema::table('recibos', function (Blueprint $table) {
             $cols = [];
 
-            if (Schema::hasColumn('recibos', 'afecta_reportes')) $cols[] = 'afecta_reportes';
-            if (Schema::hasColumn('recibos', 'tipo_movimiento')) $cols[] = 'tipo_movimiento';
-            if (Schema::hasColumn('recibos', 'es_historico')) $cols[] = 'es_historico';
-
+            if (Schema::hasColumn('recibos', 'afecta_reportes')) {
+                $cols[] = 'afecta_reportes';
+            }
+            if (Schema::hasColumn('recibos', 'tipo_movimiento')) {
+                $cols[] = 'tipo_movimiento';
+            }
+            if (Schema::hasColumn('recibos', 'es_historico')) {
+                $cols[] = 'es_historico';
+            }
 
             if (! empty($cols)) {
                 $table->dropColumn($cols);

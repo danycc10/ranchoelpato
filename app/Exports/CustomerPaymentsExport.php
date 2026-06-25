@@ -27,7 +27,7 @@ class CustomerPaymentsExport implements WithMultipleSheets
                 pagos: $this->pagos,
                 contratoFolio: $this->contratoFolio,
                 finca: $this->finca,
-           
+
                 lote: $this->lote,
             ),
             new CustomerContractsSheet(
@@ -35,7 +35,7 @@ class CustomerPaymentsExport implements WithMultipleSheets
                 resumen: $this->resumen,
                 contratoFolio: $this->contratoFolio,
                 finca: $this->finca,
-          
+
                 lote: $this->lote,
             ),
         ];

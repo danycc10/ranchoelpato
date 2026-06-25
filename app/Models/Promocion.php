@@ -9,9 +9,9 @@ class Promocion extends Model
     protected $table = 'promociones';
 
     protected $fillable = [
-        'nombre','codigo','tipo',
-        'dias_diferidos','numero_cuotas','porcentaje','monto_fijo',
-        'activa','fecha_inicio','fecha_fin',
+        'nombre', 'codigo', 'tipo',
+        'dias_diferidos', 'numero_cuotas', 'porcentaje', 'monto_fijo',
+        'activa', 'fecha_inicio', 'fecha_fin',
     ];
 
     protected $casts = [

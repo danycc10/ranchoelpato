@@ -2,8 +2,8 @@
 
 namespace App\Services\Contratos;
 
-use Carbon\Carbon;
 use App\Models\Promocion;
+use Carbon\Carbon;
 
 class ContratoPlanService
 {
@@ -22,11 +22,13 @@ class ContratoPlanService
 
     public static function aplicarPromocionEconomica(array &$data, ?Promocion $promo): void
     {
-        if (! $promo) return;
+        if (! $promo) {
+            return;
+        }
 
         if ($promo->tipo === 'descuento_saldo' && $promo->porcentaje) {
             $data['saldo_inicial'] = round($data['saldo_inicial'] * (1 - ($promo->porcentaje / 100)), 2);
-            $data['saldo_actual']  = $data['saldo_inicial'];
+            $data['saldo_actual'] = $data['saldo_inicial'];
         }
 
         if ($promo->tipo === 'descuento_monto_pago' && $promo->monto_fijo) {
@@ -40,13 +42,17 @@ class ContratoPlanService
      */
     public static function generarCuotas(array $data, ?Promocion $promo): array
     {
-        $saldo      = (float) $data['saldo_inicial'];
-        $montoPago  = (float) $data['monto_pago'];
+        $saldo = (float) $data['saldo_inicial'];
+        $montoPago = (float) $data['monto_pago'];
         $frecuencia = (string) $data['frecuencia'];
         $fechaInicio = Carbon::parse($data['fecha_inicio'])->startOfDay();
 
-        if ($saldo <= 0) return [];
-        if ($montoPago <= 0) throw new \RuntimeException('El monto de pago debe ser mayor a 0.');
+        if ($saldo <= 0) {
+            return [];
+        }
+        if ($montoPago <= 0) {
+            throw new \RuntimeException('El monto de pago debe ser mayor a 0.');
+        }
 
         $primera = self::primeraFechaVencimiento(
             $fechaInicio,
@@ -76,11 +82,11 @@ class ContratoPlanService
     {
         $frecuencia = (string) $data['frecuencia'];
 
-        $tieneAnualidad = (bool)($data['tiene_anualidad'] ?? false);
-        $anualMonto     = (float)($data['anualidad_monto'] ?? 0);
-        $anualFechaRaw  = $data['anualidad_fecha'] ?? null;
+        $tieneAnualidad = (bool) ($data['tiene_anualidad'] ?? false);
+        $anualMonto = (float) ($data['anualidad_monto'] ?? 0);
+        $anualFechaRaw = $data['anualidad_fecha'] ?? null;
 
-        $tieneAnualidad = $tieneAnualidad && $anualMonto > 0 && !empty($anualFechaRaw);
+        $tieneAnualidad = $tieneAnualidad && $anualMonto > 0 && ! empty($anualFechaRaw);
 
         $inicio = Carbon::parse($data['fecha_inicio'])->startOfDay();
 
@@ -207,7 +213,9 @@ class ContratoPlanService
             $diff = $dow - $inicio->isoWeekday();
 
             // 👇 clave: si hoy es el día (diff=0) o ya pasó (diff<0), brincar a la próxima semana
-            if ($diff <= 0) $diff += 7;
+            if ($diff <= 0) {
+                $diff += 7;
+            }
 
             return $inicio->addDays($diff)->startOfDay();
         }

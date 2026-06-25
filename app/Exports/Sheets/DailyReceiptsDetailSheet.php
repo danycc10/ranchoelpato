@@ -4,22 +4,24 @@ namespace App\Exports\Sheets;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\WithTitle;
-use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
-use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
-class DailyReceiptsDetailSheet implements FromArray, WithTitle, WithEvents, ShouldAutoSize
+class DailyReceiptsDetailSheet implements FromArray, ShouldAutoSize, WithEvents, WithTitle
 {
     protected array $rowsOut = [];
+
     protected int $lastColIndex = 8;
+
     protected int $lastRow = 1;
+
     protected ?string $detailMontoRange = null;
 
     public function __construct(
@@ -53,15 +55,15 @@ class DailyReceiptsDetailSheet implements FromArray, WithTitle, WithEvents, Shou
     {
         $detailRows = $this->detailRows->map(function ($r) {
             return (object) [
-                'folio'           => $this->norm($r->folio ?? ''),
-                'persona'         => $this->norm($r->persona ?? '—'),
-                'lote'            => $this->norm($r->lote ?? '—'),
-                'finca'           => $this->norm($r->finca ?? 'Sin finca'),
-                'concepto'        => $this->norm($r->concepto ?? 'Sin concepto'),
-                'forma'           => $this->norm($r->forma ?? 'Sin forma'),
+                'folio' => $this->norm($r->folio ?? ''),
+                'persona' => $this->norm($r->persona ?? '—'),
+                'lote' => $this->norm($r->lote ?? '—'),
+                'finca' => $this->norm($r->finca ?? 'Sin finca'),
+                'concepto' => $this->norm($r->concepto ?? 'Sin concepto'),
+                'forma' => $this->norm($r->forma ?? 'Sin forma'),
                 'cuenta_bancaria' => $this->norm($r->cuenta_bancaria ?? '—'),
-                'monto'           => (float) ($r->monto ?? 0),
-                'fecha'           => $this->norm($r->fecha_recibo ?? $this->fecha),
+                'monto' => (float) ($r->monto ?? 0),
+                'fecha' => $this->norm($r->fecha_recibo ?? $this->fecha),
             ];
         });
 
@@ -78,7 +80,7 @@ class DailyReceiptsDetailSheet implements FromArray, WithTitle, WithEvents, Shou
 
         $this->rowsOut = [];
         $this->rowsOut[] = ['DETALLE DE RECIBOS'];
-        $this->rowsOut[] = ['Fecha: ' . $this->fecha . ' | Propietario: ' . ($this->propietarioNombre ?: 'Todos')];
+        $this->rowsOut[] = ['Fecha: '.$this->fecha.' | Propietario: '.($this->propietarioNombre ?: 'Todos')];
         $this->rowsOut[] = [];
         $this->rowsOut[] = $heads;
 

@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Admin\Crud;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder;
 
 abstract class CrudIndex extends Component
 {
@@ -14,6 +14,7 @@ abstract class CrudIndex extends Component
     public string $q = '';
 
     public bool $modal = false;
+
     public ?int $editId = null;
 
     /** @var array<string, mixed> */
@@ -21,6 +22,7 @@ abstract class CrudIndex extends Component
 
     // Sorting
     public string $sortBy = '';
+
     public string $sortDir = 'asc';
 
     protected $queryString = [
@@ -30,13 +32,17 @@ abstract class CrudIndex extends Component
     ];
 
     abstract protected function modelClass(): string;
+
     abstract protected function title(): string;
+
     abstract protected function fields(): array;
+
     abstract protected function columns(): array;
 
     protected function baseQuery(): Builder
     {
         $model = $this->modelClass();
+
         return $model::query();
     }
 
@@ -216,6 +222,7 @@ abstract class CrudIndex extends Component
         foreach ($this->fields() as $key => $cfg) {
             $rules["form.$key"] = $cfg['rules'] ?? ['nullable'];
         }
+
         return $rules;
     }
 
@@ -232,8 +239,12 @@ abstract class CrudIndex extends Component
         $cfg = $this->fields()[$field] ?? [];
         $opt = $cfg['options'] ?? null;
 
-        if (is_callable($opt)) return $opt();
-        if (is_array($opt)) return $opt;
+        if (is_callable($opt)) {
+            return $opt();
+        }
+        if (is_array($opt)) {
+            return $opt;
+        }
 
         return [];
     }
@@ -241,21 +252,26 @@ abstract class CrudIndex extends Component
     protected function applySearch(Builder $query): Builder
     {
         $term = trim($this->q);
-        if ($term === '') return $query;
+        if ($term === '') {
+            return $query;
+        }
 
         $columns = $this->columns();
 
         return $query->where(function (Builder $qq) use ($columns, $term) {
             foreach ($columns as $col) {
-                if (($col['searchable'] ?? false) !== true) continue;
+                if (($col['searchable'] ?? false) !== true) {
+                    continue;
+                }
 
                 if (isset($col['search']) && is_callable($col['search'])) {
                     ($col['search'])($qq, $term);
+
                     continue;
                 }
 
                 $key = $col['key'] ?? '';
-                if ($key !== '' && !str_contains($key, '.')) {
+                if ($key !== '' && ! str_contains($key, '.')) {
                     $qq->orWhere($key, 'like', "%{$term}%");
                 }
             }

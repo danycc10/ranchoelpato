@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -22,7 +22,7 @@ return new class extends Migration
          * Para recibos ya existentes, tomar el propietario real
          * desde lote -> fraccionamiento -> propietario_id
          */
-        DB::statement("
+        DB::statement('
             UPDATE recibos r
             INNER JOIN lotes l
                 ON l.id = r.lote_id
@@ -30,7 +30,7 @@ return new class extends Migration
                 ON f.id = l.fraccionamiento_id
             SET r.propietario_contable_id = f.propietario_id
             WHERE r.propietario_contable_id IS NULL
-        ");
+        ');
     }
 
     public function down(): void

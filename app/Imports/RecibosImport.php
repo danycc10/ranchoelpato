@@ -5,12 +5,12 @@ namespace App\Imports;
 use App\Models\Cliente;
 use App\Models\Contrato;
 use App\Models\CuentaBancaria;
+use App\Models\Cuota;
 use App\Models\FormaPago;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
 use App\Models\Periodo;
 use App\Models\TipoCobro;
-use App\Models\Cuota;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +20,7 @@ use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Row;
 
-class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
+class RecibosImport implements OnEachRow, WithChunkReading, WithStartRow
 {
     public function __construct(
         private readonly int $propietarioId,
@@ -30,11 +30,17 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
 
     // caches para no consultar lo mismo miles de veces
     private array $cacheFormaPago = [];    // key => ?int
+
     private array $cacheTipoCobro = [];    // key => ?int
+
     private array $cacheCuenta = [];       // key => ?int
+
     private array $cacheFracc = [];        // key => ?int
+
     private array $cacheLote = [];         // key => ?int
+
     private array $cacheCliente = [];      // key => ?int
+
     private array $cachePeriodo = [];      // key => ?int
 
     public function startRow(): int
@@ -70,8 +76,7 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
          * 14 CUENTA
          * 15 AÑO
          */
-
-        $folio = trim((string)($r[12] ?? ''));
+        $folio = trim((string) ($r[12] ?? ''));
         if ($folio === '') {
             return;
         }
@@ -82,30 +87,31 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
                 'folio' => $folio,
                 'fecha_excel' => $r[6] ?? null,
             ]);
+
             return;
         }
 
-        $anio = (int)($r[15] ?? $fecha->year);
-        $mes  = (int)($r[10] ?? $fecha->month);
+        $anio = (int) ($r[15] ?? $fecha->year);
+        $mes = (int) ($r[10] ?? $fecha->month);
 
         // ✅ índice 13 = número de cuota pagada
-        $numeroCuotaPagada = is_numeric($r[13] ?? null) ? (int)$r[13] : null;
+        $numeroCuotaPagada = is_numeric($r[13] ?? null) ? (int) $r[13] : null;
 
         $monto = $this->parseMoney($r[5] ?? 0);
 
         $apellido = $this->normUpper($r[0] ?? '');
-        $nombre   = $this->normUpper($r[1] ?? '');
+        $nombre = $this->normUpper($r[1] ?? '');
 
         $residencial = $this->normUpper($r[2] ?? '');
-        $manzana     = trim((string)($r[3] ?? ''));
-        $loteNum     = trim((string)($r[4] ?? ''));
+        $manzana = trim((string) ($r[3] ?? ''));
+        $loteNum = trim((string) ($r[4] ?? ''));
 
         // Normalizaciones
         $formaPagoTxt = $this->normalizeFormaPago($r[7] ?? '');
-        $tipoPagoTxt  = $this->normalizeCatalog($r[8] ?? '');
-        $mensualidad  = $this->normalizeCatalog($r[11] ?? ''); // ENERO, FEBRERO...
+        $tipoPagoTxt = $this->normalizeCatalog($r[8] ?? '');
+        $mensualidad = $this->normalizeCatalog($r[11] ?? ''); // ENERO, FEBRERO...
 
-        $cuentaTxt = trim((string)($r[14] ?? ''));
+        $cuentaTxt = trim((string) ($r[14] ?? ''));
 
         DB::transaction(function () use (
             $folio, $fecha, $anio, $mes, $numeroCuotaPagada, $monto,
@@ -120,12 +126,13 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
                     'folio' => $folio,
                     'forma_pago_excel' => $formaPagoTxt,
                 ]);
+
                 return;
             }
 
             // ✅ NUNCA NULL: tipos_cobro_id es NOT NULL en tu BD
             $tipoCobroId = $this->resolveTipoCobroIdOrDefault($tipoPagoTxt);
-            $tipoCobro   = $tipoCobroId ? TipoCobro::find($tipoCobroId) : null;
+            $tipoCobro = $tipoCobroId ? TipoCobro::find($tipoCobroId) : null;
 
             // 2) Periodo (solo si requiere_periodo)
             $periodoId = null;
@@ -143,6 +150,7 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
                         'mes' => $mes,
                         'mensualidad' => $mensualidad,
                     ]);
+
                     return;
                 }
             }
@@ -160,6 +168,7 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
                     'folio' => $folio,
                     'residencial_excel' => $residencial,
                 ]);
+
                 return;
             }
 
@@ -171,6 +180,7 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
                     'manzana' => $manzana,
                     'lote' => $loteNum,
                 ]);
+
                 return;
             }
 
@@ -182,6 +192,7 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
                     'nombre' => $nombre,
                     'apellido' => $apellido,
                 ]);
+
                 return;
             }
 
@@ -193,7 +204,7 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
 
             // 7) Upsert Recibo por folio
             DB::table('recibos')->upsert([[
-                'folio' => (string)$folio,
+                'folio' => (string) $folio,
                 'fecha' => $fecha->toDateString(),
                 'anio' => $anio,
 
@@ -219,10 +230,10 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
                 'created_at' => now(),
                 'updated_at' => now(),
             ]], ['folio'], [
-                'fecha','anio','semana_pago','mes_del_anio',
-                'cliente_id','contrato_id','lote_id',
-                'tipos_cobro_id','forma_pago_id','cuentas_bancarias_id','periodo_id',
-                'monto','capturado_por_user_id','updated_at'
+                'fecha', 'anio', 'semana_pago', 'mes_del_anio',
+                'cliente_id', 'contrato_id', 'lote_id',
+                'tipos_cobro_id', 'forma_pago_id', 'cuentas_bancarias_id', 'periodo_id',
+                'monto', 'capturado_por_user_id', 'updated_at',
             ]);
 
             // =========================
@@ -250,17 +261,18 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
                     'numero_cuota' => $numeroCuotaPagada,
                     'folio' => $folio,
                 ]);
+
                 return;
             }
 
-            $nuevoPagado = (float)($cuota->pagado_total ?? 0) + (float)$monto;
+            $nuevoPagado = (float) ($cuota->pagado_total ?? 0) + (float) $monto;
 
             $update = [
                 'pagado_total' => $nuevoPagado,
                 'updated_at' => now(),
             ];
 
-            $montoCuota = (float)($cuota->monto ?? 0);
+            $montoCuota = (float) ($cuota->monto ?? 0);
 
             if ($montoCuota > 0 && $nuevoPagado + 0.0001 >= $montoCuota) {
                 $update['estatus'] = 'pagada';
@@ -279,9 +291,11 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
 
     private function tipoCobroNoAbonaACuota(?TipoCobro $tipoCobro): bool
     {
-        if (! $tipoCobro) return false;
+        if (! $tipoCobro) {
+            return false;
+        }
 
-        $nombre = mb_strtoupper(trim((string)$tipoCobro->nombre));
+        $nombre = mb_strtoupper(trim((string) $tipoCobro->nombre));
 
         return str_contains($nombre, 'RECARGO')
             || str_contains($nombre, 'MULTA')
@@ -301,15 +315,18 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
 
     private function normalizeCatalog($s): string
     {
-        $s = trim((string)$s);
+        $s = trim((string) $s);
         $s = preg_replace('/\s+/', ' ', $s);
+
         return mb_strtoupper($s);
     }
 
     private function resolveFormaPagoId(string $nombre): ?int
     {
         $nombre = trim($nombre);
-        if ($nombre === '') return null;
+        if ($nombre === '') {
+            return null;
+        }
 
         $key = mb_strtolower($nombre);
 
@@ -330,13 +347,16 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
         }
 
         $this->cacheFormaPago[$key] = $q?->id;
+
         return $this->cacheFormaPago[$key];
     }
 
     private function resolveTipoCobroId(string $nombre): ?int
     {
         $nombre = trim($nombre);
-        if ($nombre === '') return null;
+        if ($nombre === '') {
+            return null;
+        }
 
         $key = mb_strtolower($nombre);
 
@@ -358,6 +378,7 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
         }
 
         $this->cacheTipoCobro[$key] = $q?->id;
+
         return $this->cacheTipoCobro[$key];
     }
 
@@ -367,7 +388,7 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
      */
     private function resolveTipoCobroIdOrDefault(string $nombre): int
     {
-        $nombre = trim((string)$nombre);
+        $nombre = trim((string) $nombre);
 
         if ($nombre === '') {
             $nombre = 'MENSUALIDAD';
@@ -395,7 +416,9 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
     private function resolveCuenta(string $alias): ?int
     {
         $key = mb_strtolower(trim($alias));
-        if ($key === '') return null;
+        if ($key === '') {
+            return null;
+        }
 
         if (array_key_exists($key, $this->cacheCuenta)) {
             return $this->cacheCuenta[$key];
@@ -418,13 +441,16 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
         }
 
         $this->cacheCuenta[$key] = $q?->id;
+
         return $this->cacheCuenta[$key];
     }
 
     private function resolveFraccionamiento(string $nombre): ?int
     {
         $nombre = trim($nombre);
-        if ($nombre === '') $nombre = 'SIN NOMBRE';
+        if ($nombre === '') {
+            $nombre = 'SIN NOMBRE';
+        }
 
         $key = mb_strtolower($nombre);
 
@@ -445,6 +471,7 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
         }
 
         $this->cacheFracc[$key] = $q?->id;
+
         return $this->cacheFracc[$key];
     }
 
@@ -453,9 +480,11 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
         $manzana = trim($manzana);
         $lote = trim($lote);
 
-        if ($lote === '') return null;
+        if ($lote === '') {
+            return null;
+        }
 
-        $key = "{$fraccId}|".mb_strtolower($manzana)."|".mb_strtolower($lote);
+        $key = "{$fraccId}|".mb_strtolower($manzana).'|'.mb_strtolower($lote);
 
         if (array_key_exists($key, $this->cacheLote)) {
             return $this->cacheLote[$key];
@@ -480,6 +509,7 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
         }
 
         $this->cacheLote[$key] = $q?->id;
+
         return $this->cacheLote[$key];
     }
 
@@ -493,6 +523,7 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
             $i++;
             $clave = "{$base}-{$i}";
         }
+
         return $clave;
     }
 
@@ -502,7 +533,9 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
         $apellidos = trim($apellidos);
 
         $key = mb_strtolower($apellidos.'|'.$nombres);
-        if ($key === '|') $key = 'sin-nombre';
+        if ($key === '|') {
+            $key = 'sin-nombre';
+        }
 
         if (array_key_exists($key, $this->cacheCliente)) {
             return $this->cacheCliente[$key];
@@ -522,6 +555,7 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
         }
 
         $this->cacheCliente[$key] = $q?->id;
+
         return $this->cacheCliente[$key];
     }
 
@@ -549,44 +583,55 @@ class RecibosImport implements OnEachRow, WithStartRow, WithChunkReading
         }
 
         $this->cachePeriodo[$key] = $q?->id;
+
         return $this->cachePeriodo[$key];
     }
 
     private function parseFecha($value): ?Carbon
     {
-        if ($value === null || $value === '') return null;
-
-        if (is_numeric($value)) {
-            return Carbon::createFromTimestampUTC(((int)$value - 25569) * 86400)->startOfDay();
+        if ($value === null || $value === '') {
+            return null;
         }
 
-        $s = trim((string)$value);
+        if (is_numeric($value)) {
+            return Carbon::createFromTimestampUTC(((int) $value - 25569) * 86400)->startOfDay();
+        }
 
-        try { return Carbon::createFromFormat('d/m/Y', $s)->startOfDay(); } catch (\Throwable) {}
-        try { return Carbon::parse($s)->startOfDay(); } catch (\Throwable) {}
+        $s = trim((string) $value);
+
+        try {
+            return Carbon::createFromFormat('d/m/Y', $s)->startOfDay();
+        } catch (\Throwable) {
+        }
+        try {
+            return Carbon::parse($s)->startOfDay();
+        } catch (\Throwable) {
+        }
 
         return null;
     }
 
     private function parseMoney($value): float
     {
-        $s = (string)$value;
+        $s = (string) $value;
         $s = str_replace(['$', ',', ' '], '', $s);
-        return is_numeric($s) ? (float)$s : 0.0;
+
+        return is_numeric($s) ? (float) $s : 0.0;
     }
 
     private function normUpper($s): string
     {
-        $s = trim((string)$s);
+        $s = trim((string) $s);
         $s = preg_replace('/\s+/', ' ', $s);
+
         return mb_strtoupper($s);
     }
 
     private function mesNombre(int $mes): string
     {
         return [
-            1=>'ENERO',2=>'FEBRERO',3=>'MARZO',4=>'ABRIL',5=>'MAYO',6=>'JUNIO',
-            7=>'JULIO',8=>'AGOSTO',9=>'SEPTIEMBRE',10=>'OCTUBRE',11=>'NOVIEMBRE',12=>'DICIEMBRE'
+            1 => 'ENERO', 2 => 'FEBRERO', 3 => 'MARZO', 4 => 'ABRIL', 5 => 'MAYO', 6 => 'JUNIO',
+            7 => 'JULIO', 8 => 'AGOSTO', 9 => 'SEPTIEMBRE', 10 => 'OCTUBRE', 11 => 'NOVIEMBRE', 12 => 'DICIEMBRE',
         ][$mes] ?? 'MES';
     }
 }

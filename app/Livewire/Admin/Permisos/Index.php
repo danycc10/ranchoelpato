@@ -13,10 +13,13 @@ class Index extends Component
     protected string $paginationTheme = 'tailwind';
 
     public string $busqueda = '';
+
     public string $name = '';
+
     public string $guard_name = 'web';
 
     public bool $mostrarModalCrear = false;
+
     public ?int $permisoIdEditar = null;
 
     protected function rules(): array
@@ -83,8 +86,8 @@ class Index extends Component
     {
         return Permission::query()
             ->when($this->busqueda !== '', function ($q) {
-                $q->where('name', 'like', '%' . trim($this->busqueda) . '%')
-                  ->orWhere('guard_name', 'like', '%' . trim($this->busqueda) . '%');
+                $q->where('name', 'like', '%'.trim($this->busqueda).'%')
+                    ->orWhere('guard_name', 'like', '%'.trim($this->busqueda).'%');
             })
             ->orderBy('name')
             ->paginate(12);

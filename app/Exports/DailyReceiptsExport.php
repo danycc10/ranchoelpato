@@ -2,10 +2,10 @@
 
 namespace App\Exports;
 
+use App\Exports\Sheets\DailyReceiptsDetailSheet;
+use App\Exports\Sheets\DailyReceiptsSummarySheet;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
-use App\Exports\Sheets\DailyReceiptsSummarySheet;
-use App\Exports\Sheets\DailyReceiptsDetailSheet;
 
 class DailyReceiptsExport implements WithMultipleSheets
 {

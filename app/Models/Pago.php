@@ -4,12 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Pago extends Model
 {
-     use SoftDeletes;
+    use SoftDeletes;
 
     protected $table = 'pagos';
 
@@ -27,7 +27,7 @@ class Pago extends Model
     protected $casts = [
         'monto' => 'decimal:2',
         'fecha_pago' => 'datetime',
-          'anulado_at' => 'datetime',
+        'anulado_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
 
@@ -45,10 +45,12 @@ class Pago extends Model
     {
         return $this->belongsTo(Recibo::class, 'recibo_id');
     }
+
     public function getRouteKeyName(): string
     {
         return 'uuid';
     }
+
     protected static function booted()
     {
         static::creating(function ($model) {

@@ -2,24 +2,26 @@
 
 namespace App\Livewire\Admin\Clientes;
 
-use Livewire\Component;
-use Livewire\WithPagination;
-use Livewire\WithFileUploads;
 use App\Models\Cliente;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
-use Illuminate\Support\Facades\Route;
+use Livewire\WithFileUploads;
+use Livewire\WithPagination;
 
 class Index extends Component
 {
-    use WithPagination, WithFileUploads;
+    use WithFileUploads, WithPagination;
 
     public string $q = '';
+
     public string $sortBy = 'id';
+
     public string $sortDir = 'desc';
 
     public bool $modal = false;
+
     public ?int $editId = null;
 
     /** @var array<string,mixed> */
@@ -36,10 +38,13 @@ class Index extends Component
     ];
 
     public $ineFrenteFile = null;
+
     public $ineReversoFile = null;
 
     public ?string $ine_frente = null;
+
     public ?string $ine_reverso = null;
+
     public ?string $documentos_disk = 'private';
 
     protected $queryString = [
@@ -131,6 +136,7 @@ class Index extends Component
         }
 
         $digits = preg_replace('/\D+/', '', $value);
+
         return $digits !== '' ? $digits : null;
     }
 
@@ -251,6 +257,7 @@ class Index extends Component
         }
 
         $value = trim($value);
+
         return $value !== '' ? $value : null;
     }
 
@@ -258,8 +265,8 @@ class Index extends Component
     {
         $disk = 'private';
         $ext = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'bin');
-        $name = $prefix . '_' . now()->format('Ymd_His') . '_' . Str::random(8) . '.' . $ext;
-        $dir = 'clientes/' . $clienteId . '/documentos';
+        $name = $prefix.'_'.now()->format('Ymd_His').'_'.Str::random(8).'.'.$ext;
+        $dir = 'clientes/'.$clienteId.'/documentos';
 
         return $file->storeAs($dir, $name, $disk);
     }
@@ -309,73 +316,76 @@ class Index extends Component
     }
 
     protected function resolveDocumentoPreviewUrl($file, ?string $path, ?string $disk = 'private'): ?string
-{
-    if ($file && method_exists($file, 'temporaryUrl')) {
+    {
+        if ($file && method_exists($file, 'temporaryUrl')) {
+            try {
+                return $file->temporaryUrl();
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        if (! $path) {
+            return null;
+        }
+
+        $disk = $disk ?: 'private';
+
         try {
-            return $file->temporaryUrl();
+            return route('admin.private-files.show', [
+                'disk' => $disk,
+                'path' => encrypt($path),
+            ]);
         } catch (\Throwable $e) {
             report($e);
+
+            return null;
         }
     }
 
-    if (! $path) {
-        return null;
+    public function getIneFrentePreviewProperty(): ?string
+    {
+        return $this->resolveDocumentoPreviewUrl(
+            $this->ineFrenteFile,
+            $this->ine_frente,
+            $this->documentos_disk
+        );
     }
 
-    $disk = $disk ?: 'private';
-
-    try {
-        return route('admin.private-files.show', [
-            'disk' => $disk,
-            'path' => encrypt($path),
-        ]);
-    } catch (\Throwable $e) {
-        report($e);
-        return null;
-    }
-}
-
-public function getIneFrentePreviewProperty(): ?string
-{
-    return $this->resolveDocumentoPreviewUrl(
-        $this->ineFrenteFile,
-        $this->ine_frente,
-        $this->documentos_disk
-    );
-}
-
-public function getIneReversoPreviewProperty(): ?string
-{
-    return $this->resolveDocumentoPreviewUrl(
-        $this->ineReversoFile,
-        $this->ine_reverso,
-        $this->documentos_disk
-    );
-}
-
-public function getIneFrenteEsPdfProperty(): bool
-{
-    if ($this->ineFrenteFile instanceof TemporaryUploadedFile) {
-        $ext = strtolower($this->ineFrenteFile->getClientOriginalExtension() ?: '');
-        return $ext === 'pdf';
+    public function getIneReversoPreviewProperty(): ?string
+    {
+        return $this->resolveDocumentoPreviewUrl(
+            $this->ineReversoFile,
+            $this->ine_reverso,
+            $this->documentos_disk
+        );
     }
 
-    return $this->ine_frente
-        ? strtolower(pathinfo($this->ine_frente, PATHINFO_EXTENSION)) === 'pdf'
-        : false;
-}
+    public function getIneFrenteEsPdfProperty(): bool
+    {
+        if ($this->ineFrenteFile instanceof TemporaryUploadedFile) {
+            $ext = strtolower($this->ineFrenteFile->getClientOriginalExtension() ?: '');
 
-public function getIneReversoEsPdfProperty(): bool
-{
-    if ($this->ineReversoFile instanceof TemporaryUploadedFile) {
-        $ext = strtolower($this->ineReversoFile->getClientOriginalExtension() ?: '');
-        return $ext === 'pdf';
+            return $ext === 'pdf';
+        }
+
+        return $this->ine_frente
+            ? strtolower(pathinfo($this->ine_frente, PATHINFO_EXTENSION)) === 'pdf'
+            : false;
     }
 
-    return $this->ine_reverso
-        ? strtolower(pathinfo($this->ine_reverso, PATHINFO_EXTENSION)) === 'pdf'
-        : false;
-}
+    public function getIneReversoEsPdfProperty(): bool
+    {
+        if ($this->ineReversoFile instanceof TemporaryUploadedFile) {
+            $ext = strtolower($this->ineReversoFile->getClientOriginalExtension() ?: '');
+
+            return $ext === 'pdf';
+        }
+
+        return $this->ine_reverso
+            ? strtolower(pathinfo($this->ine_reverso, PATHINFO_EXTENSION)) === 'pdf'
+            : false;
+    }
 
     public function toggleEstatus(int $id): void
     {

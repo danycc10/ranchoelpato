@@ -9,6 +9,6 @@ class ReportsIndex extends Component
     public function render()
     {
         return view('livewire.reports.reports-index')
-         ->layout('layouts.app');
+            ->layout('layouts.app');
     }
 }

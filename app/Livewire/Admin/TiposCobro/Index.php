@@ -2,11 +2,11 @@
 
 namespace App\Livewire\Admin\TiposCobro;
 
+use App\Models\Propietario;
+use App\Models\TipoCobro;
+use Illuminate\Database\Eloquent\Builder;
 use Livewire\Component;
 use Livewire\WithPagination;
-use App\Models\TipoCobro;
-use App\Models\Propietario;
-use Illuminate\Database\Eloquent\Builder;
 
 class Index extends Component
 {
@@ -14,18 +14,25 @@ class Index extends Component
 
     // Tabla
     public string $q = '';
+
     public string $sortBy = 'id';
+
     public string $sortDir = 'asc';
 
     // Modal / edición
     public bool $modal = false;
+
     public ?int $editId = null;
 
     // Campos
     public string $nombre = '';
+
     public ?string $categoria = null;
+
     public bool $requiere_periodo = false;
+
     public bool $activa = true;
+
     public ?int $propietario_contable_id = null;
 
     protected $queryString = [

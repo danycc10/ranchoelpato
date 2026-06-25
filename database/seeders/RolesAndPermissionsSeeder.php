@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 class RolesAndPermissionsSeeder extends Seeder
@@ -81,14 +81,12 @@ class RolesAndPermissionsSeeder extends Seeder
             'logs.eliminar',
         ];
 
-
         foreach ($perms as $perm) {
             Permission::firstOrCreate([
                 'name' => $perm,
-                'guard_name' => 'web'
+                'guard_name' => 'web',
             ]);
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -98,24 +96,23 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $dueno = Role::firstOrCreate([
             'name' => 'dueño',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
         ]);
 
         $admin = Role::firstOrCreate([
             'name' => 'admin',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
         ]);
 
         $jefa = Role::firstOrCreate([
             'name' => 'jefa',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
         ]);
 
         $secretaria = Role::firstOrCreate([
             'name' => 'secretaria',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
         ]);
-
 
         /*
         |--------------------------------------------------------------------------
@@ -125,7 +122,6 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $dueno->syncPermissions(Permission::all());
 
-
         /*
         |--------------------------------------------------------------------------
         | Admin → TODO excepto eliminar logs y roles críticos
@@ -133,7 +129,6 @@ class RolesAndPermissionsSeeder extends Seeder
         */
 
         $admin->syncPermissions(Permission::all());
-
 
         /*
         |--------------------------------------------------------------------------
@@ -177,7 +172,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'logs.ver',
         ]);
 
-
         /*
         |--------------------------------------------------------------------------
         | Secretaria
@@ -209,7 +203,6 @@ class RolesAndPermissionsSeeder extends Seeder
 
             'clientes_excelentes.ver',
         ]);
-
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }

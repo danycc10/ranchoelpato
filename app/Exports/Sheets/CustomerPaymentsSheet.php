@@ -2,21 +2,21 @@
 
 namespace App\Exports\Sheets;
 
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithTitle;
-use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
-
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
-class CustomerPaymentsSheet implements FromCollection, WithHeadings, WithTitle, WithEvents, ShouldAutoSize, WithColumnFormatting
+class CustomerPaymentsSheet implements FromCollection, ShouldAutoSize, WithColumnFormatting, WithEvents, WithHeadings, WithTitle
 {
     public function __construct(
         public string $clienteNombre,
@@ -63,10 +63,10 @@ class CustomerPaymentsSheet implements FromCollection, WithHeadings, WithTitle, 
 
             $cuenta = $cuentaObj?->alias ?? '';
 
-            if (!$cuenta && $cuentaObj) {
+            if (! $cuenta && $cuentaObj) {
                 $cuenta = trim(
-                    ($cuentaObj->banco ?? '') .
-                    (($cuentaObj->numero ?? null) ? ' - ' . $cuentaObj->numero : '')
+                    ($cuentaObj->banco ?? '').
+                    (($cuentaObj->numero ?? null) ? ' - '.$cuentaObj->numero : '')
                 );
             }
 
@@ -85,7 +85,7 @@ class CustomerPaymentsSheet implements FromCollection, WithHeadings, WithTitle, 
                 ?? '';
 
             $fechaPago = $p->created_at
-                ? \Carbon\Carbon::parse($p->created_at)->format('Y-m-d')
+                ? Carbon::parse($p->created_at)->format('Y-m-d')
                 : '';
 
             return [
@@ -124,8 +124,8 @@ class CustomerPaymentsSheet implements FromCollection, WithHeadings, WithTitle, 
                 }
 
                 if ($this->finca || $this->lote) {
-                    $subtitle .= " | Finca: " . ($this->finca ?? '—')
-                        . " | Lote: " . ($this->lote ?? '—');
+                    $subtitle .= ' | Finca: '.($this->finca ?? '—')
+                        .' | Lote: '.($this->lote ?? '—');
                 }
 
                 $sheet->setCellValue('A1', 'HISTORIAL DE PAGOS');

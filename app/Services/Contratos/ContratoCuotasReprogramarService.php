@@ -12,9 +12,8 @@ class ContratoCuotasReprogramarService
     /**
      * Reprograma fechas de cuotas en cadena a partir de una nueva fecha inicial.
      *
-     * @param  Contrato $contrato
-     * @param  Carbon   $nuevaFechaPrimera  (fecha_vencimiento para la primera cuota)
-     * @param  bool     $soloPendientes     true = solo pendientes; false = todas
+     * @param  Carbon  $nuevaFechaPrimera  (fecha_vencimiento para la primera cuota)
+     * @param  bool  $soloPendientes  true = solo pendientes; false = todas
      */
     public static function reprogramar(Contrato $contrato, Carbon $nuevaFechaPrimera, bool $soloPendientes = false): void
     {
@@ -36,7 +35,9 @@ class ContratoCuotasReprogramarService
             }
 
             $cuotas = $cuotasQuery->get();
-            if ($cuotas->isEmpty()) return;
+            if ($cuotas->isEmpty()) {
+                return;
+            }
 
             $fecha = $nuevaFechaPrimera->copy()->startOfDay();
             $frecuencia = (string) $contrato->frecuencia;

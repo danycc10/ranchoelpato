@@ -3,12 +3,13 @@
 namespace App\Livewire\Admin\Roles;
 
 use Livewire\Component;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class Index extends Component
 {
     public ?int $roleId = null;
+
     public array $permisosSeleccionados = [];
 
     protected function ensurePuedeEditar(): void

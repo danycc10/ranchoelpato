@@ -25,7 +25,7 @@ class ReciboPago extends Model
         'evidencia_size',
         'orden',
         'capturado_por_user_id',
-                'anulado_at',
+        'anulado_at',
         'anulado_por_user_id',
         'anulado_motivo',
     ];

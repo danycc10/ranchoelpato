@@ -34,9 +34,9 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-    
+
     'print_bridge' => [
-    'secret' => env('PRINT_BRIDGE_SECRET'),
+        'secret' => env('PRINT_BRIDGE_SECRET'),
     ],
 
 ];

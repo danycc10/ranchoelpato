@@ -22,7 +22,7 @@ class TiposCobroSeeder extends Seeder
             ['nombre' => 'SERVICIO - ELECTRICIDAD', 'categoria' => 'servicio', 'requiere_periodo' => false],
             ['nombre' => 'SERVICIO - FOSA', 'categoria' => 'servicio', 'requiere_periodo' => false],
             ['nombre' => 'PROTOCOLO DE ESCRITURACIÓN', 'categoria' => 'tramite', 'requiere_periodo' => false],
-             ['nombre' => 'RETIRO', 'categoria' => 'tramite', 'requiere_periodo' => false],
+            ['nombre' => 'RETIRO', 'categoria' => 'tramite', 'requiere_periodo' => false],
         ];
 
         $now = now();

@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Admin\Periodos;
 
-use Livewire\Component;
-use Livewire\WithPagination;
 use App\Models\Periodo;
 use Illuminate\Database\Eloquent\Builder;
+use Livewire\Component;
+use Livewire\WithPagination;
 
 class Index extends Component
 {
@@ -13,17 +13,23 @@ class Index extends Component
 
     // Tabla
     public string $q = '';
+
     public string $sortBy = 'anio';
+
     public string $sortDir = 'desc';
 
     // Modal / edición
     public bool $modal = false;
+
     public ?int $editId = null;
 
     // Campos
     public string $tipo = 'mensual'; // mensual|anual
+
     public int $anio = 2026;
+
     public ?int $mes = null;
+
     public string $nombre = '';
 
     protected $queryString = [
@@ -102,6 +108,7 @@ class Index extends Component
         if ($base['tipo'] === 'mensual') {
             if ($base['mes'] === null) {
                 $this->addError('mes', 'El mes es requerido cuando el tipo es mensual.');
+
                 return;
             }
         } else {
@@ -131,6 +138,7 @@ class Index extends Component
         $it = Periodo::query()->withCount('recibos')->findOrFail($id);
         if (($it->recibos_count ?? 0) > 0) {
             $this->dispatch('toast', type: 'error', message: 'No se puede eliminar: ya existe en recibos.');
+
             return;
         }
 
@@ -150,13 +158,15 @@ class Index extends Component
     protected function applySearch(Builder $query): Builder
     {
         $term = trim($this->q);
-        if ($term === '') return $query;
+        if ($term === '') {
+            return $query;
+        }
 
         return $query->where(function (Builder $qq) use ($term) {
             $qq->where('nombre', 'like', "%{$term}%")
-               ->orWhere('tipo', 'like', "%{$term}%")
-               ->orWhere('anio', 'like', "%{$term}%")
-               ->orWhere('mes', 'like', "%{$term}%");
+                ->orWhere('tipo', 'like', "%{$term}%")
+                ->orWhere('anio', 'like', "%{$term}%")
+                ->orWhere('mes', 'like', "%{$term}%");
         });
     }
 
@@ -166,7 +176,9 @@ class Index extends Component
         $key = $this->sortBy ?: 'anio';
 
         $allowed = ['id', 'tipo', 'anio', 'mes', 'nombre'];
-        if (! in_array($key, $allowed, true)) $key = 'anio';
+        if (! in_array($key, $allowed, true)) {
+            $key = 'anio';
+        }
 
         return $query->orderBy($key, $dir);
     }

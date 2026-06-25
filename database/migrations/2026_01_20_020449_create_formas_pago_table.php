@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-Schema::create('formas_pago', function (Blueprint $table) {
-    $table->id();
-    $table->string('nombre');
-    $table->boolean('requiere_cuenta')->default(false);
-    $table->boolean('activa')->default(true);
-    $table->timestamps();
-});
+        Schema::create('formas_pago', function (Blueprint $table) {
+            $table->id();
+            $table->string('nombre');
+            $table->boolean('requiere_cuenta')->default(false);
+            $table->boolean('activa')->default(true);
+            $table->timestamps();
+        });
 
     }
 

@@ -50,7 +50,7 @@ class ImageUploadService
         int $quality = 72,
         ?string $referenceFolder = null
     ): array {
-        $manager = new ImageManager(new Driver());
+        $manager = new ImageManager(new Driver);
 
         $image = $manager->read($file->getRealPath());
         $image = $image->scaleDown(width: $maxWidth, height: $maxHeight);
@@ -107,24 +107,24 @@ class ImageUploadService
             ? $this->sanitizeFolderName($referenceFolder)
             : null;
 
-        $basePath = $folder . '/' . $datePath;
+        $basePath = $folder.'/'.$datePath;
 
         if ($referenceFolder) {
-            $basePath .= '/' . $referenceFolder;
+            $basePath .= '/'.$referenceFolder;
         }
 
         $fileName = $referenceFolder
-            ? $referenceFolder . '-' . Str::uuid() . '.' . $extension
-            : Str::uuid() . '.' . $extension;
+            ? $referenceFolder.'-'.Str::uuid().'.'.$extension
+            : Str::uuid().'.'.$extension;
 
-        $path = $basePath . '/' . $fileName;
+        $path = $basePath.'/'.$fileName;
 
         return [$path, $fileName];
     }
 
     public function deleteIfExists(?string $path): void
     {
-        if (!$path) {
+        if (! $path) {
             return;
         }
 

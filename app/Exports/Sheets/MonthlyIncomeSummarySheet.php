@@ -4,23 +4,17 @@ namespace App\Exports\Sheets;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
-use Maatwebsite\Excel\Concerns\WithEvents;
-use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Events\AfterSheet;
-
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 
-class MonthlyIncomeSummarySheet implements
-    FromCollection,
-    WithHeadings,
-    WithTitle,
-    WithColumnFormatting,
-    WithEvents
+class MonthlyIncomeSummarySheet implements FromCollection, WithColumnFormatting, WithEvents, WithHeadings, WithTitle
 {
     public function __construct(
         public int $anio,
@@ -132,14 +126,14 @@ class MonthlyIncomeSummarySheet implements
                 $sheet->insertNewRowBefore(1, 8);
 
                 $lastCol = $this->colLetter(6 + count($this->metodosPago));
-                $tableHeaderRow  = 9;
-                $firstDataRow    = 10;
+                $tableHeaderRow = 9;
+                $firstDataRow = 10;
 
-                $bgMain   = '0F766E';
-                $bgSoft   = 'CCFBF1';
-                $bgHead   = '99F6E4';
-                $bgZebra  = 'F8FAFC';
-                $borderC  = '0F766E';
+                $bgMain = '0F766E';
+                $bgSoft = 'CCFBF1';
+                $bgHead = '99F6E4';
+                $bgZebra = 'F8FAFC';
+                $borderC = '0F766E';
 
                 $highestRow = $sheet->getHighestRow();
 
@@ -151,7 +145,7 @@ class MonthlyIncomeSummarySheet implements
 
                 // ===== TÍTULO =====
                 $sheet->mergeCells("A1:{$lastCol}1");
-                $sheet->setCellValue("A1", 'RESUMEN DE INGRESOS MENSUALES');
+                $sheet->setCellValue('A1', 'RESUMEN DE INGRESOS MENSUALES');
 
                 $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
                     'font' => [
@@ -243,7 +237,7 @@ class MonthlyIncomeSummarySheet implements
                 // ===== LOGO =====
                 $logoPath = public_path('storage/images/logo-espinoza.jpeg');
                 if (file_exists($logoPath)) {
-                    $drawing = new Drawing();
+                    $drawing = new Drawing;
                     $drawing->setName('Logo');
                     $drawing->setDescription('Logo reporte');
                     $drawing->setPath($logoPath);
@@ -254,7 +248,7 @@ class MonthlyIncomeSummarySheet implements
                 }
 
                 // ===== MATRIZ CONCEPTOS POR FINCA =====
-                if ($this->conceptosPorFinca && !empty($this->conceptosPorFinca->fincas)) {
+                if ($this->conceptosPorFinca && ! empty($this->conceptosPorFinca->fincas)) {
                     $fincas = collect($this->conceptosPorFinca->fincas);
                     $filasConceptos = collect($this->conceptosPorFinca->filas);
 
@@ -282,14 +276,14 @@ class MonthlyIncomeSummarySheet implements
                     })->values();
 
                     if ($fincasFiltradas->isNotEmpty() && $filasFiltradas->isNotEmpty()) {
-                        $matrixTitleRow  = 5;
+                        $matrixTitleRow = 5;
                         $matrixHeaderRow = 6;
                         $matrixDataStart = 7;
 
-                        $sheet->mergeCells("A{$matrixTitleRow}:" . $this->colLetter(count($fincasFiltradas) + 1) . "{$matrixTitleRow}");
+                        $sheet->mergeCells("A{$matrixTitleRow}:".$this->colLetter(count($fincasFiltradas) + 1)."{$matrixTitleRow}");
                         $sheet->setCellValue("A{$matrixTitleRow}", 'CONCEPTOS AGRUPADOS POR FINCA');
 
-                        $sheet->getStyle("A{$matrixTitleRow}:" . $this->colLetter(count($fincasFiltradas) + 1) . "{$matrixTitleRow}")
+                        $sheet->getStyle("A{$matrixTitleRow}:".$this->colLetter(count($fincasFiltradas) + 1)."{$matrixTitleRow}")
                             ->applyFromArray([
                                 'font' => [
                                     'name' => 'Dubai Medium',
@@ -310,7 +304,7 @@ class MonthlyIncomeSummarySheet implements
 
                         $colIndex = 2;
                         foreach ($fincasFiltradas as $finca) {
-                            $sheet->setCellValue($this->colLetter($colIndex) . $matrixHeaderRow, mb_strtoupper($finca['nombre']));
+                            $sheet->setCellValue($this->colLetter($colIndex).$matrixHeaderRow, mb_strtoupper($finca['nombre']));
                             $colIndex++;
                         }
 
@@ -345,7 +339,7 @@ class MonthlyIncomeSummarySheet implements
                             $colIndex = 2;
                             foreach ($fincasFiltradas as $finca) {
                                 $sheet->setCellValue(
-                                    $this->colLetter($colIndex) . $row,
+                                    $this->colLetter($colIndex).$row,
                                     (float) ($fila['fincas'][$finca['nombre']] ?? 0)
                                 );
                                 $colIndex++;
@@ -486,7 +480,7 @@ class MonthlyIncomeSummarySheet implements
 
         while ($index > 0) {
             $mod = ($index - 1) % 26;
-            $letter = chr(65 + $mod) . $letter;
+            $letter = chr(65 + $mod).$letter;
             $index = intdiv($index - 1, 26);
         }
 

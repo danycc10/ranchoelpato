@@ -5,11 +5,11 @@ namespace App\Jobs;
 use App\Models\Cuota;
 use App\Notifications\CuotaAtrasadaNotification;
 use Illuminate\Bus\Queueable;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class SendCuotaAtrasadaNotifications implements ShouldQueue
 {
@@ -38,7 +38,7 @@ class SendCuotaAtrasadaNotifications implements ShouldQueue
 
                 $cliente = $cuota->contrato?->cliente;
 
-                if (!$cliente) {
+                if (! $cliente) {
 
                     Log::warning('Cuota sin cliente', [
                         'cuota_id' => $cuota->id,
@@ -62,7 +62,7 @@ class SendCuotaAtrasadaNotifications implements ShouldQueue
                 | CORREO
                 |--------------------------------------------------------------------------
                 */
-                if (!empty($cliente->correo)) {
+                if (! empty($cliente->correo)) {
 
                     Log::info('Enviando notificación correo', [
                         'correo' => $cliente->correo,
@@ -82,7 +82,7 @@ class SendCuotaAtrasadaNotifications implements ShouldQueue
                 | WHATSAPP
                 |--------------------------------------------------------------------------
                 */
-                if (!empty($cliente->telefono)) {
+                if (! empty($cliente->telefono)) {
 
                     Log::info('Cliente tiene teléfono', [
                         'telefono' => $cliente->telefono,
@@ -106,6 +106,6 @@ class SendCuotaAtrasadaNotifications implements ShouldQueue
 
     protected function calcularRecargo(Cuota $cuota): float
     {
-        return round(((float)$cuota->monto) * 0.05, 2);
+        return round(((float) $cuota->monto) * 0.05, 2);
     }
 }

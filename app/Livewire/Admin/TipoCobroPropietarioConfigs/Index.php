@@ -12,6 +12,7 @@ use Livewire\Component;
 class Index extends Component
 {
     public ?int $tipo_cobro_id = null;
+
     public ?int $fraccionamiento_id = null;
 
     public array $rows = [];
@@ -38,7 +39,7 @@ class Index extends Component
     {
         $this->rows = [];
 
-        if (!$this->tipo_cobro_id || !$this->fraccionamiento_id) {
+        if (! $this->tipo_cobro_id || ! $this->fraccionamiento_id) {
             return;
         }
 
@@ -110,7 +111,7 @@ class Index extends Component
 
     public function limpiarFila(int $index): void
     {
-        if (!isset($this->rows[$index])) {
+        if (! isset($this->rows[$index])) {
             return;
         }
 
@@ -121,7 +122,7 @@ class Index extends Component
 
     public function aplicarPropietarioATodos(?int $propietarioId): void
     {
-        if (!$propietarioId) {
+        if (! $propietarioId) {
             return;
         }
 

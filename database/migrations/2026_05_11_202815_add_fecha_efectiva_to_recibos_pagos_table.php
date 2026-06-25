@@ -17,12 +17,12 @@ return new class extends Migration
         });
 
         // Rellenar históricos usando la fecha del recibo
-        DB::statement("
+        DB::statement('
             UPDATE recibos_pagos rp
             INNER JOIN recibos r ON r.id = rp.recibo_id
             SET rp.fecha_efectiva = r.fecha
             WHERE rp.fecha_efectiva IS NULL
-        ");
+        ');
     }
 
     public function down(): void

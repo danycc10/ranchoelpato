@@ -4,22 +4,16 @@ namespace App\Exports\Sheets;
 
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
-
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
-class MonthlyIncomeLateDetailSheet implements
-    FromCollection,
-    WithHeadings,
-    WithTitle,
-    WithColumnFormatting,
-    WithEvents
+class MonthlyIncomeLateDetailSheet implements FromCollection, WithColumnFormatting, WithEvents, WithHeadings, WithTitle
 {
     public function __construct(
         public int $anio,
@@ -35,7 +29,7 @@ class MonthlyIncomeLateDetailSheet implements
     protected function monthRange(): array
     {
         $start = now()->setDate($this->anio, $this->mes, 1)->startOfDay();
-        $end   = (clone $start)->endOfMonth()->endOfDay();
+        $end = (clone $start)->endOfMonth()->endOfDay();
 
         return [$start->toDateString(), $end->toDateString()];
     }

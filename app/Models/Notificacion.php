@@ -32,16 +32,16 @@ class Notificacion extends Model
 
     public function cliente()
     {
-        return $this->belongsTo(\App\Models\Cliente::class);
+        return $this->belongsTo(Cliente::class);
     }
 
     public function contrato()
     {
-        return $this->belongsTo(\App\Models\Contrato::class);
+        return $this->belongsTo(Contrato::class);
     }
 
     public function cuota()
     {
-        return $this->belongsTo(\App\Models\Cuota::class);
+        return $this->belongsTo(Cuota::class);
     }
 }

@@ -12,7 +12,7 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
-class ContractsExport implements FromArray, WithTitle, WithEvents, ShouldAutoSize
+class ContractsExport implements FromArray, ShouldAutoSize, WithEvents, WithTitle
 {
     public function __construct(
         public Collection $rows
@@ -63,7 +63,7 @@ class ContractsExport implements FromArray, WithTitle, WithEvents, ShouldAutoSiz
             };
 
             $diaPago = match ($row->frecuencia) {
-                'mensual' => !empty($row->dia_mes) ? 'Día ' . $row->dia_mes : '',
+                'mensual' => ! empty($row->dia_mes) ? 'Día '.$row->dia_mes : '',
                 'semanal' => $this->nombreDiaSemana($row->dia_semana),
                 default => '',
             };
@@ -87,10 +87,10 @@ class ContractsExport implements FromArray, WithTitle, WithEvents, ShouldAutoSiz
                 (float) ($row->valor_recargo ?? 0),
                 (int) ($row->dias_gracia ?? 0),
                 ((int) ($row->tiene_anualidad ?? 0)) === 1 ? 'Sí' : 'No',
-                !empty($row->anualidad_fecha) ? optional($row->anualidad_fecha)->format('d/m/Y') : '',
+                ! empty($row->anualidad_fecha) ? optional($row->anualidad_fecha)->format('d/m/Y') : '',
                 (float) ($row->anualidad_monto ?? 0),
-                    $row->deleted_at 
-        ? optional($row->deleted_at)->format('d/m/Y H:i') 
+                $row->deleted_at
+        ? optional($row->deleted_at)->format('d/m/Y H:i')
         : '',
             ];
         }
@@ -166,7 +166,7 @@ class ContractsExport implements FromArray, WithTitle, WithEvents, ShouldAutoSiz
                             'vertical' => Alignment::VERTICAL_CENTER,
                         ],
                     ]);
-                    
+
                     $sheet->getStyle("U4:U{$lastRow}")
                         ->getNumberFormat()
                         ->setFormatCode('dd/mm/yyyy hh:mm');

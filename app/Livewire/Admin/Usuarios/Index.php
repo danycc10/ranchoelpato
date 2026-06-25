@@ -2,12 +2,12 @@
 
 namespace App\Livewire\Admin\Usuarios;
 
-use App\Models\User;
 use App\Models\Propietario;
+use App\Models\User;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class Index extends Component
 {
@@ -16,9 +16,11 @@ class Index extends Component
     public string $q = '';
 
     public bool $modal = false;
+
     public ?int $userId = null;
 
     public ?string $roleSeleccionado = null;
+
     public array $permisosSeleccionados = [];
 
     public bool $mostrarPermisosRol = true;

@@ -2,23 +2,36 @@
 
 namespace App\Livewire\Admin\ClientesExcelentes;
 
-use Livewire\Component;
-use Livewire\WithPagination;
+use App\Models\TipoCobro;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use App\Models\TipoCobro;
+use Livewire\Component;
+use Livewire\WithPagination;
 
 class Index extends Component
 {
     use WithPagination;
 
     public int $meses = 12;
+
     public int $minScore = 10;
+
     public bool $soloElegibles = true;
 
-    public function updatingMeses(): void { $this->resetPage(); }
-    public function updatingMinScore(): void { $this->resetPage(); }
-    public function updatingSoloElegibles(): void { $this->resetPage(); }
+    public function updatingMeses(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingMinScore(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSoloElegibles(): void
+    {
+        $this->resetPage();
+    }
 
     protected function obtenerTipoCobroRecargoId(): ?int
     {
@@ -26,7 +39,7 @@ class Index extends Component
             ->whereRaw('UPPER(nombre) LIKE ?', ['%RECARGO%'])
             ->value('id');
 
-        return $id ? (int)$id : null;
+        return $id ? (int) $id : null;
     }
 
     public function render()
@@ -45,7 +58,7 @@ class Index extends Component
                 DB::raw('MIN(pagos.fecha_pago) as fecha_pago'),
                 DB::raw('MAX(CASE 
                     WHEN recibos.id IS NOT NULL AND (
-                        ' . ($recargoTipoCobroId ? "recibos.tipos_cobro_id = {$recargoTipoCobroId}" : "0=1") . '
+                        '.($recargoTipoCobroId ? "recibos.tipos_cobro_id = {$recargoTipoCobroId}" : '0=1').'
                         OR UPPER(COALESCE(recibos.observaciones, "")) LIKE "%RECARGO%"
                     )
                     THEN 1 ELSE 0 END) as es_recargo'
@@ -76,7 +89,7 @@ class Index extends Component
                 DB::raw("TRIM(CONCAT(clientes.nombres,' ',clientes.apellidos)) as cliente_nombre"),
                 'contratos.id as contrato_id',
                 'contratos.folio_contrato',
-                   'contratos.uuid as contrato_uuid',   // ✅ AQUI
+                'contratos.uuid as contrato_uuid',   // ✅ AQUI
                 DB::raw('COUNT(cuotas.id) as cuotas_pagadas'),
                 DB::raw('SUM(CASE WHEN DATEDIFF(cuotas.fecha_vencimiento, pp.fecha_pago) >= 1 THEN 1 ELSE 0 END) as pagadas_adelantadas'),
                 DB::raw('AVG(CASE WHEN DATEDIFF(cuotas.fecha_vencimiento, pp.fecha_pago) >= 1 THEN DATEDIFF(cuotas.fecha_vencimiento, pp.fecha_pago) ELSE NULL END) as adelanto_promedio_dias'),
@@ -95,12 +108,12 @@ class Index extends Component
                 ) as score'),
             ])
             ->whereDate('cuotas.fecha_vencimiento', '>=', $desde)
-            ->groupBy('clientes.id', 'clientes.nombres', 'clientes.apellidos', 'contratos.id',    'contratos.uuid', 'contratos.folio_contrato', 'contratos.dias_gracia')
+            ->groupBy('clientes.id', 'clientes.nombres', 'clientes.apellidos', 'contratos.id', 'contratos.uuid', 'contratos.folio_contrato', 'contratos.dias_gracia')
             ->having('score', '>=', $this->minScore)
             ->when($this->soloElegibles, function ($q) {
                 // elegible: sin pagos tarde y recargos 0
                 $q->havingRaw('pagadas_tarde = 0')
-                  ->havingRaw('recargos_pagados = 0');
+                    ->havingRaw('recargos_pagados = 0');
             })
             ->orderByDesc('score')
             ->paginate(15);

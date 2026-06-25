@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Imports\ContratosDonacionImport;
 use Illuminate\Console\Command;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Imports\ContratosDonacionImport;
 
 class ImportarContratosDonacion extends Command
 {
@@ -21,15 +21,17 @@ class ImportarContratosDonacion extends Command
 
         if (! file_exists($archivo)) {
             $this->error("❌ El archivo no existe: {$archivo}");
+
             return 1;
         }
 
         if ($propietarioId <= 0) {
-            $this->error("❌ propietario_id inválido.");
+            $this->error('❌ propietario_id inválido.');
+
             return 1;
         }
 
-        $this->info("📥 Importando informativos de donación...");
+        $this->info('📥 Importando informativos de donación...');
 
         Excel::import(
             new ContratosDonacionImport(
@@ -39,7 +41,8 @@ class ImportarContratosDonacion extends Command
             $archivo
         );
 
-        $this->info("✅ Importación de donación finalizada.");
+        $this->info('✅ Importación de donación finalizada.');
+
         return 0;
     }
 }

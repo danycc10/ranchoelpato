@@ -10,25 +10,30 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Maatwebsite\Excel\Facades\Excel;
 
-
 class Index extends Component
 {
     use WithPagination;
 
     // Búsqueda + orden
     public string $q = '';
+
     public string $sortBy = 'ubicacion';
+
     public string $sortDir = 'asc';
 
     // Filtros
     public ?string $estatusFilter = null;
+
     public ?string $frecuenciaFilter = null;
+
     public ?int $fraccionamientoFilter = null;
 
     public ?string $inicioDesde = null;
+
     public ?string $inicioHasta = null;
 
     public $saldoMin = null;
+
     public $saldoMax = null;
 
     public bool $soloConSaldo = false;
@@ -47,15 +52,50 @@ class Index extends Component
         'soloConSaldo' => ['except' => false],
     ];
 
-    public function updatingQ(): void { $this->resetPage(); }
-    public function updatingEstatusFilter(): void { $this->resetPage(); }
-    public function updatingFrecuenciaFilter(): void { $this->resetPage(); }
-    public function updatingFraccionamientoFilter(): void { $this->resetPage(); }
-    public function updatingInicioDesde(): void { $this->resetPage(); }
-    public function updatingInicioHasta(): void { $this->resetPage(); }
-    public function updatingSaldoMin(): void { $this->resetPage(); }
-    public function updatingSaldoMax(): void { $this->resetPage(); }
-    public function updatingSoloConSaldo(): void { $this->resetPage(); }
+    public function updatingQ(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingEstatusFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFrecuenciaFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFraccionamientoFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingInicioDesde(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingInicioHasta(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSaldoMin(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSaldoMax(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSoloConSaldo(): void
+    {
+        $this->resetPage();
+    }
 
     public function limpiarFiltros(): void
     {
@@ -88,7 +128,7 @@ class Index extends Component
             'ubicacion',
         ];
 
-        if (!in_array($key, $allowed, true)) {
+        if (! in_array($key, $allowed, true)) {
             $key = 'ubicacion';
         }
 
@@ -133,7 +173,7 @@ class Index extends Component
                             });
                         } else {
                             $nameQ->orWhere('nombres', 'like', "%{$term}%")
-                                  ->orWhere('apellidos', 'like', "%{$term}%");
+                                ->orWhere('apellidos', 'like', "%{$term}%");
                         }
                     });
                 })
@@ -187,53 +227,53 @@ class Index extends Component
         return $query;
     }
 
-protected function buildQuery(): Builder
-{
-    $query = Contrato::withTrashed()
-        ->with(['cliente', 'lote.fraccionamiento'])
-        ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
-        ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
-        ->select('contratos.*')
-        ->where('contratos.tipo', 'terreno')
-        ->where(function (Builder $q) {
-            $q->whereNull('contratos.es_financiamiento_instalacion')
-                ->orWhere('contratos.es_financiamiento_instalacion', 0);
-        });
+    protected function buildQuery(): Builder
+    {
+        $query = Contrato::withTrashed()
+            ->with(['cliente', 'lote.fraccionamiento'])
+            ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
+            ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
+            ->select('contratos.*')
+            ->where('contratos.tipo', 'terreno')
+            ->where(function (Builder $q) {
+                $q->whereNull('contratos.es_financiamiento_instalacion')
+                    ->orWhere('contratos.es_financiamiento_instalacion', 0);
+            });
 
-    $query = $this->applySearch($query);
-    $query = $this->applyFilters($query);
+        $query = $this->applySearch($query);
+        $query = $this->applyFilters($query);
 
-    $dir = strtolower($this->sortDir) === 'desc' ? 'desc' : 'asc';
+        $dir = strtolower($this->sortDir) === 'desc' ? 'desc' : 'asc';
 
-    $allowed = [
-        'folio_contrato',
-        'fecha_inicio',
-        'frecuencia',
-        'estatus',
-        'saldo_actual',
-        'ubicacion',
-    ];
+        $allowed = [
+            'folio_contrato',
+            'fecha_inicio',
+            'frecuencia',
+            'estatus',
+            'saldo_actual',
+            'ubicacion',
+        ];
 
-    $sortKey = in_array($this->sortBy, $allowed, true)
-        ? $this->sortBy
-        : 'ubicacion';
+        $sortKey = in_array($this->sortBy, $allowed, true)
+            ? $this->sortBy
+            : 'ubicacion';
 
-    if ($sortKey === 'ubicacion') {
-        $query->orderBy('fraccionamientos.nombre', $dir)
-            ->orderBy('lotes.manzana', $dir)
-            ->orderByRaw("CAST(COALESCE(lotes.lote, '0') AS UNSIGNED) {$dir}");
-    } else {
-        $query->orderBy("contratos.{$sortKey}", $dir);
+        if ($sortKey === 'ubicacion') {
+            $query->orderBy('fraccionamientos.nombre', $dir)
+                ->orderBy('lotes.manzana', $dir)
+                ->orderByRaw("CAST(COALESCE(lotes.lote, '0') AS UNSIGNED) {$dir}");
+        } else {
+            $query->orderBy("contratos.{$sortKey}", $dir);
+        }
+
+        return $query;
     }
-
-    return $query;
-}
 
     public function exportarExcel()
     {
         $rows = $this->buildQuery()->get();
 
-        $filename = 'contratos_' . now()->format('Ymd_His') . '.xlsx';
+        $filename = 'contratos_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(new ContractsExport($rows), $filename);
     }

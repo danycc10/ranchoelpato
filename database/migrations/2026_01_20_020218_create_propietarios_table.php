@@ -11,14 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-Schema::create('propietarios', function (Blueprint $table) {
-    $table->id();
-    $table->string('nombre');
-    $table->string('telefono')->nullable();
-    $table->string('correo')->nullable();
-    $table->text('notas')->nullable();
-    $table->timestamps();
-});
+        Schema::create('propietarios', function (Blueprint $table) {
+            $table->id();
+            $table->string('nombre');
+            $table->string('telefono')->nullable();
+            $table->string('correo')->nullable();
+            $table->text('notas')->nullable();
+            $table->timestamps();
+        });
 
     }
 

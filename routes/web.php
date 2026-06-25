@@ -1,66 +1,58 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-
-
-
+use App\Http\Controllers\Admin\ContratosPdfController;
 /*
 |--------------------------------------------------------------------------
 | Imports – Admin / Contratos
 |--------------------------------------------------------------------------
 */
-use App\Livewire\Admin\Contratos\Index as ContratosIndex;
-use App\Livewire\Admin\Contratos\Create as ContratosCreate;
-use App\Livewire\Admin\Contratos\Show as ContratosShow;
-use App\Livewire\Admin\Contratos\Edit as ContratosEdit;
-
-use App\Livewire\Admin\ContratosServicios\Index as ContratoServicioIndex;
-use App\Livewire\Admin\ContratosServicios\Create as ContratoServicioCreate;
-use App\Livewire\Admin\ContratosServicios\Show as ContratoServicioShow;
-use App\Livewire\Admin\ContratosServicios\Edit as ContratosServiciosEdit;
-
-use App\Livewire\Admin\Recibos\Index as RecibosIndex;
 use App\Http\Controllers\Admin\ReciboFirmaController;
 use App\Http\Controllers\Admin\RecibosPrintController;
 use App\Http\Controllers\PrivateFileController;
-
-use App\Livewire\Admin\Recibos\Edit;
-
-use App\Livewire\Admin\TipoCobroPropietarioConfigs\Index as TipoCobroPropietarioConfigsIndex;
-
+use App\Livewire\Admin\ClientesExcelentes\Contrato as ClientesExcelentesContrato;
+use App\Livewire\Admin\ClientesExcelentes\Index as ClientesExcelentesIndex;
+use App\Livewire\Admin\Contratos\Create as ContratosCreate;
+use App\Livewire\Admin\Contratos\Edit as ContratosEdit;
+use App\Livewire\Admin\Contratos\Index as ContratosIndex;
+use App\Livewire\Admin\Contratos\Show as ContratosShow;
+use App\Livewire\Admin\ContratosServicios\Create as ContratoServicioCreate;
+use App\Livewire\Admin\ContratosServicios\Edit as ContratosServiciosEdit;
+use App\Livewire\Admin\ContratosServicios\Index as ContratoServicioIndex;
+use App\Livewire\Admin\ContratosServicios\Show as ContratoServicioShow;
+use App\Livewire\Admin\Permisos\Index as PermisosIndex;
 /*
 |--------------------------------------------------------------------------
 | Imports – Reports
 |--------------------------------------------------------------------------
 */
-use App\Livewire\Reports\ReportsIndex;
-use App\Livewire\Reports\DailyReceiptsReport;
-use App\Livewire\Reports\CustomerPaymentsReport;
-use App\Livewire\Reports\MonthlyIncomeReport;
-use App\Livewire\Reports\BankMovementsReport;
-
+use App\Livewire\Admin\Promociones\Index;
+use App\Livewire\Admin\Recibos\Crear;
+use App\Livewire\Admin\Recibos\Edit;
+use App\Livewire\Admin\Recibos\Index as RecibosIndex;
+use App\Livewire\Admin\Sistema\Index as SistemaIndex;
 /*
 |--------------------------------------------------------------------------
 | Imports – Dashboard
 |--------------------------------------------------------------------------
 */
-use App\Livewire\Dashboard\CobranzaDashboard;
-
+use App\Livewire\Admin\TipoCobroPropietarioConfigs\Index as TipoCobroPropietarioConfigsIndex;
 /*
 |--------------------------------------------------------------------------
 | Imports – Admin / Clientes Excelentes
 |--------------------------------------------------------------------------
 */
-use App\Livewire\Admin\ClientesExcelentes\Index as ClientesExcelentesIndex;
-use App\Livewire\Admin\ClientesExcelentes\Contrato as ClientesExcelentesContrato;
-
+use App\Livewire\Dashboard\CobranzaDashboard;
+use App\Livewire\Reports\BankMovementsReport;
 /*
 |--------------------------------------------------------------------------
 | Imports – Admin / Sistema
 |--------------------------------------------------------------------------
 */
-use App\Livewire\Admin\Sistema\Index as SistemaIndex;
-use App\Livewire\Admin\Permisos\Index as PermisosIndex;
+use App\Livewire\Reports\CustomerPaymentsReport;
+use App\Livewire\Reports\DailyReceiptsReport;
+use App\Livewire\Reports\MonthlyIncomeReport;
+use App\Livewire\Reports\ReportsIndex;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -68,7 +60,7 @@ use App\Livewire\Admin\Permisos\Index as PermisosIndex;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/', fn() => view('welcome'));
+Route::get('/', fn () => view('welcome'));
 
 /*
 |--------------------------------------------------------------------------
@@ -139,44 +131,44 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
         /*
         | Catálogos
         */
-        Route::get('/promociones', \App\Livewire\Admin\Promociones\Index::class)
+        Route::get('/promociones', Index::class)
             ->name('promociones')
             ->middleware('permission:catalogos.ver');
 
-        Route::get('/tipos-cobro', \App\Livewire\Admin\TiposCobro\Index::class)
+        Route::get('/tipos-cobro', App\Livewire\Admin\TiposCobro\Index::class)
             ->name('tipos-cobro')
             ->middleware('permission:catalogos.ver');
 
-        Route::get('/formas-pago', \App\Livewire\Admin\FormasPago\Index::class)
+        Route::get('/formas-pago', App\Livewire\Admin\FormasPago\Index::class)
             ->name('formas-pago')
             ->middleware('permission:catalogos.ver');
 
-        Route::get('/propietarios', \App\Livewire\Admin\Propietarios\Index::class)
+        Route::get('/propietarios', App\Livewire\Admin\Propietarios\Index::class)
             ->name('propietarios')
             ->middleware('permission:catalogos.ver');
 
-        Route::get('/periodos', \App\Livewire\Admin\Periodos\Index::class)
+        Route::get('/periodos', App\Livewire\Admin\Periodos\Index::class)
             ->name('periodos')
             ->middleware('permission:catalogos.ver');
 
-        Route::get('/fraccionamientos', \App\Livewire\Admin\Fraccionamientos\Index::class)
+        Route::get('/fraccionamientos', App\Livewire\Admin\Fraccionamientos\Index::class)
             ->name('fraccionamientos')
             ->middleware('permission:catalogos.ver');
 
-        Route::get('/lotes', \App\Livewire\Admin\Lotes\Index::class)
+        Route::get('/lotes', App\Livewire\Admin\Lotes\Index::class)
             ->name('lotes')
             ->middleware('permission:catalogos.ver');
 
-        Route::get('/cuentas-bancarias', \App\Livewire\Admin\CuentasBancarias\Index::class)
+        Route::get('/cuentas-bancarias', App\Livewire\Admin\CuentasBancarias\Index::class)
             ->name('cuentas-bancarias')
             ->middleware('permission:catalogos.ver');
 
-        Route::get('/clientes', \App\Livewire\Admin\Clientes\Index::class)
+        Route::get('/clientes', App\Livewire\Admin\Clientes\Index::class)
             ->name('clientes')
             ->middleware('permission:clientes.ver');
-            
+
         Route::get('/configuracion-propietarios-contables', TipoCobroPropietarioConfigsIndex::class)
-        ->name('configuracion-propietarios-contables.index');
+            ->name('configuracion-propietarios-contables.index');
 
         /*
         | Contratos
@@ -193,7 +185,7 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
             ->name('contratos.show')
             ->middleware('permission:contratos.ver_detalle');
 
-        Route::get('/contratos/{contrato}/pdf', [\App\Http\Controllers\Admin\ContratosPdfController::class, 'download'])
+        Route::get('/contratos/{contrato}/pdf', [ContratosPdfController::class, 'download'])
             ->name('contratos.pdf');
 
         Route::get('/contratos/{uuid}/editar', ContratosEdit::class)
@@ -217,10 +209,9 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
 
         Route::get('/private/contratos/{uuid}/documentos/{tipo}/scan', [PrivateFileController::class, 'showContratoDocumentoScan'])
             ->name('private.contratos.documentos.scan');
-            
+
         Route::get('/private-files/show', [PrivateFileController::class, 'show'])
             ->name('private-files.show');
-
 
         /*
         | Contratos Servicios
@@ -243,7 +234,7 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
         /*
         | Cobranza / Recibos
         */
-         Route::get('/cuotas', \App\Livewire\Admin\Cuotas\Index::class)
+        Route::get('/cuotas', App\Livewire\Admin\Cuotas\Index::class)
             ->name('cuotas')
             ->middleware('permission:cuotas.ver');
 
@@ -254,7 +245,7 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
         Route::get('/recibos/{uuid}/editar', Edit::class)
             ->name('recibos.edit');
 
-        Route::get('/recibos/crear', \App\Livewire\Admin\Recibos\Crear::class)
+        Route::get('/recibos/crear', Crear::class)
             ->name('recibos.crear')
             ->middleware('permission:recibos.crear');
 
@@ -265,14 +256,14 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
         Route::get('/recibos/imprimir-lote/{token}', [RecibosPrintController::class, 'pdfLote'])
             ->name('recibos.pdf-lote')
             ->middleware('permission:recibos.imprimir');
-            
-            Route::get('/recibos/{recibo}/print-data', [RecibosPrintController::class, 'printData'])
-    ->name('recibos.print-data')
-    ->middleware('permission:recibos.imprimir');
-    
-    Route::get('/recibos/{recibo}/print-token', [RecibosPrintController::class, 'printToken'])
-    ->name('recibos.print-token')
-    ->middleware('permission:recibos.imprimir');
+
+        Route::get('/recibos/{recibo}/print-data', [RecibosPrintController::class, 'printData'])
+            ->name('recibos.print-data')
+            ->middleware('permission:recibos.imprimir');
+
+        Route::get('/recibos/{recibo}/print-token', [RecibosPrintController::class, 'printToken'])
+            ->name('recibos.print-token')
+            ->middleware('permission:recibos.imprimir');
 
         Route::get('/recibos/lote/{token}/imprimir', [RecibosPrintController::class, 'showLote'])
             ->name('recibos.print-lote')
@@ -310,19 +301,19 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
         | Usuarios / Roles / Logs
         |--------------------------------------------------------------------------
         */
-        Route::get('/usuarios', \App\Livewire\Admin\Usuarios\Index::class)
+        Route::get('/usuarios', App\Livewire\Admin\Usuarios\Index::class)
             ->name('usuarios.index')
             ->middleware('permission:usuarios.ver');
 
-        Route::get('/roles', \App\Livewire\Admin\Roles\Index::class)
+        Route::get('/roles', App\Livewire\Admin\Roles\Index::class)
             ->name('roles.index')
             ->middleware('permission:roles.ver');
-            
+
         Route::get('/permisos', PermisosIndex::class)
             ->name('permisos.index')
             ->middleware('permission:permisos.ver');
 
-        Route::get('/logs', \App\Livewire\Admin\Logs\Index::class)
+        Route::get('/logs', App\Livewire\Admin\Logs\Index::class)
             ->name('logs.index')
             ->middleware('permission:logs.ver');
     });

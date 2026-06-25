@@ -11,14 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-Schema::create('periodos', function (Blueprint $table) {
-    $table->id();
-    $table->enum('tipo', ['mensual','anual']);
-    $table->integer('anio');
-    $table->integer('mes')->nullable();
-    $table->string('nombre');
-    $table->timestamps();
-});
+        Schema::create('periodos', function (Blueprint $table) {
+            $table->id();
+            $table->enum('tipo', ['mensual', 'anual']);
+            $table->integer('anio');
+            $table->integer('mes')->nullable();
+            $table->string('nombre');
+            $table->timestamps();
+        });
 
     }
 

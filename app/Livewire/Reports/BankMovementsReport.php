@@ -15,20 +15,23 @@ class BankMovementsReport extends Component
     use WithPagination;
 
     public ?int $propietarioId = null;
+
     public array $cuentaBancariaIds = [];
+
     public string $desde;
+
     public string $hasta;
 
     public function mount(): void
     {
         $this->desde = now()->startOfMonth()->toDateString();
         $this->hasta = now()->toDateString();
-        
-         $user = auth()->user();
 
-            if ( $user->propietario_id) {
-        $this->propietarioId = $user->propietario_id;
-    }
+        $user = auth()->user();
+
+        if ($user->propietario_id) {
+            $this->propietarioId = $user->propietario_id;
+        }
         $this->cuentaBancariaIds = [];
     }
 
@@ -60,7 +63,6 @@ class BankMovementsReport extends Component
             ->get(['id', 'nombre']);
     }
 
-
     public function getCuentasProperty()
     {
         return CuentaBancaria::query()
@@ -86,7 +88,6 @@ class BankMovementsReport extends Component
 
     protected function baseQuery()
     {
-
 
         return ReciboPago::query()
             ->with([
@@ -115,16 +116,15 @@ class BankMovementsReport extends Component
                     ->whereNull('deleted_at')
                     ->where('folio', 'not like', 'REC%');
             })
-
-->when(
-    $this->propietarioId,
-    fn ($q) => $q->whereHas('recibo', function ($sub) {
-        $sub->where('propietario_contable_id', $this->propietarioId);
-    })
-)
+            ->when(
+                $this->propietarioId,
+                fn ($q) => $q->whereHas('recibo', function ($sub) {
+                    $sub->where('propietario_contable_id', $this->propietarioId);
+                })
+            )
 
             ->when(
-                !empty($this->cuentaBancariaIds),
+                ! empty($this->cuentaBancariaIds),
                 fn ($q) => $q->whereIn('cuenta_bancaria_id', $this->cuentaBancariaIds)
             )
 
@@ -165,7 +165,7 @@ class BankMovementsReport extends Component
     {
         $cuentaNombre = null;
 
-        if (!empty($this->cuentaBancariaIds)) {
+        if (! empty($this->cuentaBancariaIds)) {
             $cuentaNombre = CuentaBancaria::query()
                 ->whereIn('id', $this->cuentaBancariaIds)
                 ->pluck('alias')

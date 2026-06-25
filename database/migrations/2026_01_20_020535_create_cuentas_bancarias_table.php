@@ -11,16 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-Schema::create('cuentas_bancarias', function (Blueprint $table) {
-    $table->id();
-    $table->foreignId('propietario_id')->constrained()->cascadeOnDelete();
-    $table->string('alias');
-    $table->string('banco')->nullable();
-    $table->string('tipo')->nullable(); // clabe, tarjeta, efectivo
-    $table->string('numero')->nullable();
-    $table->boolean('activa')->default(true);
-    $table->timestamps();
-});
+        Schema::create('cuentas_bancarias', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('propietario_id')->constrained()->cascadeOnDelete();
+            $table->string('alias');
+            $table->string('banco')->nullable();
+            $table->string('tipo')->nullable(); // clabe, tarjeta, efectivo
+            $table->string('numero')->nullable();
+            $table->boolean('activa')->default(true);
+            $table->timestamps();
+        });
 
     }
 

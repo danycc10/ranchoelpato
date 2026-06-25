@@ -2,14 +2,14 @@
 
 namespace App\Livewire\Admin\Lotes;
 
-use Livewire\Component;
-use Livewire\WithPagination;
-use App\Models\Lote;
-use App\Models\Fraccionamiento;
-use App\Models\Propietario;
 use App\Exports\LotesExport;
+use App\Models\Fraccionamiento;
+use App\Models\Lote;
+use App\Models\Propietario;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
+use Livewire\Component;
+use Livewire\WithPagination;
 use Maatwebsite\Excel\Facades\Excel;
 
 class Index extends Component
@@ -18,44 +18,67 @@ class Index extends Component
 
     // Tabla
     public string $q = '';
+
     public string $sortBy = 'lote';
+
     public string $sortDir = 'asc';
 
     // Filtros
     public ?int $fraccionamientoFilter = null;
+
     public ?int $propietarioFilter = null;
+
     public ?string $estatusFilter = null;
+
     public ?string $manzanaFilter = null;
+
     public ?string $loteFilter = null;
 
     public ?float $areaMin = null;
+
     public ?float $areaMax = null;
+
     public ?float $precioMin = null;
+
     public ?float $precioMax = null;
 
     // Modal / edición
     public bool $modal = false;
+
     public ?int $editId = null;
 
     // Campos base
     public ?int $fraccionamiento_id = null;
+
     public ?string $manzana = null;
+
     public string $lote = '';
+
     public string $clave = '';
+
     public ?float $area_m2 = null;
+
     public ?float $precio_lista = null;
+
     public string $estatus = 'disponible';
+
     public ?string $notas = null;
 
     // Nuevos campos
     public ?string $medida_norte = null;
+
     public ?string $medida_sur = null;
+
     public ?string $medida_este = null;
+
     public ?string $medida_oeste = null;
 
     public ?string $colindancia_norte = null;
+
     public ?string $colindancia_sur = null;
+
     public ?string $colindancia_este = null;
+
     public ?string $colindancia_oeste = null;
 
     // Control de autogeneración de clave
@@ -77,16 +100,55 @@ class Index extends Component
         'precioMax' => ['except' => null],
     ];
 
-    public function updatingQ(): void { $this->resetPage(); }
-    public function updatingFraccionamientoFilter(): void { $this->resetPage(); }
-    public function updatingPropietarioFilter(): void { $this->resetPage(); }
-    public function updatingEstatusFilter(): void { $this->resetPage(); }
-    public function updatingManzanaFilter(): void { $this->resetPage(); }
-    public function updatingLoteFilter(): void { $this->resetPage(); }
-    public function updatingAreaMin(): void { $this->resetPage(); }
-    public function updatingAreaMax(): void { $this->resetPage(); }
-    public function updatingPrecioMin(): void { $this->resetPage(); }
-    public function updatingPrecioMax(): void { $this->resetPage(); }
+    public function updatingQ(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFraccionamientoFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingPropietarioFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingEstatusFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingManzanaFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingLoteFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingAreaMin(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingAreaMax(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingPrecioMin(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingPrecioMax(): void
+    {
+        $this->resetPage();
+    }
 
     public function updatedManzana($value): void
     {
@@ -114,6 +176,7 @@ class Index extends Component
 
         if ($m === null || $l === null) {
             $this->clave = '';
+
             return;
         }
 
@@ -130,7 +193,7 @@ class Index extends Component
         $raw = preg_replace('/^[mMlL]\s*/', '', $raw);
         $raw = preg_replace('/\s+/', '', $raw);
 
-        return $prefix . $raw;
+        return $prefix.$raw;
     }
 
     public function limpiarFiltros(): void
@@ -287,6 +350,7 @@ class Index extends Component
 
         if (($it->contratos_count ?? 0) > 0 || ($it->recibos_count ?? 0) > 0) {
             $this->dispatch('toast', type: 'error', message: 'No se puede eliminar: el lote ya tiene contratos o recibos.');
+
             return;
         }
 
@@ -297,7 +361,7 @@ class Index extends Component
     public function exportarExcel()
     {
         $rows = $this->buildQuery()->get();
-        $filename = 'lotes_' . now()->format('Ymd_His') . '.xlsx';
+        $filename = 'lotes_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(new LotesExport($rows), $filename);
     }
@@ -335,8 +399,7 @@ class Index extends Component
         }
 
         if ($this->propietarioFilter) {
-            $query->whereHas('fraccionamiento', fn (Builder $f) =>
-                $f->where('propietario_id', (int) $this->propietarioFilter)
+            $query->whereHas('fraccionamiento', fn (Builder $f) => $f->where('propietario_id', (int) $this->propietarioFilter)
             );
         }
 
@@ -345,11 +408,11 @@ class Index extends Component
         }
 
         if (is_string($this->manzanaFilter) && trim($this->manzanaFilter) !== '') {
-            $query->where('manzana', 'like', '%' . trim($this->manzanaFilter) . '%');
+            $query->where('manzana', 'like', '%'.trim($this->manzanaFilter).'%');
         }
 
         if (is_string($this->loteFilter) && trim($this->loteFilter) !== '') {
-            $query->where('lote', 'like', '%' . trim($this->loteFilter) . '%');
+            $query->where('lote', 'like', '%'.trim($this->loteFilter).'%');
         }
 
         if ($this->areaMin !== null && $this->areaMin !== '') {

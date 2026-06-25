@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Imports\ContratosServiciosImport;
 use Illuminate\Console\Command;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Imports\ContratosServiciosImport;
 
 class ImportarContratosServicios extends Command
 {
@@ -25,11 +25,13 @@ class ImportarContratosServicios extends Command
 
         if (! file_exists($archivo)) {
             $this->error("❌ El archivo no existe: {$archivo}");
+
             return self::FAILURE;
         }
 
         if ($propietarioId <= 0) {
             $this->error('❌ propietario_id inválido.');
+
             return self::FAILURE;
         }
 
@@ -45,10 +47,10 @@ class ImportarContratosServicios extends Command
         $this->info('⚡ Iniciando importación de contratos de servicio...');
         $this->line("Archivo: {$archivo}");
         $this->line("Propietario ID: {$propietarioId}");
-        $this->line("Capturado por: " . ($capturadoPor ?: 'null'));
+        $this->line('Capturado por: '.($capturadoPor ?: 'null'));
         $this->line("Recargo default: {$recargo}");
         $this->line("Días de gracia default: {$diasGracia}");
-        $this->line("Backfill: " . ($backfill ?: 'No'));
+        $this->line('Backfill: '.($backfill ?: 'No'));
 
         try {
             Excel::import(
@@ -64,10 +66,12 @@ class ImportarContratosServicios extends Command
             );
 
             $this->info('✅ Importación de contratos de servicio finalizada correctamente.');
+
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $this->error('❌ Error durante la importación: ' . $e->getMessage());
+            $this->error('❌ Error durante la importación: '.$e->getMessage());
             report($e);
+
             return self::FAILURE;
         }
     }

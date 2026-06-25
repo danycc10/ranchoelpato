@@ -16,7 +16,7 @@ class PeriodosSeeder extends Seeder
                 'tipo' => 'mensual',
                 'anio' => $anio,
                 'mes' => $mes,
-                'nombre' => strtoupper(now()->setMonth($mes)->translatedFormat('F')) . " $anio",
+                'nombre' => strtoupper(now()->setMonth($mes)->translatedFormat('F'))." $anio",
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

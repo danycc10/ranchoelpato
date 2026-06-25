@@ -1,6 +1,7 @@
 <?php
 
 // app/Console/Commands/BackfillUuids.php
+
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
@@ -10,12 +11,13 @@ use Illuminate\Support\Str;
 class BackfillUuids extends Command
 {
     protected $signature = 'app:backfill-uuids';
+
     protected $description = 'Rellena UUIDs en tablas principales';
 
     public function handle(): int
     {
         $tables = [
-            'fraccionamientos','lotes','propietarios','contratos','cuotas','recibos','pagos',
+            'fraccionamientos', 'lotes', 'propietarios', 'contratos', 'cuotas', 'recibos', 'pagos',
         ];
 
         foreach ($tables as $t) {
@@ -33,7 +35,8 @@ class BackfillUuids extends Command
                 });
         }
 
-        $this->info("Listo ✅");
+        $this->info('Listo ✅');
+
         return self::SUCCESS;
     }
 }

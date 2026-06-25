@@ -32,27 +32,27 @@ class RecibosPrintController extends Controller
             'monto' => (float) $recibo->monto,
         ]);
     }
-    
+
     public function printToken(Recibo $recibo)
-{
-    $secret = config('services.print_bridge.secret');
+    {
+        $secret = config('services.print_bridge.secret');
 
-    abort_if(blank($secret), 500, 'Print bridge secret no configurado.');
+        abort_if(blank($secret), 500, 'Print bridge secret no configurado.');
 
-    $payload = [
-        'recibo_uuid' => $recibo->uuid,
-        'user_id' => auth()->id(),
-        'expires_at' => now()->addSeconds(30)->timestamp,
-    ];
+        $payload = [
+            'recibo_uuid' => $recibo->uuid,
+            'user_id' => auth()->id(),
+            'expires_at' => now()->addSeconds(30)->timestamp,
+        ];
 
-    $json = json_encode($payload);
+        $json = json_encode($payload);
 
-    return response()->json([
-        'ok' => true,
-        'payload' => base64_encode($json),
-        'signature' => hash_hmac('sha256', $json, $secret),
-    ]);
-}
+        return response()->json([
+            'ok' => true,
+            'payload' => base64_encode($json),
+            'signature' => hash_hmac('sha256', $json, $secret),
+        ]);
+    }
 
     public function pdf(Recibo $recibo)
     {
@@ -63,7 +63,7 @@ class RecibosPrintController extends Controller
         $pdf = Pdf::loadView('admin.recibos.imprimir', compact('recibo', 'modo'));
         $pdf->setPaper([0, 0, 226.77, 700], 'portrait');
 
-        return $pdf->download('recibo_' . $recibo->folio . '.pdf');
+        return $pdf->download('recibo_'.$recibo->folio.'.pdf');
     }
 
     public function showLote(string $token)
@@ -82,12 +82,12 @@ class RecibosPrintController extends Controller
         $pdf = Pdf::loadView('admin.recibos.imprimir-lote', compact('recibos', 'modo', 'token'));
         $pdf->setPaper([0, 0, 226.77, 3000], 'portrait');
 
-        return $pdf->download('recibos_lote_' . now()->format('Ymd_His') . '.pdf');
+        return $pdf->download('recibos_lote_'.now()->format('Ymd_His').'.pdf');
     }
 
     protected function obtenerRecibosDesdeToken(string $token)
     {
-        $payload = cache()->get('print_batch:' . $token);
+        $payload = cache()->get('print_batch:'.$token);
 
         abort_unless($payload, 404);
         abort_unless((int) ($payload['user_id'] ?? 0) === (int) auth()->id(), 403);

@@ -4,19 +4,18 @@ namespace App\Exports\Sheets;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithTitle;
-use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
-
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
-class CustomerContractsSheet implements FromCollection, WithHeadings, WithTitle, WithEvents, ShouldAutoSize, WithColumnFormatting
+class CustomerContractsSheet implements FromCollection, ShouldAutoSize, WithColumnFormatting, WithEvents, WithHeadings, WithTitle
 {
     public function __construct(
         public string $clienteNombre,
@@ -49,17 +48,17 @@ class CustomerContractsSheet implements FromCollection, WithHeadings, WithTitle,
     public function collection()
     {
         return $this->resumen->map(function ($c) {
-            $get = fn($key, $default = null) => is_array($c) ? ($c[$key] ?? $default) : ($c->{$key} ?? $default);
+            $get = fn ($key, $default = null) => is_array($c) ? ($c[$key] ?? $default) : ($c->{$key} ?? $default);
 
             return [
                 (string) $get('finca', ''),
                 (string) $get('lote', ''),
                 (string) $get('estatus', ''),
-                (float)  $get('precio_total', 0),
-                (float)  $get('enganche', 0),
-                (float)  $get('total_pagado', 0),
-                (float)  $get('saldo_restante_calc', 0),
-                (float)  $get('saldo_actual', 0),
+                (float) $get('precio_total', 0),
+                (float) $get('enganche', 0),
+                (float) $get('total_pagado', 0),
+                (float) $get('saldo_restante_calc', 0),
+                (float) $get('saldo_actual', 0),
                 (string) $get('ultimo_pago', ''),
             ];
         });
@@ -90,8 +89,8 @@ class CustomerContractsSheet implements FromCollection, WithHeadings, WithTitle,
                 }
 
                 if ($this->finca || $this->lote) {
-                    $subtitle .= " | Finca: " . ($this->finca ?? '—')
-                        . " | Lote: " . ($this->lote ?? '—');
+                    $subtitle .= ' | Finca: '.($this->finca ?? '—')
+                        .' | Lote: '.($this->lote ?? '—');
                 }
 
                 $sheet->setCellValue('A1', 'RESUMEN DE CONTRATOS');

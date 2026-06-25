@@ -5,11 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
-
 // ✅ Spatie Activity Log
-use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Models\Activity;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Cuota extends Model
 {
@@ -36,7 +35,7 @@ class Cuota extends Model
         'monto' => 'decimal:2',
         'pagado_total' => 'decimal:2',
         'recargo_aplicado' => 'decimal:2',
-           'es_anualidad' => 'boolean',
+        'es_anualidad' => 'boolean',
     ];
 
     /**
@@ -54,7 +53,7 @@ class Cuota extends Model
                 'created_at',
                 'deleted_at',
             ])
-            ->setDescriptionForEvent(fn(string $eventName) => match ($eventName) {
+            ->setDescriptionForEvent(fn (string $eventName) => match ($eventName) {
                 'created' => 'Cuota creada',
                 'updated' => 'Cuota actualizada',
                 'deleted' => 'Cuota eliminada',
@@ -89,22 +88,22 @@ class Cuota extends Model
 
     public function pagos()
     {
-        return $this->hasMany(\App\Models\Pago::class, 'cuota_id');
+        return $this->hasMany(Pago::class, 'cuota_id');
     }
 
     public function condonaciones()
     {
-        return $this->hasMany(\App\Models\Condonacion::class);
+        return $this->hasMany(Condonacion::class);
     }
 
     public function getRouteKeyName(): string
     {
         return 'uuid';
     }
-    
-        public function recibos()
+
+    public function recibos()
     {
-        return $this->hasMany(\App\Models\Recibo::class, 'cuota_id');
+        return $this->hasMany(Recibo::class, 'cuota_id');
     }
 
     protected static function booted()

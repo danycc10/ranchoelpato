@@ -9,21 +9,21 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-public function up(): void
-{
-    Schema::table('users', function (Blueprint $table) {
-        $table->foreignId('propietario_id')
-            ->nullable()
-            ->after('id')
-            ->constrained('propietarios')
-            ->nullOnDelete();
-    });
-}
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->foreignId('propietario_id')
+                ->nullable()
+                ->after('id')
+                ->constrained('propietarios')
+                ->nullOnDelete();
+        });
+    }
 
-public function down(): void
-{
-    Schema::table('users', function (Blueprint $table) {
-        $table->dropConstrainedForeignId('propietario_id');
-    });
-}
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('propietario_id');
+        });
+    }
 };

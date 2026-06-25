@@ -24,12 +24,12 @@ return new class extends Migration
 
                 Schema::table($tableName, function (Blueprint $table) use ($tableName) {
 
-                    if (!Schema::hasColumn($tableName, 'uuid')) {
+                    if (! Schema::hasColumn($tableName, 'uuid')) {
 
                         $table->uuid('uuid')
-                              ->nullable()
-                              ->unique()
-                              ->after('id');
+                            ->nullable()
+                            ->unique()
+                            ->after('id');
 
                     }
 

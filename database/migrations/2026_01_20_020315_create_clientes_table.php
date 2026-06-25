@@ -11,18 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-Schema::create('clientes', function (Blueprint $table) {
-    $table->id();
-    $table->string('nombres');
-    $table->string('apellidos');
-    $table->string('telefono')->nullable();
-    $table->string('correo')->nullable();
-    $table->string('direccion')->nullable();
-    $table->string('rfc')->nullable();
-    $table->text('notas')->nullable();
-    $table->enum('estatus', ['activo','inactivo'])->default('activo');
-    $table->timestamps();
-});
+        Schema::create('clientes', function (Blueprint $table) {
+            $table->id();
+            $table->string('nombres');
+            $table->string('apellidos');
+            $table->string('telefono')->nullable();
+            $table->string('correo')->nullable();
+            $table->string('direccion')->nullable();
+            $table->string('rfc')->nullable();
+            $table->text('notas')->nullable();
+            $table->enum('estatus', ['activo', 'inactivo'])->default('activo');
+            $table->timestamps();
+        });
 
     }
 

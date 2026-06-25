@@ -10,17 +10,11 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
-
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
-class MonthlyIncomePendingSheet implements
-    FromCollection,
-    WithHeadings,
-    WithTitle,
-    WithColumnFormatting,
-    WithEvents
+class MonthlyIncomePendingSheet implements FromCollection, WithColumnFormatting, WithEvents, WithHeadings, WithTitle
 {
     public function __construct(
         public int $anio,
@@ -30,13 +24,13 @@ class MonthlyIncomePendingSheet implements
 
     public function title(): string
     {
-        return "Pendientes";
+        return 'Pendientes';
     }
 
     protected function monthRange(): array
     {
         $start = now()->setDate($this->anio, $this->mes, 1)->startOfDay();
-        $end   = (clone $start)->endOfMonth()->endOfDay();
+        $end = (clone $start)->endOfMonth()->endOfDay();
 
         return [$start, $end];
     }

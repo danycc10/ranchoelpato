@@ -19,10 +19,10 @@ class ReciboFirmaController extends Controller
         return response()->file(
             Storage::disk($disk)->path($recibo->firma_path),
             [
-                'Content-Type'  => $recibo->firma_mime ?: 'image/png',
+                'Content-Type' => $recibo->firma_mime ?: 'image/png',
                 'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-                'Pragma'        => 'no-cache',
-                'Expires'       => '0',
+                'Pragma' => 'no-cache',
+                'Expires' => '0',
             ]
         );
     }

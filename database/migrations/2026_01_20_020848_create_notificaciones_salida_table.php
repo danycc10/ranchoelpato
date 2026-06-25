@@ -11,20 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-Schema::create('notificaciones_salida', function (Blueprint $table) {
-    $table->id();
-    $table->enum('canal', ['whatsapp','correo']);
-    $table->string('tipo');
-    $table->foreignId('cliente_id')->nullable()->constrained()->nullOnDelete();
-    $table->foreignId('contrato_id')->nullable()->constrained()->nullOnDelete();
-    $table->foreignId('cuota_id')->nullable()->constrained()->nullOnDelete();
-    $table->string('destino');
-    $table->json('payload');
-    $table->enum('estatus', ['en_cola','enviado','fallido'])->default('en_cola');
-    $table->timestamp('enviado_en')->nullable();
-    $table->string('error')->nullable();
-    $table->timestamps();
-});
+        Schema::create('notificaciones_salida', function (Blueprint $table) {
+            $table->id();
+            $table->enum('canal', ['whatsapp', 'correo']);
+            $table->string('tipo');
+            $table->foreignId('cliente_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('contrato_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('cuota_id')->nullable()->constrained()->nullOnDelete();
+            $table->string('destino');
+            $table->json('payload');
+            $table->enum('estatus', ['en_cola', 'enviado', 'fallido'])->default('en_cola');
+            $table->timestamp('enviado_en')->nullable();
+            $table->string('error')->nullable();
+            $table->timestamps();
+        });
 
     }
 

@@ -2,16 +2,15 @@
 
 namespace App\Livewire\Admin\ContratosServicios;
 
-use Livewire\Component;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use Carbon\Carbon;
-
-use App\Models\Contrato;
 use App\Models\Cliente;
+use App\Models\Contrato;
+use App\Models\ContratoHistorial;
 use App\Models\Cuota;
 use App\Models\Pago;
-use App\Models\ContratoHistorial;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Livewire\Component;
 
 class Edit extends Component
 {
@@ -24,12 +23,15 @@ class Edit extends Component
     public ?string $nueva_fecha_inicio = null;
 
     public string $nueva_frecuencia = 'mensual';
+
     public ?int $nuevo_dia_mes = null;
+
     public ?int $nuevo_dia_semana = null;
 
     public ?float $nuevo_monto_pago = null;
 
     public bool $confirmar_reestructura = false;
+
     public bool $confirmar_cancelacion = false;
 
     public function mount(string $uuid): void
@@ -81,10 +83,10 @@ class Edit extends Component
     public function guardarCambios(): void
     {
         $rules = [
-            'cliente_id'         => ['required', 'integer', 'exists:clientes,id'],
+            'cliente_id' => ['required', 'integer', 'exists:clientes,id'],
             'nueva_fecha_inicio' => ['nullable', 'date'],
-            'nueva_frecuencia'   => ['required', 'in:semanal,mensual'],
-            'nuevo_monto_pago'   => ['required', 'numeric', 'min:0.01'],
+            'nueva_frecuencia' => ['required', 'in:semanal,mensual'],
+            'nuevo_monto_pago' => ['required', 'numeric', 'min:0.01'],
         ];
 
         if ($this->nueva_frecuencia === 'mensual') {
@@ -103,19 +105,20 @@ class Edit extends Component
 
         if ($cambiaCalendarioOMonto && ! $this->confirmar_reestructura) {
             $this->addError('confirmar_reestructura', 'Debes confirmar para continuar.');
+
             return;
         }
 
         DB::transaction(function () use ($cambiaCalendarioOMonto) {
             $antes = [
-                'cliente_id'   => (int) $this->contrato->cliente_id,
+                'cliente_id' => (int) $this->contrato->cliente_id,
                 'fecha_inicio' => optional($this->contrato->fecha_inicio)?->toDateString(),
-                'frecuencia'   => (string) ($this->contrato->frecuencia ?? 'mensual'),
-                'dia_mes'      => isset($this->contrato->dia_mes) ? (int) $this->contrato->dia_mes : null,
-                'dia_semana'   => isset($this->contrato->dia_semana) ? (int) $this->contrato->dia_semana : null,
-                'monto_pago'   => isset($this->contrato->monto_pago) ? (float) $this->contrato->monto_pago : null,
+                'frecuencia' => (string) ($this->contrato->frecuencia ?? 'mensual'),
+                'dia_mes' => isset($this->contrato->dia_mes) ? (int) $this->contrato->dia_mes : null,
+                'dia_semana' => isset($this->contrato->dia_semana) ? (int) $this->contrato->dia_semana : null,
+                'monto_pago' => isset($this->contrato->monto_pago) ? (float) $this->contrato->monto_pago : null,
                 'saldo_actual' => (float) ($this->contrato->saldo_actual ?? 0),
-                'estatus'      => (string) ($this->contrato->estatus ?? 'activo'),
+                'estatus' => (string) ($this->contrato->estatus ?? 'activo'),
             ];
 
             $saldoAnterior = (float) ($this->contrato->saldo_actual ?? 0);
@@ -165,14 +168,14 @@ class Edit extends Component
             $this->contrato->load(['cliente', 'lote', 'contratoBase']);
 
             $despues = [
-                'cliente_id'   => (int) $this->contrato->cliente_id,
+                'cliente_id' => (int) $this->contrato->cliente_id,
                 'fecha_inicio' => optional($this->contrato->fecha_inicio)?->toDateString(),
-                'frecuencia'   => (string) ($this->contrato->frecuencia ?? 'mensual'),
-                'dia_mes'      => isset($this->contrato->dia_mes) ? (int) $this->contrato->dia_mes : null,
-                'dia_semana'   => isset($this->contrato->dia_semana) ? (int) $this->contrato->dia_semana : null,
-                'monto_pago'   => isset($this->contrato->monto_pago) ? (float) $this->contrato->monto_pago : null,
+                'frecuencia' => (string) ($this->contrato->frecuencia ?? 'mensual'),
+                'dia_mes' => isset($this->contrato->dia_mes) ? (int) $this->contrato->dia_mes : null,
+                'dia_semana' => isset($this->contrato->dia_semana) ? (int) $this->contrato->dia_semana : null,
+                'monto_pago' => isset($this->contrato->monto_pago) ? (float) $this->contrato->monto_pago : null,
                 'saldo_actual' => (float) ($this->contrato->saldo_actual ?? 0),
-                'estatus'      => (string) ($this->contrato->estatus ?? 'activo'),
+                'estatus' => (string) ($this->contrato->estatus ?? 'activo'),
             ];
 
             $saldoNuevo = (float) ($this->contrato->saldo_actual ?? 0);
@@ -199,16 +202,16 @@ class Edit extends Component
             }
 
             ContratoHistorial::create([
-                'contrato_id'       => $this->contrato->id,
-                'user_id'           => auth()->id(),
-                'tipo'              => $tipo,
-                'antes'             => $antes,
-                'despues'           => $despues,
-                'saldo_anterior'    => $saldoAnterior,
-                'saldo_nuevo'       => $saldoNuevo,
+                'contrato_id' => $this->contrato->id,
+                'user_id' => auth()->id(),
+                'tipo' => $tipo,
+                'antes' => $antes,
+                'despues' => $despues,
+                'saldo_anterior' => $saldoAnterior,
+                'saldo_nuevo' => $saldoNuevo,
                 'cuotas_eliminadas' => $cuotasEliminadas,
-                'cuotas_creadas'    => $cuotasCreadas,
-                'nota'              => $cambiaCalendarioOMonto
+                'cuotas_creadas' => $cuotasCreadas,
+                'nota' => $cambiaCalendarioOMonto
                     ? 'Edicion de contrato de servicio con regeneracion de cuotas pendientes.'
                     : 'Edicion de datos del contrato de servicio sin regeneracion de cuotas.',
             ]);
@@ -224,6 +227,7 @@ class Edit extends Component
 
         if (! $this->confirmar_cancelacion) {
             $this->addError('confirmar_cancelacion', 'Debes confirmar la cancelacion del contrato.');
+
             return;
         }
 
@@ -232,6 +236,7 @@ class Edit extends Component
 
         if (($this->contrato->estatus ?? null) === 'cancelado') {
             $this->dispatch('toast', type: 'warning', message: 'Este contrato ya esta cancelado.');
+
             return;
         }
 
@@ -240,6 +245,7 @@ class Edit extends Component
             (float) ($this->contrato->saldo_actual ?? 0) <= 0
         ) {
             $this->dispatch('toast', type: 'warning', message: 'No se puede cancelar un contrato liquidado.');
+
             return;
         }
 
@@ -268,7 +274,7 @@ class Edit extends Component
 
             $antes = [
                 'estatus_contrato' => (string) ($this->contrato->estatus ?? 'activo'),
-                'saldo_actual'     => (float) ($this->contrato->saldo_actual ?? 0),
+                'saldo_actual' => (float) ($this->contrato->saldo_actual ?? 0),
             ];
 
             $cuotasEliminadas = (int) Cuota::query()
@@ -292,20 +298,20 @@ class Edit extends Component
 
             $despues = [
                 'estatus_contrato' => (string) ($this->contrato->estatus ?? 'cancelado'),
-                'saldo_actual'     => (float) ($this->contrato->saldo_actual ?? 0),
+                'saldo_actual' => (float) ($this->contrato->saldo_actual ?? 0),
             ];
 
             ContratoHistorial::create([
-                'contrato_id'       => $this->contrato->id,
-                'user_id'           => auth()->id(),
-                'tipo'              => 'cancelacion_contrato',
-                'antes'             => $antes,
-                'despues'           => $despues,
-                'saldo_anterior'    => (float) ($antes['saldo_actual'] ?? 0),
-                'saldo_nuevo'       => (float) ($despues['saldo_actual'] ?? 0),
+                'contrato_id' => $this->contrato->id,
+                'user_id' => auth()->id(),
+                'tipo' => 'cancelacion_contrato',
+                'antes' => $antes,
+                'despues' => $despues,
+                'saldo_anterior' => (float) ($antes['saldo_actual'] ?? 0),
+                'saldo_nuevo' => (float) ($despues['saldo_actual'] ?? 0),
                 'cuotas_eliminadas' => $cuotasEliminadas,
-                'cuotas_creadas'    => 0,
-                'nota'              => 'Contrato de servicio cancelado. Se eliminaron cuotas pendientes y el contrato quedo cancelado.',
+                'cuotas_creadas' => 0,
+                'nota' => 'Contrato de servicio cancelado. Se eliminaron cuotas pendientes y el contrato quedo cancelado.',
             ]);
         });
 
@@ -402,14 +408,14 @@ class Edit extends Component
             }
 
             $cuotasNuevas[] = [
-                'uuid'              => (string) Str::uuid(),
-                'contrato_id'       => $contratoId,
-                'numero'            => $numero,
+                'uuid' => (string) Str::uuid(),
+                'contrato_id' => $contratoId,
+                'numero' => $numero,
                 'fecha_vencimiento' => $fechaVenc->toDateString(),
-                'monto'             => round($montoCuota, 2),
-                'estatus'           => 'pendiente',
-                'created_at'        => now(),
-                'updated_at'        => now(),
+                'monto' => round($montoCuota, 2),
+                'estatus' => 'pendiente',
+                'created_at' => now(),
+                'updated_at' => now(),
             ];
 
             $restante = round($restante - $montoCuota, 2);

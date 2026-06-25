@@ -12,7 +12,7 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
-class LotesExport implements FromArray, WithTitle, WithEvents, ShouldAutoSize
+class LotesExport implements FromArray, ShouldAutoSize, WithEvents, WithTitle
 {
     public function __construct(
         public Collection $rows

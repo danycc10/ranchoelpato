@@ -4,11 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
 // ✅ Spatie Activity Log
-use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Models\Activity;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Condonacion extends Model
 {
@@ -45,7 +44,7 @@ class Condonacion extends Model
                 'created_at',
                 'deleted_at',
             ])
-            ->setDescriptionForEvent(fn(string $eventName) => match ($eventName) {
+            ->setDescriptionForEvent(fn (string $eventName) => match ($eventName) {
                 'created' => 'Condonación creada',
                 'updated' => 'Condonación actualizada',
                 'deleted' => 'Condonación eliminada',

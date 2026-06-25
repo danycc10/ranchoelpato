@@ -10,13 +10,13 @@ return new class extends Migration
     {
         Schema::table('recibos', function (Blueprint $table) {
             $table->unsignedBigInteger('cuota_id')
-                  ->nullable()
-                  ->after('contrato_id');
+                ->nullable()
+                ->after('contrato_id');
 
             $table->foreign('cuota_id')
-                  ->references('id')
-                  ->on('cuotas')
-                  ->nullOnDelete();
+                ->references('id')
+                ->on('cuotas')
+                ->nullOnDelete();
         });
     }
 

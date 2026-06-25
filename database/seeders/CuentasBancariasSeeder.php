@@ -17,7 +17,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'BBVA',
                 'tipo' => 'CLABE',
                 'numero' => '9844',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 1,
@@ -25,7 +25,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'BBVA',
                 'tipo' => 'TARJETA',
                 'numero' => '0298',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 1,
@@ -33,7 +33,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'BBVA',
                 'tipo' => 'TARJETA',
                 'numero' => '3876',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 1,
@@ -41,7 +41,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'MP',
                 'tipo' => 'CLABE',
                 'numero' => '7617',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 1,
@@ -49,7 +49,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'BANAMEX',
                 'tipo' => 'TARJETA',
                 'numero' => '5287',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 1,
@@ -57,7 +57,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'SPIN',
                 'tipo' => 'OXXO',
                 'numero' => '7063',
-                'activa' => 1
+                'activa' => 1,
             ],
 
             [
@@ -66,7 +66,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'BBVA',
                 'tipo' => 'CLABE',
                 'numero' => '6358',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 2,
@@ -74,7 +74,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'SPIN',
                 'tipo' => 'CLABE',
                 'numero' => '6942',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 2,
@@ -82,7 +82,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'MP',
                 'tipo' => 'CLABE',
                 'numero' => '9365',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 2,
@@ -90,7 +90,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'BBVA',
                 'tipo' => 'TARJETA',
                 'numero' => '1975',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 2,
@@ -98,7 +98,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'SPIN',
                 'tipo' => 'OXXO',
                 'numero' => '4761',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 2,
@@ -106,7 +106,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'OXXO',
                 'tipo' => 'OXXO',
                 'numero' => null,
-                'activa' => 1
+                'activa' => 1,
             ],
 
             [
@@ -115,7 +115,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'OXXO',
                 'tipo' => 'OXXO',
                 'numero' => null,
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 1,
@@ -123,7 +123,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'SPIN',
                 'tipo' => 'CLABE',
                 'numero' => '2835',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 1,
@@ -131,7 +131,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'SPIN',
                 'tipo' => 'TARJETA',
                 'numero' => '6890',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 1,
@@ -139,7 +139,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'SPIN',
                 'tipo' => 'TARJETA',
                 'numero' => '0303',
-                'activa' => 1
+                'activa' => 1,
             ],
             [
                 'propietario_id' => 1,
@@ -147,7 +147,7 @@ class CuentasBancariasSeeder extends Seeder
                 'banco' => 'SPIN',
                 'tipo' => 'CLABE',
                 'numero' => '3034',
-                'activa' => 1
+                'activa' => 1,
             ],
 
         ]);

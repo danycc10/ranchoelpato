@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
- Schema::create('fraccionamientos', function (Blueprint $table) {
-    $table->id();
-    $table->foreignId('propietario_id')->constrained()->cascadeOnDelete();
-    $table->string('nombre');
-    $table->string('ubicacion')->nullable();
-    $table->timestamps();
-});
+        Schema::create('fraccionamientos', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('propietario_id')->constrained()->cascadeOnDelete();
+            $table->string('nombre');
+            $table->string('ubicacion')->nullable();
+            $table->timestamps();
+        });
 
     }
 

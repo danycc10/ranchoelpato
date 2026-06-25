@@ -2,16 +2,15 @@
 
 namespace App\Livewire\Admin\Cuotas;
 
-use Livewire\Component;
-use Livewire\WithPagination;
+use App\Models\Contrato;
 use App\Models\Cuota;
 use App\Models\Pago;
-use App\Models\Recibo;
 use App\Models\Propietario;
+use App\Models\Recibo;
 use App\Models\TipoCobro;
-use App\Models\Contrato;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
+use Livewire\Component;
+use Livewire\WithPagination;
 
 class Index extends Component
 {
@@ -22,17 +21,23 @@ class Index extends Component
     public string $q = '';
 
     public ?int $propietario_id = null;
+
     public string $estatus = 'todas';
 
     public ?string $mes = null;   // YYYY-MM
+
     public ?string $desde = null; // YYYY-MM-DD
+
     public ?string $hasta = null; // YYYY-MM-DD
 
     public string $tipo_contrato = 'todos'; // todos | terreno | servicio
+
     public ?int $tipo_servicio_id = null;
 
     public bool $modalImprimir = false;
+
     public ?string $urlImprimirPrincipal = null;
+
     public ?string $urlImprimirRecargo = null;
 
     protected $queryString = [
@@ -58,7 +63,7 @@ class Index extends Component
     public function updating($name, $value): void
     {
         if (in_array($name, [
-            'q', 'propietario_id', 'estatus', 'mes', 'desde', 'hasta', 'tipo_contrato', 'tipo_servicio_id'
+            'q', 'propietario_id', 'estatus', 'mes', 'desde', 'hasta', 'tipo_contrato', 'tipo_servicio_id',
         ], true)) {
             $this->resetPage();
         }
@@ -85,25 +90,25 @@ class Index extends Component
     }
 
     private function aplicarRangoPorMes(bool $forzar = false): void
-{
-    $mes = trim((string) $this->mes);
+    {
+        $mes = trim((string) $this->mes);
 
-    if ($mes === '') {
-        return;
-    }
-
-    try {
-        $inicio = Carbon::createFromFormat('!Y-m', $mes)->startOfMonth();
-        $fin = $inicio->copy()->endOfMonth();
-
-        if ($forzar || ! $this->desde || ! $this->hasta) {
-            $this->desde = $inicio->format('Y-m-d');
-            $this->hasta = $fin->format('Y-m-d');
+        if ($mes === '') {
+            return;
         }
-    } catch (\Throwable $e) {
-        // no romper
+
+        try {
+            $inicio = Carbon::createFromFormat('!Y-m', $mes)->startOfMonth();
+            $fin = $inicio->copy()->endOfMonth();
+
+            if ($forzar || ! $this->desde || ! $this->hasta) {
+                $this->desde = $inicio->format('Y-m-d');
+                $this->hasta = $fin->format('Y-m-d');
+            }
+        } catch (\Throwable $e) {
+            // no romper
+        }
     }
-}
 
     // =========================================================
     // ✅ TERRENO
@@ -184,96 +189,96 @@ class Index extends Component
         ]);
     }
 
-protected function resolverTcServicioDesdeContrato(?Contrato $contrato): string
-{
-    if (! $contrato) {
+    protected function resolverTcServicioDesdeContrato(?Contrato $contrato): string
+    {
+        if (! $contrato) {
+            return 'agua';
+        }
+
+        // 1) Campo directo más confiable en tu sistema
+        if (isset($contrato->servicio_tipo) && is_string($contrato->servicio_tipo) && trim($contrato->servicio_tipo) !== '') {
+            $slug = $this->normalizarTcSlug($contrato->servicio_tipo);
+            if ($slug) {
+                return $slug;
+            }
+        }
+
+        // 2) Compatibilidad si en algún registro viejo usaste otro nombre
+        if (isset($contrato->tipo_servicio) && is_string($contrato->tipo_servicio) && trim($contrato->tipo_servicio) !== '') {
+            $slug = $this->normalizarTcSlug($contrato->tipo_servicio);
+            if ($slug) {
+                return $slug;
+            }
+        }
+
+        // 3) Si guardas un tipo_cobro relacionado por id específico
+        if (isset($contrato->tipo_servicio_id) && $contrato->tipo_servicio_id) {
+            $tc = TipoCobro::find((int) $contrato->tipo_servicio_id);
+            $slug = $this->mapTipoCobroNombreATcSlug($tc?->nombre);
+            if ($slug) {
+                return $slug;
+            }
+        }
+
+        // 4) Compatibilidad con tipos_cobro_id
+        if (isset($contrato->tipos_cobro_id) && $contrato->tipos_cobro_id) {
+            $tc = TipoCobro::find((int) $contrato->tipos_cobro_id);
+            $slug = $this->mapTipoCobroNombreATcSlug($tc?->nombre);
+            if ($slug) {
+                return $slug;
+            }
+        }
+
         return 'agua';
     }
 
-    // 1) Campo directo más confiable en tu sistema
-    if (isset($contrato->servicio_tipo) && is_string($contrato->servicio_tipo) && trim($contrato->servicio_tipo) !== '') {
-        $slug = $this->normalizarTcSlug($contrato->servicio_tipo);
-        if ($slug) {
-            return $slug;
+    protected function normalizarTcSlug(?string $value): ?string
+    {
+        if (! $value) {
+            return null;
         }
+
+        $v = mb_strtolower(trim($value));
+
+        return match ($v) {
+            'agua' => 'agua',
+            'electricidad', 'electrico', 'electrica' => 'electricidad',
+            'fosa' => 'fosa',
+            'limpieza' => 'limpieza',
+            default => null,
+        };
     }
 
-    // 2) Compatibilidad si en algún registro viejo usaste otro nombre
-    if (isset($contrato->tipo_servicio) && is_string($contrato->tipo_servicio) && trim($contrato->tipo_servicio) !== '') {
-        $slug = $this->normalizarTcSlug($contrato->tipo_servicio);
-        if ($slug) {
-            return $slug;
+    protected function mapTipoCobroNombreATcSlug(?string $nombre): ?string
+    {
+        if (! $nombre) {
+            return null;
         }
-    }
 
-    // 3) Si guardas un tipo_cobro relacionado por id específico
-    if (isset($contrato->tipo_servicio_id) && $contrato->tipo_servicio_id) {
-        $tc = TipoCobro::find((int) $contrato->tipo_servicio_id);
-        $slug = $this->mapTipoCobroNombreATcSlug($tc?->nombre);
-        if ($slug) {
-            return $slug;
+        $n = mb_strtoupper(trim($nombre));
+
+        if (str_contains($n, 'AGUA')) {
+            return 'agua';
         }
-    }
 
-    // 4) Compatibilidad con tipos_cobro_id
-    if (isset($contrato->tipos_cobro_id) && $contrato->tipos_cobro_id) {
-        $tc = TipoCobro::find((int) $contrato->tipos_cobro_id);
-        $slug = $this->mapTipoCobroNombreATcSlug($tc?->nombre);
-        if ($slug) {
-            return $slug;
+        if (
+            str_contains($n, 'ELECTRIC') ||
+            str_contains($n, 'LUZ') ||
+            str_contains($n, 'ENERG')
+        ) {
+            return 'electricidad';
         }
-    }
 
-    return 'agua';
-}
+        if (str_contains($n, 'FOSA')) {
+            return 'fosa';
+        }
 
-protected function normalizarTcSlug(?string $value): ?string
-{
-    if (! $value) {
+        if (str_contains($n, 'LIMPIEZA')) {
+            return 'limpieza';
+        }
+
         return null;
     }
-
-    $v = mb_strtolower(trim($value));
-
-    return match ($v) {
-        'agua' => 'agua',
-        'electricidad', 'electrico', 'electrica' => 'electricidad',
-        'fosa' => 'fosa',
-        'limpieza' => 'limpieza',
-        default => null,
-    };
-}
-
-protected function mapTipoCobroNombreATcSlug(?string $nombre): ?string
-{
-    if (! $nombre) {
-        return null;
-    }
-
-    $n = mb_strtoupper(trim($nombre));
-
-    if (str_contains($n, 'AGUA')) {
-        return 'agua';
-    }
-
-    if (
-        str_contains($n, 'ELECTRIC') ||
-        str_contains($n, 'LUZ') ||
-        str_contains($n, 'ENERG')
-    ) {
-        return 'electricidad';
-    }
-
-    if (str_contains($n, 'FOSA')) {
-        return 'fosa';
-    }
-
-    if (str_contains($n, 'LIMPIEZA')) {
-        return 'limpieza';
-    }
-
-    return null;
-}
 
     // =========================================================
     // ✅ IMPRIMIR
@@ -284,6 +289,7 @@ protected function mapTipoCobroNombreATcSlug(?string $nombre): ?string
 
         if (! $principalUuid) {
             $this->dispatch('toast', type: 'warning', message: 'Esa cuota aún no tiene recibo.');
+
             return;
         }
 
@@ -293,6 +299,7 @@ protected function mapTipoCobroNombreATcSlug(?string $nombre): ?string
 
         if (! $recargoUuid) {
             $this->dispatch('open-print-tab', url: $urlPrincipal);
+
             return;
         }
 
@@ -316,12 +323,14 @@ protected function mapTipoCobroNombreATcSlug(?string $nombre): ?string
         if (! $principal) {
             $this->cerrarModalImprimir();
             $this->dispatch('toast', type: 'warning', message: 'No se encontró el recibo principal.');
+
             return;
         }
 
         if ($tipo === 'principal') {
             $this->dispatch('open-print-tab', url: $principal);
             $this->cerrarModalImprimir();
+
             return;
         }
 
@@ -329,11 +338,13 @@ protected function mapTipoCobroNombreATcSlug(?string $nombre): ?string
             if (! $recargo) {
                 $this->dispatch('toast', type: 'warning', message: 'No se encontró el recibo de recargo.');
                 $this->cerrarModalImprimir();
+
                 return;
             }
 
             $this->dispatch('open-print-tab', url: $recargo);
             $this->cerrarModalImprimir();
+
             return;
         }
 
@@ -345,6 +356,7 @@ protected function mapTipoCobroNombreATcSlug(?string $nombre): ?string
             }
 
             $this->cerrarModalImprimir();
+
             return;
         }
 

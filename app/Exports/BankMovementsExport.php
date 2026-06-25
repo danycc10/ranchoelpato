@@ -2,24 +2,27 @@
 
 namespace App\Exports;
 
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\WithTitle;
-use Maatwebsite\Excel\Concerns\WithEvents;
-use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
-class BankMovementsExport implements FromArray, WithTitle, WithEvents, WithColumnFormatting, ShouldAutoSize
+class BankMovementsExport implements FromArray, ShouldAutoSize, WithColumnFormatting, WithEvents, WithTitle
 {
     protected int $lastRow = 1;
+
     protected int $headerRow = 4;
+
     protected int $dataStartRow = 5;
+
     protected int $totalRow = 0;
 
     public function __construct(
@@ -40,7 +43,7 @@ class BankMovementsExport implements FromArray, WithTitle, WithEvents, WithColum
 
         $out[] = ['REPORTE DE MOVIMIENTOS BANCARIOS'];
         $out[] = ["Rango: {$this->desde} a {$this->hasta}"];
-        $out[] = ['Cuenta: ' . ($this->cuentaNombre ?: 'Todas')];
+        $out[] = ['Cuenta: '.($this->cuentaNombre ?: 'Todas')];
 
         $out[] = [
             'Fecha',
@@ -60,27 +63,27 @@ class BankMovementsExport implements FromArray, WithTitle, WithEvents, WithColum
 
         foreach ($this->rows as $r) {
             $cliente = trim(
-                ($r->recibo?->cliente?->nombres ?? '') . ' ' .
+                ($r->recibo?->cliente?->nombres ?? '').' '.
                 ($r->recibo?->cliente?->apellidos ?? '')
             );
 
-            $finca   = $r->recibo?->contrato?->lote?->fraccionamiento?->nombre ?? '';
+            $finca = $r->recibo?->contrato?->lote?->fraccionamiento?->nombre ?? '';
             $manzana = $r->recibo?->contrato?->lote?->manzana ?? '';
-            $lote    = $r->recibo?->contrato?->lote?->lote ?? '';
+            $lote = $r->recibo?->contrato?->lote?->lote ?? '';
 
             $cuentaTxt = $r->cuentaBancaria?->alias ?? '';
 
             $cuotaTxt = '';
 
             if ($r->recibo?->cuota) {
-                $cuotaTxt =  $r->recibo->cuota->numero;
+                $cuotaTxt = $r->recibo->cuota->numero;
             }
 
             $monto = (float) ($r->monto ?? 0);
             $total += $monto;
 
             $out[] = [
-                $r->created_at ? \Carbon\Carbon::parse($r->created_at)->format('Y-m-d') : '',
+                $r->created_at ? Carbon::parse($r->created_at)->format('Y-m-d') : '',
                 $r->recibo?->folio ?? '',
                 $cliente,
                 $finca,
@@ -223,7 +226,7 @@ class BankMovementsExport implements FromArray, WithTitle, WithEvents, WithColum
                 $sheet->getRowDimension(2)->setRowHeight(20);
                 $sheet->getRowDimension(3)->setRowHeight(20);
                 $sheet->getRowDimension(4)->setRowHeight(22);
-            }
+            },
         ];
     }
 }

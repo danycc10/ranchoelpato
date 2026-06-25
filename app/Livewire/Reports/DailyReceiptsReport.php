@@ -16,22 +16,25 @@ class DailyReceiptsReport extends Component
     use WithPagination;
 
     public string $fecha;
+
     public array $propietarioIds = [];
 
     public bool $showReciboModal = false;
+
     public ?int $selectedPagoId = null;
+
     public ?array $selectedReciboData = null;
 
     public function mount(): void
     {
         $this->fecha = now()->toDateString();
-        
-            $user = auth()->user();
 
-    if ( $user->propietario_id) {
-        $this->propietarioIds = [(int) $user->propietario_id];
-    }
-    
+        $user = auth()->user();
+
+        if ($user->propietario_id) {
+            $this->propietarioIds = [(int) $user->propietario_id];
+        }
+
     }
 
     public function updatedFecha(): void
@@ -43,7 +46,7 @@ class DailyReceiptsReport extends Component
     {
         $this->propietarioIds = collect($this->propietarioIds)
             ->filter()
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -75,8 +78,8 @@ class DailyReceiptsReport extends Component
             ->whereNull('recibos.deleted_at')
             ->where('recibos.folio', 'not like', 'REC%')
             ->when(
-                !empty($this->propietarioIds),
-                fn($q) => $q->whereIn('recibos.propietario_contable_id', $this->propietarioIds)
+                ! empty($this->propietarioIds),
+                fn ($q) => $q->whereIn('recibos.propietario_contable_id', $this->propietarioIds)
             );
     }
 
@@ -142,18 +145,18 @@ class DailyReceiptsReport extends Component
     {
         return DB::table('formas_pago')
             ->pluck('nombre')
-            ->map(fn($m) => strtoupper(trim($m)))
+            ->map(fn ($m) => strtoupper(trim($m)))
             ->filter()
             ->unique()
             ->sortBy(function ($metodo) {
                 $m = mb_strtolower($metodo);
 
                 return match (true) {
-                    str_contains($m, 'efect')    => 1,
+                    str_contains($m, 'efect') => 1,
                     str_contains($m, 'transfer') => 2,
-                    str_contains($m, 'tarje')    => 3,
-                    str_contains($m, 'oxxo')     => 4,
-                    default                      => 99,
+                    str_contains($m, 'tarje') => 3,
+                    str_contains($m, 'oxxo') => 4,
+                    default => 99,
                 };
             })
             ->values();
@@ -292,7 +295,7 @@ class DailyReceiptsReport extends Component
         $recibo = $pago->recibo;
 
         $persona = $recibo?->cliente?->nombre_completo
-            ?? trim(($recibo?->cliente?->nombres ?? '') . ' ' . ($recibo?->cliente?->apellidos ?? ''));
+            ?? trim(($recibo?->cliente?->nombres ?? '').' '.($recibo?->cliente?->apellidos ?? ''));
 
         if (blank($persona)) {
             $persona = '—';
@@ -352,7 +355,7 @@ class DailyReceiptsReport extends Component
     {
         $propietariosNombres = collect();
 
-        if (!empty($this->propietarioIds)) {
+        if (! empty($this->propietarioIds)) {
             $propietariosNombres = Propietario::query()
                 ->whereIn('id', $this->propietarioIds)
                 ->orderBy('nombre')
@@ -368,7 +371,7 @@ class DailyReceiptsReport extends Component
         $file = "reporte_diario_{$this->fecha}_{$timestamp}";
 
         if ($propietariosNombres->isNotEmpty()) {
-            $file .= '_' . Str::slug($propietariosNombres->join('_'), '_');
+            $file .= '_'.Str::slug($propietariosNombres->join('_'), '_');
         }
 
         $file .= '.xlsx';

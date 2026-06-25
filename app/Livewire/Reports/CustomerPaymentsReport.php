@@ -16,7 +16,9 @@ class CustomerPaymentsReport extends Component
     use WithPagination;
 
     public ?int $clienteId = null;
+
     public ?int $contratoId = null;
+
     public string $searchCliente = '';
 
     public function mount(): void
@@ -237,9 +239,8 @@ class CustomerPaymentsReport extends Component
                 'formaPago',
                 'cuentaBancaria',
             ])
-            ->whereHas('recibo.contrato', fn (Builder $q) =>
-                $q->where('cliente_id', $this->clienteId)
-                    ->when($this->contratoId, fn ($qq) => $qq->whereKey($this->contratoId))
+            ->whereHas('recibo.contrato', fn (Builder $q) => $q->where('cliente_id', $this->clienteId)
+                ->when($this->contratoId, fn ($qq) => $qq->whereKey($this->contratoId))
             )
             ->orderByDesc('fecha_efectiva')
             ->paginate(25);
@@ -262,9 +263,8 @@ class CustomerPaymentsReport extends Component
                 'formaPago',
                 'cuentaBancaria',
             ])
-            ->whereHas('recibo.contrato', fn (Builder $q) =>
-                $q->where('cliente_id', $this->clienteId)
-                    ->when($this->contratoId, fn ($qq) => $qq->whereKey($this->contratoId))
+            ->whereHas('recibo.contrato', fn (Builder $q) => $q->where('cliente_id', $this->clienteId)
+                ->when($this->contratoId, fn ($qq) => $qq->whereKey($this->contratoId))
             )
             ->orderByDesc('fecha_efectiva')
             ->get();
@@ -277,8 +277,8 @@ class CustomerPaymentsReport extends Component
         $timestamp = now()->format('Y-m-d_H-i-s');
 
         $file = "pagos_cliente_{$this->clienteId}"
-            . ($this->contratoId ? "_contrato_{$this->contratoId}" : "")
-            . "_{$timestamp}.xlsx";
+            .($this->contratoId ? "_contrato_{$this->contratoId}" : '')
+            ."_{$timestamp}.xlsx";
 
         return Excel::download(
             new CustomerPaymentsExport(

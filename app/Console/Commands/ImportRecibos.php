@@ -17,13 +17,14 @@ class ImportRecibos extends Command
     public function handle(): int
     {
         $file = $this->argument('file');
-        $propietarioId = (int)$this->option('propietario_id');
+        $propietarioId = (int) $this->option('propietario_id');
         $capturado = $this->option('capturado_por_user_id');
-        $capturado = $capturado !== null ? (int)$capturado : null;
-        $createMissing = (int)$this->option('create-missing') === 1;
+        $capturado = $capturado !== null ? (int) $capturado : null;
+        $createMissing = (int) $this->option('create-missing') === 1;
 
         if (! file_exists($file)) {
             $this->error("No existe: {$file}");
+
             return self::FAILURE;
         }
 
@@ -34,6 +35,7 @@ class ImportRecibos extends Command
         ), $file);
 
         $this->info('Import terminado.');
+
         return self::SUCCESS;
     }
 }

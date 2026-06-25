@@ -11,7 +11,7 @@ class Propietario extends Model
     protected $table = 'propietarios';
 
     protected $fillable = [
-       'nombre',
+        'nombre',
         'nombre_legal',
         'curp',
         'telefono',
@@ -41,6 +41,7 @@ class Propietario extends Model
     {
         return 'uuid';
     }
+
     protected static function booted()
     {
         static::creating(function ($model) {
@@ -51,7 +52,7 @@ class Propietario extends Model
     }
 
     public function tipoCobroConfigs()
-{
-    return $this->hasMany(TipoCobroPropietarioConfig::class);
-}
+    {
+        return $this->hasMany(TipoCobroPropietarioConfig::class);
+    }
 }

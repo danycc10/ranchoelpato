@@ -18,7 +18,7 @@ class PropietariosSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
-                       [
+            [
                 'nombre' => 'Alejandro',
                 'telefono' => null,
                 'correo' => null,

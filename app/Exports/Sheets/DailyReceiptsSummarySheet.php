@@ -4,25 +4,28 @@ namespace App\Exports\Sheets;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\WithTitle;
-use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
-use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
-class DailyReceiptsSummarySheet implements FromArray, WithTitle, WithEvents, ShouldAutoSize
+class DailyReceiptsSummarySheet implements FromArray, ShouldAutoSize, WithEvents, WithTitle
 {
     protected array $rowsOut = [];
+
     protected int $lastColIndex = 1;
+
     protected int $lastRow = 1;
 
     protected array $methodHeaderRows = [];
+
     protected array $methodTotalRows = [];
+
     protected array $summaryMoneyRanges = [];
 
     public function __construct(
@@ -56,11 +59,11 @@ class DailyReceiptsSummarySheet implements FromArray, WithTitle, WithEvents, Sho
     {
         $rows = $this->rows->map(function ($r) {
             return (object) [
-                'metodo'   => $this->norm($r->metodo ?? 'Sin forma', true),
+                'metodo' => $this->norm($r->metodo ?? 'Sin forma', true),
                 'finca_id' => (int) ($r->finca_id ?? 0),
-                'finca'    => $this->norm($r->finca ?? 'Sin finca', true),
+                'finca' => $this->norm($r->finca ?? 'Sin finca', true),
                 'concepto' => $this->norm($r->concepto ?? 'Sin concepto', true),
-                'total'    => (float) ($r->total ?? 0),
+                'total' => (float) ($r->total ?? 0),
             ];
         });
 
@@ -87,13 +90,21 @@ class DailyReceiptsSummarySheet implements FromArray, WithTitle, WithEvents, Sho
             $f = $r->finca_id;
             $c = $r->concepto;
 
-            if (!isset($pivot[$m])) $pivot[$m] = [];
-            if (!isset($pivot[$m][$f])) $pivot[$m][$f] = [];
-            if (!isset($pivot[$m][$f][$c])) $pivot[$m][$f][$c] = 0.0;
+            if (! isset($pivot[$m])) {
+                $pivot[$m] = [];
+            }
+            if (! isset($pivot[$m][$f])) {
+                $pivot[$m][$f] = [];
+            }
+            if (! isset($pivot[$m][$f][$c])) {
+                $pivot[$m][$f][$c] = 0.0;
+            }
 
             $pivot[$m][$f][$c] += (float) $r->total;
 
-            if (!isset($fincasPorMetodo[$m])) $fincasPorMetodo[$m] = [];
+            if (! isset($fincasPorMetodo[$m])) {
+                $fincasPorMetodo[$m] = [];
+            }
             $fincasPorMetodo[$m][$f] = $r->finca;
         }
 
@@ -111,7 +122,7 @@ class DailyReceiptsSummarySheet implements FromArray, WithTitle, WithEvents, Sho
         $this->summaryMoneyRanges = [];
 
         $this->rowsOut[] = ['REPORTE DIARIO DE RECIBOS'];
-        $this->rowsOut[] = ['Fecha: ' . $this->fecha . ' | Propietario: ' . ($this->propietarioNombre ?: 'Todos')];
+        $this->rowsOut[] = ['Fecha: '.$this->fecha.' | Propietario: '.($this->propietarioNombre ?: 'Todos')];
         $this->rowsOut[] = [];
 
         foreach ($metodos as $metodo) {
@@ -148,7 +159,7 @@ class DailyReceiptsSummarySheet implements FromArray, WithTitle, WithEvents, Sho
                 $this->rowsOut[] = $row;
             }
 
-            $totalRow = ['TOTAL ' . $metodo];
+            $totalRow = ['TOTAL '.$metodo];
             foreach ($conceptos as $c) {
                 $totalRow[] = (float) $totalesMetodoPorConcepto[$c];
             }

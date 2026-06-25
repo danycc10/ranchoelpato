@@ -24,19 +24,21 @@ class SendReciboMail implements ShouldQueue
     {
         $recibo = Recibo::with('cliente')->find($this->reciboId);
 
-        if (!$recibo) {
+        if (! $recibo) {
             Log::warning('SendReciboMail: recibo no encontrado', ['recibo_id' => $this->reciboId]);
+
             return;
         }
 
         // ✅ TU CAMPO REAL ES "correo"
-        $email = trim((string)($recibo->cliente?->correo ?? ''));
+        $email = trim((string) ($recibo->cliente?->correo ?? ''));
 
         if ($email === '') {
             Log::info('SendReciboMail: cliente sin correo, se omite', [
                 'recibo_id' => $recibo->id,
                 'cliente_id' => $recibo->cliente_id,
             ]);
+
             return;
         }
 

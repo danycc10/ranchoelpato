@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('contratos', function (Blueprint $table) {
-            if (!Schema::hasColumn('contratos', 'promocion_id')) {
+            if (! Schema::hasColumn('contratos', 'promocion_id')) {
                 $table->unsignedBigInteger('promocion_id')->nullable()->after('lote_id');
 
                 // Si quieres FK (recomendado) y tu tabla promociones existe:
@@ -29,7 +29,10 @@ return new class extends Migration
             if (Schema::hasColumn('contratos', 'promocion_id')) {
 
                 // drop FK si existe
-                try { $table->dropForeign(['promocion_id']); } catch (\Throwable $e) {}
+                try {
+                    $table->dropForeign(['promocion_id']);
+                } catch (Throwable $e) {
+                }
 
                 $table->dropColumn('promocion_id');
             }

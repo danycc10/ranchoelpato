@@ -32,10 +32,10 @@ class ReciboMail extends Mailable
         // ✅ PDF con tu vista existente
         $pdf = Pdf::loadView('admin.recibos.imprimir', [
             'recibo' => $this->recibo,
-            'modo'   => 'pdf',
+            'modo' => 'pdf',
         ]);
 
-        $filename = 'Recibo-' . ($this->recibo->folio ?? $this->recibo->id) . '.pdf';
+        $filename = 'Recibo-'.($this->recibo->folio ?? $this->recibo->id).'.pdf';
 
         // ✅ Link (si quieres mostrar botón "Ver recibo")
         $urlVerRecibo = null;
@@ -45,7 +45,7 @@ class ReciboMail extends Mailable
             $urlVerRecibo = null;
         }
 
-        return $this->subject('Recibo ' . ($this->recibo->folio ?? ''))
+        return $this->subject('Recibo '.($this->recibo->folio ?? ''))
             ->markdown('emails.recibos.recibo', [
                 'recibo' => $this->recibo,
                 'urlVerRecibo' => $urlVerRecibo, // opcional

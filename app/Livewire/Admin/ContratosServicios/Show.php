@@ -2,8 +2,6 @@
 
 namespace App\Livewire\Admin\ContratosServicios;
 
-use Livewire\Component;
-use Livewire\WithPagination;
 use App\Models\Contrato;
 use App\Models\ContratoHistorial;
 use App\Models\Cuota;
@@ -15,26 +13,29 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Component;
 
 class Show extends Component
 {
- 
-
     public Contrato $contrato;
-   
 
     // ✅ Reprogramar
     public bool $showReprogramar = false;
+
     public ?string $nuevaFechaPrimerPago = null;
 
     // ✅ Anular pago/recibo
     public bool $showAnularPago = false;
+
     public ?int $cuotaAnularId = null;
+
     public string $motivoAnulacion = 'Corrección de pago/recibo';
 
     // ✅ Pagada histórica
     public bool $showMarcarPagada = false;
+
     public ?int $cuotaIdMarcarPagada = null;
+
     public string $observacionPagoHistorico = 'Pago histórico registrado fuera del sistema.';
 
     public function mount(Contrato $contrato): void
@@ -88,67 +89,67 @@ class Show extends Component
         $this->nuevaFechaPrimerPago = optional($first?->fecha_vencimiento)->format('Y-m-d');
     }
 
-public function guardarReprogramacion(): void
-{
-    abort_unless(auth()->user()?->can('sistema.ver'), 403);
+    public function guardarReprogramacion(): void
+    {
+        abort_unless(auth()->user()?->can('sistema.ver'), 403);
 
-    $this->validate([
-        'nuevaFechaPrimerPago' => ['required', 'date'],
-    ]);
+        $this->validate([
+            'nuevaFechaPrimerPago' => ['required', 'date'],
+        ]);
 
-    $contrato = Contrato::query()->findOrFail($this->contrato->id);
+        $contrato = Contrato::query()->findOrFail($this->contrato->id);
 
-    $antes = [
-        'primer_vencimiento' => optional(
-            Cuota::query()
-                ->where('contrato_id', $contrato->id)
-                ->orderBy('numero')
-                ->first()?->fecha_vencimiento
-        )?->toDateString(),
-        'frecuencia' => $contrato->frecuencia,
-    ];
+        $antes = [
+            'primer_vencimiento' => optional(
+                Cuota::query()
+                    ->where('contrato_id', $contrato->id)
+                    ->orderBy('numero')
+                    ->first()?->fecha_vencimiento
+            )?->toDateString(),
+            'frecuencia' => $contrato->frecuencia,
+        ];
 
-    $saldoAnterior = (float) ($contrato->saldo_actual ?? 0);
+        $saldoAnterior = (float) ($contrato->saldo_actual ?? 0);
 
-    $fecha = Carbon::parse($this->nuevaFechaPrimerPago)->startOfDay();
+        $fecha = Carbon::parse($this->nuevaFechaPrimerPago)->startOfDay();
 
-    ContratoCuotasReprogramarService::reprogramar(
-        $contrato,
-        $fecha,
-        false
-    );
+        ContratoCuotasReprogramarService::reprogramar(
+            $contrato,
+            $fecha,
+            false
+        );
 
-    $contrato->refresh();
+        $contrato->refresh();
 
-    $despues = [
-        'primer_vencimiento' => optional(
-            Cuota::query()
-                ->where('contrato_id', $contrato->id)
-                ->orderBy('numero')
-                ->first()?->fecha_vencimiento
-        )?->toDateString(),
-        'frecuencia' => $contrato->frecuencia,
-    ];
+        $despues = [
+            'primer_vencimiento' => optional(
+                Cuota::query()
+                    ->where('contrato_id', $contrato->id)
+                    ->orderBy('numero')
+                    ->first()?->fecha_vencimiento
+            )?->toDateString(),
+            'frecuencia' => $contrato->frecuencia,
+        ];
 
-    ContratoHistorial::create([
-        'contrato_id' => $contrato->id,
-        'user_id' => auth()->id(),
-        'tipo' => 'reprogramacion',
-        'antes' => $antes,
-        'despues' => $despues,
-        'saldo_anterior' => $saldoAnterior,
-        'saldo_nuevo' => (float) ($contrato->saldo_actual ?? 0),
-        'motivo' => 'Reprogramación de calendario',
-        'nota' => 'Reprogramación desde pantalla del contrato de servicio.',
-    ]);
+        ContratoHistorial::create([
+            'contrato_id' => $contrato->id,
+            'user_id' => auth()->id(),
+            'tipo' => 'reprogramacion',
+            'antes' => $antes,
+            'despues' => $despues,
+            'saldo_anterior' => $saldoAnterior,
+            'saldo_nuevo' => (float) ($contrato->saldo_actual ?? 0),
+            'motivo' => 'Reprogramación de calendario',
+            'nota' => 'Reprogramación desde pantalla del contrato de servicio.',
+        ]);
 
-    // ✅ recargar hasta después de guardar historial
-    $contrato->refresh();
-    $this->loadContrato($contrato);
+        // ✅ recargar hasta después de guardar historial
+        $contrato->refresh();
+        $this->loadContrato($contrato);
 
-    $this->showReprogramar = false;
-    session()->flash('ok', 'Todas las cuotas fueron recalculadas.');
-}
+        $this->showReprogramar = false;
+        session()->flash('ok', 'Todas las cuotas fueron recalculadas.');
+    }
 
     // ===================== PAGADA HISTÓRICA =====================
 
@@ -165,6 +166,7 @@ public function guardarReprogramacion(): void
 
         if ($tienePago) {
             session()->flash('ok', 'La cuota ya tiene pago registrado.');
+
             return;
         }
 
@@ -317,13 +319,13 @@ public function guardarReprogramacion(): void
         $ultimoNumero = (int) Recibo::query()
             ->withTrashed()
             ->whereRaw("folio REGEXP '^REC-[0-9]{6}$'")
-            ->selectRaw("MAX(CAST(SUBSTRING(folio, 5) AS UNSIGNED)) as max_num")
+            ->selectRaw('MAX(CAST(SUBSTRING(folio, 5) AS UNSIGNED)) as max_num')
             ->lockForUpdate()
             ->value('max_num');
 
         $siguiente = $ultimoNumero + 1;
 
-        return 'REC-' . str_pad((string) $siguiente, 6, '0', STR_PAD_LEFT);
+        return 'REC-'.str_pad((string) $siguiente, 6, '0', STR_PAD_LEFT);
     }
 
     protected function recalcularSaldoContrato(int $contratoId): float
@@ -353,95 +355,96 @@ public function guardarReprogramacion(): void
         $this->showAnularPago = true;
     }
 
-public function anularPagoConfirmado(): void
-{
-    abort_unless(auth()->user()?->can('recibos.eliminar'), 403);
+    public function anularPagoConfirmado(): void
+    {
+        abort_unless(auth()->user()?->can('recibos.eliminar'), 403);
 
-    $this->validate([
-        'cuotaAnularId' => ['required', 'integer'],
-        'motivoAnulacion' => ['required', 'string', 'max:255'],
-    ]);
+        $this->validate([
+            'cuotaAnularId' => ['required', 'integer'],
+            'motivoAnulacion' => ['required', 'string', 'max:255'],
+        ]);
 
-    $contrato = Contrato::query()->findOrFail($this->contrato->id);
-    $saldoAnterior = (float) ($contrato->saldo_actual ?? 0);
+        $contrato = Contrato::query()->findOrFail($this->contrato->id);
+        $saldoAnterior = (float) ($contrato->saldo_actual ?? 0);
 
-    $cuota = Cuota::query()
-        ->where('contrato_id', $contrato->id)
-        ->where('id', (int) $this->cuotaAnularId)
-        ->first();
+        $cuota = Cuota::query()
+            ->where('contrato_id', $contrato->id)
+            ->where('id', (int) $this->cuotaAnularId)
+            ->first();
 
-    // ✅ tomar el recibo antes de anularlo
-    $recibo = Recibo::query()
-        ->withTrashed()
-        ->where('contrato_id', $contrato->id)
-        ->where('cuota_id', (int) $this->cuotaAnularId)
-        ->latest('id')
-        ->first();
+        // ✅ tomar el recibo antes de anularlo
+        $recibo = Recibo::query()
+            ->withTrashed()
+            ->where('contrato_id', $contrato->id)
+            ->where('cuota_id', (int) $this->cuotaAnularId)
+            ->latest('id')
+            ->first();
 
-    $antes = [
-        'cuota_id' => (int) $this->cuotaAnularId,
-        'cuota_numero' => (int) ($cuota?->numero ?? 0),
-        'pagado_total' => (float) ($cuota?->pagado_total ?? 0),
-        'estatus' => (string) ($cuota?->estatus ?? ''),
-        'folio_recibo' => (string) ($recibo?->folio ?? ''),
-        'recibo_id' => (int) ($recibo?->id ?? 0),
-    ];
+        $antes = [
+            'cuota_id' => (int) $this->cuotaAnularId,
+            'cuota_numero' => (int) ($cuota?->numero ?? 0),
+            'pagado_total' => (float) ($cuota?->pagado_total ?? 0),
+            'estatus' => (string) ($cuota?->estatus ?? ''),
+            'folio_recibo' => (string) ($recibo?->folio ?? ''),
+            'recibo_id' => (int) ($recibo?->id ?? 0),
+        ];
 
-    CuotaPagoRollbackService::anularPagoReciboDeCuota(
-        $contrato,
-        (int) $this->cuotaAnularId,
-        (int) auth()->id(),
-        $this->motivoAnulacion
-    );
+        CuotaPagoRollbackService::anularPagoReciboDeCuota(
+            $contrato,
+            (int) $this->cuotaAnularId,
+            (int) auth()->id(),
+            $this->motivoAnulacion
+        );
 
-    $saldoNuevo = $this->recalcularSaldoContrato($contrato->id);
+        $saldoNuevo = $this->recalcularSaldoContrato($contrato->id);
 
-    $contrato->update([
-        'saldo_actual' => $saldoNuevo,
-    ]);
+        $contrato->update([
+            'saldo_actual' => $saldoNuevo,
+        ]);
 
-    $contrato->refresh();
+        $contrato->refresh();
 
-    $cuota2 = Cuota::query()
-        ->where('contrato_id', $contrato->id)
-        ->find((int) $this->cuotaAnularId);
+        $cuota2 = Cuota::query()
+            ->where('contrato_id', $contrato->id)
+            ->find((int) $this->cuotaAnularId);
 
-    $despues = [
-        'cuota_id' => (int) $this->cuotaAnularId,
-        'cuota_numero' => (int) ($cuota2?->numero ?? 0),
-        'pagado_total' => (float) ($cuota2?->pagado_total ?? 0),
-        'estatus' => (string) ($cuota2?->estatus ?? ''),
-        'folio_recibo_anulado' => (string) ($recibo?->folio ?? ''),
-    ];
+        $despues = [
+            'cuota_id' => (int) $this->cuotaAnularId,
+            'cuota_numero' => (int) ($cuota2?->numero ?? 0),
+            'pagado_total' => (float) ($cuota2?->pagado_total ?? 0),
+            'estatus' => (string) ($cuota2?->estatus ?? ''),
+            'folio_recibo_anulado' => (string) ($recibo?->folio ?? ''),
+        ];
 
-    ContratoHistorial::create([
-        'contrato_id' => $contrato->id,
-        'user_id' => auth()->id(),
-        'tipo' => 'anular_pago',
-        'antes' => $antes,
-        'despues' => $despues,
-        'saldo_anterior' => $saldoAnterior,
-        'saldo_nuevo' => $saldoNuevo,
-        'motivo' => $this->motivoAnulacion,
-        'nota' => 'Anulación de pago/recibo desde contrato de servicio.',
-    ]);
+        ContratoHistorial::create([
+            'contrato_id' => $contrato->id,
+            'user_id' => auth()->id(),
+            'tipo' => 'anular_pago',
+            'antes' => $antes,
+            'despues' => $despues,
+            'saldo_anterior' => $saldoAnterior,
+            'saldo_nuevo' => $saldoNuevo,
+            'motivo' => $this->motivoAnulacion,
+            'nota' => 'Anulación de pago/recibo desde contrato de servicio.',
+        ]);
 
-    // ✅ recargar hasta después de guardar historial
-    $contrato->refresh();
-    $this->loadContrato($contrato);
+        // ✅ recargar hasta después de guardar historial
+        $contrato->refresh();
+        $this->loadContrato($contrato);
 
-    $this->showAnularPago = false;
-    $this->cuotaAnularId = null;
-    $this->motivoAnulacion = 'Corrección de pago/recibo';
+        $this->showAnularPago = false;
+        $this->cuotaAnularId = null;
+        $this->motivoAnulacion = 'Corrección de pago/recibo';
 
-    session()->flash('ok', 'Pago/recibo anulado correctamente.');
-}
-public function render()
-{
-    $cuotas = $this->cuotasQuery()->get();
+        session()->flash('ok', 'Pago/recibo anulado correctamente.');
+    }
 
-    return view('livewire.admin.contratos-servicios.show', [
-        'cuotas' => $cuotas,
-    ])->layout('layouts.app');
-}
+    public function render()
+    {
+        $cuotas = $this->cuotasQuery()->get();
+
+        return view('livewire.admin.contratos-servicios.show', [
+            'cuotas' => $cuotas,
+        ])->layout('layouts.app');
+    }
 }

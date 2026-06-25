@@ -2,26 +2,24 @@
 
 namespace App\Exports;
 
-use Illuminate\Support\Collection;
 use Illuminate\Support\Carbon;
-use Maatwebsite\Excel\Concerns\{
-    WithMultipleSheets,
-    FromCollection,
-    FromArray,
-    WithHeadings,
-    WithMapping,
-    ShouldAutoSize,
-    WithTitle,
-    WithStyles,
-    WithColumnFormatting,
-    WithEvents
-};
+use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
+use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class CobranzaPendientesExport implements WithMultipleSheets
 {
@@ -41,7 +39,7 @@ class CobranzaPendientesExport implements WithMultipleSheets
     }
 }
 
-class CobranzaPendientesDiaSheet implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithTitle, WithStyles, WithColumnFormatting, WithEvents
+class CobranzaPendientesDiaSheet implements FromCollection, ShouldAutoSize, WithColumnFormatting, WithEvents, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     public function __construct(
         protected Collection $cuotas,
@@ -80,7 +78,7 @@ class CobranzaPendientesDiaSheet implements FromCollection, WithHeadings, WithMa
         $fracc = $lote?->fraccionamiento?->nombre ?? '—';
 
         return [
-            trim(($cliente?->nombres ?? '') . ' ' . ($cliente?->apellidos ?? '')) ?: '—',
+            trim(($cliente?->nombres ?? '').' '.($cliente?->apellidos ?? '')) ?: '—',
             $cliente?->telefono ?: '—',
             $cliente?->correo ?: '—',
             $cuota->contrato?->folio_contrato ?: '—',
@@ -142,7 +140,7 @@ class CobranzaPendientesDiaSheet implements FromCollection, WithHeadings, WithMa
     }
 }
 
-class CobranzaAtrasadasSheet implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithTitle, WithStyles, WithColumnFormatting, WithEvents
+class CobranzaAtrasadasSheet implements FromCollection, ShouldAutoSize, WithColumnFormatting, WithEvents, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     public function __construct(
         protected Collection $cuotas,
@@ -219,7 +217,7 @@ class CobranzaAtrasadasSheet implements FromCollection, WithHeadings, WithMappin
         $total = $monto + $recargo;
 
         return [
-            trim(($cliente?->nombres ?? '') . ' ' . ($cliente?->apellidos ?? '')) ?: '—',
+            trim(($cliente?->nombres ?? '').' '.($cliente?->apellidos ?? '')) ?: '—',
             $cliente?->telefono ?: '—',
             $cliente?->correo ?: '—',
             $cuota->contrato?->folio_contrato ?: '—',
@@ -290,7 +288,7 @@ class CobranzaAtrasadasSheet implements FromCollection, WithHeadings, WithMappin
     }
 }
 
-class CobranzaResumenSheet implements FromArray, WithTitle, ShouldAutoSize, WithStyles, WithColumnFormatting, WithEvents
+class CobranzaResumenSheet implements FromArray, ShouldAutoSize, WithColumnFormatting, WithEvents, WithStyles, WithTitle
 {
     public function __construct(
         protected Collection $cuotasHoy,

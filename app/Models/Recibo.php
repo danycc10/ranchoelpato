@@ -5,14 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
-
+use Illuminate\Support\Str;
 // ✅ Spatie Activity Log
-use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Models\Activity;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Recibo extends Model
 {
@@ -67,7 +66,7 @@ class Recibo extends Model
         'firma_size',
         'firmado_en',
         'firmado_por',
-        
+
     ];
 
     protected $casts = [
@@ -203,14 +202,14 @@ class Recibo extends Model
     }
 
     public function pagosDetalle()
-{
-    return $this->hasMany(ReciboPago::class, 'recibo_id')->orderBy('orden');
-}
+    {
+        return $this->hasMany(ReciboPago::class, 'recibo_id')->orderBy('orden');
+    }
 
-public function propietarioContable()
-{
-    return $this->belongsTo(\App\Models\Propietario::class, 'propietario_contable_id');
-}
+    public function propietarioContable()
+    {
+        return $this->belongsTo(Propietario::class, 'propietario_contable_id');
+    }
 
     protected static function booted(): void
     {
