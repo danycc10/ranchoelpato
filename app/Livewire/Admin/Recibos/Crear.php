@@ -16,6 +16,7 @@ use App\Models\ReciboPago;
 use App\Models\TipoCobro;
 use App\Services\Contabilidad\PropietarioContableResolver;
 use App\Services\ImageUploadService;
+use App\Services\Recibos\RecargoCuotaCalculator;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -879,161 +880,6 @@ class Crear extends Component
         return str_contains($nombre, 'EFECTIVO');
     }
 
-    protected function getDiasGraciaContrato(Contrato $contrato): int
-    {
-        $candidatos = [
-            'dias_gracia',
-            'dias_gracia_pago',
-            'dias_gracia_recargo',
-            'dias_gracia_mensualidad',
-            'grace_days',
-        ];
-
-        foreach ($candidatos as $campo) {
-            if (isset($contrato->{$campo}) && is_numeric($contrato->{$campo})) {
-                return (int) $contrato->{$campo};
-            }
-        }
-
-        return 0;
-    }
-
-    protected function calcularRecargoDesdeContrato(Contrato $contrato, Cuota $cuota, int $diasAtraso = 0): float
-    {
-        $guardado = (float) ($cuota->recargo_aplicado ?? 0);
-        if ($guardado > 0) {
-            return round($guardado, 2);
-        }
-
-        $get = function (array $campos) use ($contrato) {
-            foreach ($campos as $campo) {
-                if (isset($contrato->{$campo}) && $contrato->{$campo} !== '' && $contrato->{$campo} !== null) {
-                    $raw = (string) $contrato->{$campo};
-                    $raw = str_replace(['$', ',', ' '], '', $raw);
-                    $raw = str_replace('%', '', $raw);
-
-                    if (is_numeric($raw)) {
-                        return (float) $raw;
-                    }
-                }
-            }
-
-            return null;
-        };
-
-        $tipo = null;
-        foreach (['recargo_tipo', 'tipo_recargo', 'recargo_mode', 'recargo_modo'] as $campoTipo) {
-            if (isset($contrato->{$campoTipo}) && $contrato->{$campoTipo}) {
-                $tipo = mb_strtolower(trim((string) $contrato->{$campoTipo}));
-                break;
-            }
-        }
-
-        $valor = $get([
-            'recargo_valor',
-            'valor_recargo',
-            'recargo_amount',
-            'recargo_cantidad',
-        ]);
-
-        /*
-            frecuencia_recargo_dias:
-            Controla cada cuántos días aumenta el recargo DESPUÉS del primer recargo.
-
-            Ejemplo A:
-            dias_gracia = 7
-            frecuencia_recargo_dias = 7
-            vence 23 abril
-            primer recargo 1 mayo
-            segundo recargo 8 mayo
-            tercer recargo 15 mayo
-
-            Ejemplo B:
-            dias_gracia = 3
-            frecuencia_recargo_dias = 4
-            vence 8 mayo
-            primer recargo 12 mayo
-            segundo recargo 16 mayo
-            tercer recargo 20 mayo
-        */
-        $frecuenciaDias = max(1, $this->getFrecuenciaRecargoDias($contrato));
-
-        /*
-            $diasAtraso representa días desde el PRIMER día de recargo,
-            no desde la fecha de vencimiento.
-
-            Si primer recargo es 12 mayo:
-
-            12 mayo => diasAtraso = 0 => veces = 1
-            13 mayo => diasAtraso = 1 => veces = 1
-            14 mayo => diasAtraso = 2 => veces = 1
-            15 mayo => diasAtraso = 3 => veces = 1
-            16 mayo => diasAtraso = 4 => veces = 2
-        */
-        $veces = $diasAtraso >= 0
-            ? (int) floor($diasAtraso / $frecuenciaDias) + 1
-            : 0;
-
-        if ($tipo && $valor !== null && $valor > 0) {
-            if (str_contains($tipo, 'dia') || str_contains($tipo, 'diar')) {
-                return $diasAtraso >= 0 ? round($valor * ($diasAtraso + 1), 2) : 0.0;
-            }
-
-            if (str_contains($tipo, 'por') || str_contains($tipo, 'pct') || str_contains($tipo, '%')) {
-                return $diasAtraso >= 0
-                    ? round(((float) $cuota->monto) * ($valor / 100) * $veces, 2)
-                    : 0.0;
-            }
-
-            return $veces > 0 ? round($valor * $veces, 2) : 0.0;
-        }
-
-        $porDia = $get([
-            'recargo_por_dia',
-            'monto_recargo_dia',
-            'recargo_diario',
-            'recargo_dia',
-            'monto_recargo_por_dia',
-            'recargo_x_dia',
-        ]);
-
-        if ($porDia !== null && $porDia > 0 && $diasAtraso >= 0) {
-            return round($porDia * ($diasAtraso + 1), 2);
-        }
-
-        $porcentaje = $get([
-            'recargo_porcentaje',
-            'porcentaje_recargo',
-            'recargo_pct',
-            'recargo_percent',
-            'porc_recargo',
-            'recargo_%',
-        ]);
-
-        if ($porcentaje !== null && $porcentaje > 0) {
-            return $diasAtraso >= 0
-                ? round((((float) $cuota->monto) * ($porcentaje / 100)) * $veces, 2)
-                : 0.0;
-        }
-
-        $fijo = $get([
-            'recargo_monto',
-            'monto_recargo',
-            'recargo_fijo',
-            'recargo',
-            'recargo_mensualidad',
-            'monto_recargo_mensualidad',
-            'recargo_importe',
-            'importe_recargo',
-        ]);
-
-        if ($fijo !== null && $fijo > 0) {
-            return $veces > 0 ? round($fijo * $veces, 2) : 0.0;
-        }
-
-        return 0.0;
-    }
-
     protected function getRecargoFinal(): float
     {
         if ($this->recargoModo === 'condonar') {
@@ -1065,119 +911,13 @@ class Crear extends Component
 
     protected function calcularEstadoRecargoCuota(Cuota $cuota): array
     {
-        $contrato = $cuota->contrato;
-        $contrato->loadMissing('lote.fraccionamiento');
-
-        $vence = Carbon::parse($cuota->fecha_vencimiento)->startOfDay();
-        $hoy = Carbon::now()->startOfDay();
-
-        $diasGracia = max(0, (int) $this->getDiasGraciaContrato($contrato));
-
-        $formaPagoParaRecargo = $this->recargo_forma_pago_id ?: $this->forma_pago_id;
-        $esEfectivo = $this->formaPagoEsEfectivo($formaPagoParaRecargo);
-
-        $fraccionamientoNombre = mb_strtoupper(trim((string) ($contrato->lote?->fraccionamiento?->nombre ?? '')));
-        $diaVence = (int) $vence->dayOfWeekIso;
-
-        $aplicaDiaExtraPorFraccionamiento = false;
-
-        if (
-            $fraccionamientoNombre === 'DEL NORTE' ||
-            $fraccionamientoNombre === 'DEL NORTE LUNES'
-        ) {
-            $aplicaDiaExtraPorFraccionamiento = in_array($diaVence, [1, 3], true);
-        } elseif ($fraccionamientoNombre === 'REYES') {
-            $aplicaDiaExtraPorFraccionamiento = ($diaVence === 4);
-        }
-
-        $aplicaDiaExtraEfectivo = $esEfectivo && $aplicaDiaExtraPorFraccionamiento;
-
-        $primerDiaRecargo = $vence->copy()->addDays($diasGracia + 1);
-
-        $primerDiaRecargoConDiaExtra = $aplicaDiaExtraEfectivo
-            ? $primerDiaRecargo->copy()->addDay()
-            : $primerDiaRecargo->copy();
-
-        $cuotaEnGracia = $hoy->lt($primerDiaRecargo);
-        $cuotaVencida = $hoy->greaterThanOrEqualTo($primerDiaRecargo);
-
-        $estaDentroDelDiaExtra = $aplicaDiaExtraEfectivo
-            && $hoy->greaterThanOrEqualTo($primerDiaRecargo)
-            && $hoy->lt($primerDiaRecargoConDiaExtra);
-
-        $diasDesdePrimerRecargo = $hoy->greaterThanOrEqualTo($primerDiaRecargo)
-            ? $primerDiaRecargo->diffInDays($hoy)
-            : -1;
-
-        $diasAtrasoParaMostrar = $diasDesdePrimerRecargo >= 0
-            ? $diasDesdePrimerRecargo + 1
-            : 0;
-
-        $recargoCalculado = $this->calcularRecargoDesdeContrato(
-            $contrato,
-            $cuota,
-            $diasDesdePrimerRecargo
+        return app(RecargoCuotaCalculator::class)->estado(
+            cuota: $cuota,
+            formaPagoId: $this->recargo_forma_pago_id ?: $this->forma_pago_id,
+            permiteAjusteUsuario: count($this->cuotaIds) <= 1 && $this->tipoCobroEsMensualidad($this->tipos_cobro_id),
+            recargoModo: $this->recargoModo,
+            recargoMontoManual: $this->recargoMontoManual,
         );
-
-        $recargoOriginal = $recargoCalculado;
-        $recargoFinal = 0.0;
-        $recargoCondonado = false;
-        $mensaje = null;
-
-        if ($esEfectivo) {
-            if ($cuotaEnGracia) {
-                $recargoFinal = 0.0;
-                $mensaje = 'Cuota aún dentro del periodo sin recargo.';
-            } elseif ($estaDentroDelDiaExtra) {
-                $recargoFinal = 0.0;
-                $recargoCondonado = true;
-
-                if ($fraccionamientoNombre === 'DEL NORTE') {
-                    $mensaje = 'Cuota vencida: por pago en efectivo se otorga 1 día extra antes del primer recargo para Del Norte.';
-                } elseif ($fraccionamientoNombre === 'REYES') {
-                    $mensaje = 'Cuota vencida: por pago en efectivo se otorga 1 día extra antes del primer recargo para Reyes.';
-                } else {
-                    $mensaje = 'Cuota vencida: se otorgó 1 día extra por pago en efectivo.';
-                }
-            } else {
-                $recargoFinal = $recargoCalculado;
-                $mensaje = 'Cuota vencida: se cobrará recargo según las reglas del contrato.';
-            }
-        } else {
-            $recargoFinal = $cuotaVencida ? $recargoCalculado : 0.0;
-
-            if ($cuotaVencida && $recargoCalculado > 0) {
-                $mensaje = 'Cuota vencida: se cobrará recargo según el contrato.';
-            } elseif ($cuotaEnGracia) {
-                $mensaje = 'Cuota aún dentro del periodo sin recargo.';
-            }
-        }
-
-        $esSeleccionUnica = count($this->cuotaIds) <= 1;
-
-        if ($esSeleccionUnica && $this->tipoCobroEsMensualidad($this->tipos_cobro_id)) {
-            if ($this->recargoModo === 'condonar') {
-                $recargoFinal = 0.0;
-                $recargoCondonado = true;
-            } elseif ($this->recargoModo === 'manual') {
-                $recargoFinal = round(max(0, (float) ($this->recargoMontoManual ?? 0)), 2);
-                $recargoCondonado = $recargoFinal <= 0;
-            }
-        }
-
-        return [
-            'cuota_vencida' => $cuotaVencida,
-            'cuota_en_gracia' => $cuotaEnGracia,
-            'dias_atraso' => $diasAtrasoParaMostrar,
-            'dias_gracia_total' => $diasGracia,
-            'recargo_monto' => round($recargoFinal, 2),
-            'recargo_monto_original' => round($recargoOriginal, 2),
-            'recargo_condonado' => $recargoCondonado,
-            'cuota_fecha_vencimiento' => $vence->format('Y-m-d'),
-            'cuota_fecha_limite' => $primerDiaRecargo->copy()->subDay()->format('Y-m-d'),
-            'cuota_fecha_limite_condonada' => $primerDiaRecargoConDiaExtra->format('Y-m-d'),
-            'recargo_mensaje' => $mensaje,
-        ];
     }
 
     protected function recalcularResumenCuotasSeleccionadas(): void
@@ -1972,13 +1712,6 @@ class Crear extends Component
         throw ValidationException::withMessages([
             'folio' => 'No fue posible asignar un folio único. Intenta nuevamente.',
         ]);
-    }
-
-    protected function getFrecuenciaRecargoDias(Contrato $contrato): int
-    {
-        $frecuencia = (int) ($contrato->frecuencia_recargo_dias ?? 7);
-
-        return max(1, $frecuencia);
     }
 
     protected function getConteoRecibosEsperados(): array
