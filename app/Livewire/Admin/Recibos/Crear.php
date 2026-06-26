@@ -18,6 +18,7 @@ use App\Services\Contabilidad\PropietarioContableResolver;
 use App\Services\ImageUploadService;
 use App\Services\Recibos\RecargoCuotaCalculator;
 use App\Services\Recibos\ReciboFolioService;
+use App\Services\Recibos\ReciboPagoNormalizer;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -1408,78 +1409,16 @@ class Crear extends Component
 
     protected function normalizarPagosPrincipales(?float $montoEsperado = null): array
     {
-        $pagos = collect($this->pagos)
-            ->map(function ($pago, $index) {
-                $formaPagoId = isset($pago['forma_pago_id']) && $pago['forma_pago_id'] !== '' ? (int) $pago['forma_pago_id'] : null;
-                $monto = round((float) ($pago['monto'] ?? 0), 2);
-
-                return [
-                    'forma_pago_id' => $formaPagoId,
-                    'cuentas_bancarias_id' => $this->formaPagoRequiereCuenta($formaPagoId)
-                        ? (isset($pago['cuentas_bancarias_id']) && $pago['cuentas_bancarias_id'] !== '' ? (int) $pago['cuentas_bancarias_id'] : null)
-                        : null,
-                    'monto' => $monto,
-                    'referencia' => isset($pago['referencia']) && trim((string) $pago['referencia']) !== ''
-                        ? trim((string) $pago['referencia'])
-                        : null,
-                    'evidencia' => $pago['evidencia'] ?? null,
-                    'sin_evidencia' => (bool) ($pago['sin_evidencia'] ?? false),
-                    'orden' => $index + 1,
-                ];
-            })
-            ->filter(fn ($pago) => $pago['forma_pago_id'] && $pago['monto'] > 0)
-            ->values()
-            ->all();
-
-        if (empty($pagos)) {
-            throw ValidationException::withMessages([
-                'pagos' => 'Debes capturar al menos una forma de pago.',
-            ]);
-        }
-
-        foreach ($pagos as $index => $pago) {
-            if ($this->formaPagoRequiereCuenta($pago['forma_pago_id']) && empty($pago['cuentas_bancarias_id'])) {
-                throw ValidationException::withMessages([
-                    'pagos.'.$index.'.cuentas_bancarias_id' => 'La cuenta bancaria es obligatoria para esta forma de pago.',
-                ]);
-            }
-
-            if ($this->formaPagoRequiereCuenta($pago['forma_pago_id'])
-                && empty($pago['evidencia'])
-                && empty($pago['sin_evidencia'])
-            ) {
-                throw ValidationException::withMessages([
-                    'pagos.'.$index.'.evidencia' => 'Debes adjuntar la evidencia para esta forma de pago.',
-                ]);
-            }
-        }
-
-        $suma = round((float) collect($pagos)->sum('monto'), 2);
-
-        if ($montoEsperado !== null && round((float) $montoEsperado, 2) !== $suma) {
-            throw ValidationException::withMessages([
-                'pagos' => 'La suma de las formas de pago debe coincidir con el monto total del recibo.',
-            ]);
-        }
-
-        return $pagos;
+        return app(ReciboPagoNormalizer::class)->normalizar(
+            pagos: $this->pagos,
+            montoEsperado: $montoEsperado,
+            formaPagoRequiereCuenta: fn (?int $formaPagoId): bool => $this->formaPagoRequiereCuenta($formaPagoId),
+        );
     }
 
     protected function resolverMetodoDesdeFormaPago(?int $formaPagoId): string
     {
-        if (! $formaPagoId) {
-            return 'efectivo';
-        }
-
-        $forma = FormaPago::find($formaPagoId);
-        $nombre = mb_strtoupper(trim((string) ($forma?->nombre ?? '')));
-
-        return match (true) {
-            str_contains($nombre, 'TRANSFER') => 'transferencia',
-            str_contains($nombre, 'OXXO') => 'oxxo',
-            str_contains($nombre, 'STRIPE') || str_contains($nombre, 'TARJETA') || str_contains($nombre, 'TERMINAL') => 'stripe',
-            default => 'efectivo',
-        };
+        return app(ReciboPagoNormalizer::class)->metodoDesdeFormaPago($formaPagoId);
     }
 
     protected function crearDetallesPagoRecibo(
