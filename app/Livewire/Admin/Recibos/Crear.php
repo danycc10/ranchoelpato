@@ -19,6 +19,7 @@ use App\Services\ImageUploadService;
 use App\Services\Recibos\RecargoCuotaCalculator;
 use App\Services\Recibos\ReciboFolioService;
 use App\Services\Recibos\ReciboPagoNormalizer;
+use App\Services\Recibos\TipoCobroClassifier;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -698,99 +699,32 @@ class Crear extends Component
 
     protected function tipoCobroEsMensualidad(?int $tipoCobroId): bool
     {
-        if (! $tipoCobroId) {
-            return false;
-        }
-
-        $tipo = TipoCobro::find($tipoCobroId);
-        if (! $tipo) {
-            return false;
-        }
-
-        $nombre = mb_strtoupper(trim((string) $tipo->nombre));
-
-        return str_contains($nombre, 'MENSUAL');
+        return app(TipoCobroClassifier::class)->esMensualidad($tipoCobroId);
     }
 
     protected function tipoCobroEsAnualidad(?int $tipoCobroId): bool
     {
-        if (! $tipoCobroId) {
-            return false;
-        }
-
-        $tipo = TipoCobro::find($tipoCobroId);
-        if (! $tipo) {
-            return false;
-        }
-
-        $nombre = mb_strtoupper(trim((string) $tipo->nombre));
-
-        return str_contains($nombre, 'ANUAL');
+        return app(TipoCobroClassifier::class)->esAnualidad($tipoCobroId);
     }
 
     protected function tipoCobroEsRecargo(?int $tipoCobroId): bool
     {
-        if (! $tipoCobroId) {
-            return false;
-        }
-
-        $tipo = TipoCobro::find($tipoCobroId);
-        if (! $tipo) {
-            return false;
-        }
-
-        $nombre = mb_strtoupper(trim((string) $tipo->nombre));
-
-        return str_contains($nombre, 'RECARGO');
+        return app(TipoCobroClassifier::class)->esRecargo($tipoCobroId);
     }
 
     protected function tipoCobroEsServicio(?int $tipoCobroId): bool
     {
-        if (! $tipoCobroId) {
-            return false;
-        }
-
-        $tipo = TipoCobro::find($tipoCobroId);
-
-        return $tipo?->categoria === 'servicio';
+        return app(TipoCobroClassifier::class)->esServicio($tipoCobroId);
     }
 
     protected function tipoCobroRequiereAsociarCuota(?int $tipoCobroId): bool
     {
-        if (! $tipoCobroId) {
-            return false;
-        }
-
-        if ($this->tipoCobroEsMensualidad($tipoCobroId)) {
-            return true;
-        }
-        if ($this->tipoCobroEsAnualidad($tipoCobroId)) {
-            return true;
-        }
-        if ($this->tipoCobroEsServicio($tipoCobroId)) {
-            return true;
-        }
-        if ($this->tipoCobroEsRecargo($tipoCobroId)) {
-            return true;
-        }
-
-        return false;
+        return app(TipoCobroClassifier::class)->requiereAsociarCuota($tipoCobroId);
     }
 
     protected function tipoCobroAfectaSaldoContrato(?int $tipoCobroId): bool
     {
-        if (! $tipoCobroId) {
-            return false;
-        }
-
-        $tc = TipoCobro::find($tipoCobroId);
-        if (! $tc) {
-            return false;
-        }
-
-        $nombre = mb_strtoupper(trim((string) $tc->nombre));
-
-        return str_contains($nombre, 'ANUAL') || str_contains($nombre, 'ENGANCHE');
+        return app(TipoCobroClassifier::class)->afectaSaldoContrato($tipoCobroId);
     }
 
     protected function resetInfoContratoYLote(): void
