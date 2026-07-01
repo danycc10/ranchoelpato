@@ -298,7 +298,9 @@ class Create extends Component
         $data = $this->payloadContrato();
         ContratoPlanService::aplicarPromocionEconomica($data, $this->promocion);
 
-        DB::transaction(function () use ($data) {
+        $contrato = null;
+
+        DB::transaction(function () use ($data, &$contrato) {
             $base = Contrato::query()->lockForUpdate()->findOrFail($this->contrato_base_id);
 
             $contrato = Contrato::query()->create([
@@ -324,6 +326,27 @@ class Create extends Component
                 'tipo' => 'servicio',
                 'servicio_tipo' => $this->servicio_tipo,
                 'contrato_base_id' => $base->id,
+                'archivo_contrato_disk' => 'private',
+
+                'vendedor_nombre_legal' => $base->vendedor_nombre_legal,
+                'vendedor_curp' => $base->vendedor_curp,
+                'comprador_nombre_legal' => $base->comprador_nombre_legal,
+                'comprador_curp' => $base->comprador_curp,
+                'comprador_ine_frente' => $base->comprador_ine_frente,
+                'comprador_ine_reverso' => $base->comprador_ine_reverso,
+                'vendedor_ine_frente' => $base->vendedor_ine_frente,
+                'vendedor_ine_reverso' => $base->vendedor_ine_reverso,
+                'credenciales_disk' => $base->credenciales_disk,
+
+                'area_m2_snapshot' => $base->area_m2_snapshot,
+                'medida_norte_snapshot' => $base->medida_norte_snapshot,
+                'medida_sur_snapshot' => $base->medida_sur_snapshot,
+                'medida_este_snapshot' => $base->medida_este_snapshot,
+                'medida_oeste_snapshot' => $base->medida_oeste_snapshot,
+                'colindancia_norte_snapshot' => $base->colindancia_norte_snapshot,
+                'colindancia_sur_snapshot' => $base->colindancia_sur_snapshot,
+                'colindancia_este_snapshot' => $base->colindancia_este_snapshot,
+                'colindancia_oeste_snapshot' => $base->colindancia_oeste_snapshot,
             ]);
 
             $plan = ContratoPlanService::generarCuotas($data, $this->promocion);
@@ -346,7 +369,7 @@ class Create extends Component
 
         $this->dispatch('toast', type: 'success', message: 'Contrato de servicio creado y cuotas generadas.');
 
-        return redirect()->to(route('admin.contratos-servicios.index'));
+        return redirect()->route('admin.contratos-servicios.show', $contrato?->uuid);
     }
 
     public function render()

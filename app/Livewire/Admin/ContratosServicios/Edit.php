@@ -20,6 +20,8 @@ class Edit extends Component
 
     public ?int $cliente_id = null;
 
+    public ?string $nuevo_estatus = null;
+
     public ?string $nueva_fecha_inicio = null;
 
     public string $nueva_frecuencia = 'mensual';
@@ -29,6 +31,20 @@ class Edit extends Component
     public ?int $nuevo_dia_semana = null;
 
     public ?float $nuevo_monto_pago = null;
+
+    public ?float $nuevo_precio_total = null;
+
+    public ?float $nuevo_enganche = null;
+
+    public ?float $nuevo_saldo_inicial = null;
+
+    public ?float $nuevo_saldo_actual = null;
+
+    public ?int $dias_gracia = null;
+
+    public string $tipo_recargo = 'fijo';
+
+    public ?float $valor_recargo = null;
 
     public bool $confirmar_reestructura = false;
 
@@ -45,6 +61,7 @@ class Edit extends Component
             ->firstOrFail();
 
         $this->cliente_id = (int) $this->contrato->cliente_id;
+        $this->nuevo_estatus = (string) ($this->contrato->estatus ?? 'activo');
 
         $this->nueva_fecha_inicio = $this->contrato->fecha_inicio
             ? Carbon::parse($this->contrato->fecha_inicio)->toDateString()
@@ -57,6 +74,31 @@ class Edit extends Component
         $this->nuevo_monto_pago = isset($this->contrato->monto_pago)
             ? (float) $this->contrato->monto_pago
             : null;
+
+        $this->nuevo_precio_total = isset($this->contrato->precio_total)
+            ? (float) $this->contrato->precio_total
+            : null;
+
+        $this->nuevo_enganche = isset($this->contrato->enganche)
+            ? (float) $this->contrato->enganche
+            : null;
+
+        $this->nuevo_saldo_inicial = isset($this->contrato->saldo_inicial)
+            ? (float) $this->contrato->saldo_inicial
+            : null;
+
+        $this->nuevo_saldo_actual = isset($this->contrato->saldo_actual)
+            ? (float) $this->contrato->saldo_actual
+            : null;
+
+        $this->dias_gracia = isset($this->contrato->dias_gracia)
+            ? (int) $this->contrato->dias_gracia
+            : 0;
+
+        $this->tipo_recargo = (string) ($this->contrato->tipo_recargo ?? 'fijo');
+        $this->valor_recargo = isset($this->contrato->valor_recargo)
+            ? (float) $this->contrato->valor_recargo
+            : 0.0;
     }
 
     public function updatedNuevaFrecuencia(): void
@@ -84,9 +126,17 @@ class Edit extends Component
     {
         $rules = [
             'cliente_id' => ['required', 'integer', 'exists:clientes,id'],
+            'nuevo_estatus' => ['required', 'in:activo,moroso,liquidado'],
             'nueva_fecha_inicio' => ['nullable', 'date'],
             'nueva_frecuencia' => ['required', 'in:semanal,mensual'],
             'nuevo_monto_pago' => ['required', 'numeric', 'min:0.01'],
+            'nuevo_precio_total' => ['nullable', 'numeric', 'min:0'],
+            'nuevo_enganche' => ['nullable', 'numeric', 'min:0'],
+            'nuevo_saldo_inicial' => ['nullable', 'numeric', 'min:0'],
+            'nuevo_saldo_actual' => ['nullable', 'numeric', 'min:0'],
+            'dias_gracia' => ['required', 'integer', 'min:0', 'max:365'],
+            'tipo_recargo' => ['required', 'in:fijo,porcentaje'],
+            'valor_recargo' => ['required', 'numeric', 'min:0'],
         ];
 
         if ($this->nueva_frecuencia === 'mensual') {
@@ -95,21 +145,46 @@ class Edit extends Component
             $rules['nuevo_dia_semana'] = ['required', 'integer', 'min:1', 'max:7'];
         }
 
-        $this->validate($rules);
-
         $cambiaCalendarioOMonto =
             ((string) ($this->contrato->frecuencia ?? 'mensual') !== (string) $this->nueva_frecuencia) ||
             ((int) ($this->contrato->dia_mes ?? 0) !== (int) ($this->nuevo_dia_mes ?? 0)) ||
             ((int) ($this->contrato->dia_semana ?? 0) !== (int) ($this->nuevo_dia_semana ?? 0)) ||
             ((float) ($this->contrato->monto_pago ?? 0) !== (float) ($this->nuevo_monto_pago ?? 0));
 
-        if ($cambiaCalendarioOMonto && ! $this->confirmar_reestructura) {
+        $cambiaSaldoActual =
+            ((float) ($this->contrato->saldo_actual ?? 0) !== (float) ($this->nuevo_saldo_actual ?? 0));
+
+        $requiereReestructura = $cambiaCalendarioOMonto || $cambiaSaldoActual;
+
+        $this->validate($rules);
+
+        if (
+            $this->nuevo_precio_total !== null &&
+            $this->nuevo_enganche !== null &&
+            (float) $this->nuevo_enganche > (float) $this->nuevo_precio_total
+        ) {
+            $this->addError('nuevo_enganche', 'El enganche no puede ser mayor al precio total.');
+
+            return;
+        }
+
+        if (
+            $this->nuevo_saldo_inicial !== null &&
+            $this->nuevo_saldo_actual !== null &&
+            (float) $this->nuevo_saldo_actual > (float) $this->nuevo_saldo_inicial
+        ) {
+            $this->addError('nuevo_saldo_actual', 'El saldo actual no puede ser mayor al saldo inicial.');
+
+            return;
+        }
+
+        if ($requiereReestructura && ! $this->confirmar_reestructura) {
             $this->addError('confirmar_reestructura', 'Debes confirmar para continuar.');
 
             return;
         }
 
-        DB::transaction(function () use ($cambiaCalendarioOMonto) {
+        DB::transaction(function () use ($requiereReestructura) {
             $antes = [
                 'cliente_id' => (int) $this->contrato->cliente_id,
                 'fecha_inicio' => optional($this->contrato->fecha_inicio)?->toDateString(),
@@ -117,13 +192,27 @@ class Edit extends Component
                 'dia_mes' => isset($this->contrato->dia_mes) ? (int) $this->contrato->dia_mes : null,
                 'dia_semana' => isset($this->contrato->dia_semana) ? (int) $this->contrato->dia_semana : null,
                 'monto_pago' => isset($this->contrato->monto_pago) ? (float) $this->contrato->monto_pago : null,
+                'precio_total' => isset($this->contrato->precio_total) ? (float) $this->contrato->precio_total : null,
+                'enganche' => isset($this->contrato->enganche) ? (float) $this->contrato->enganche : null,
+                'saldo_inicial' => isset($this->contrato->saldo_inicial) ? (float) $this->contrato->saldo_inicial : null,
                 'saldo_actual' => (float) ($this->contrato->saldo_actual ?? 0),
+                'dias_gracia' => isset($this->contrato->dias_gracia) ? (int) $this->contrato->dias_gracia : 0,
+                'frecuencia_recargo_dias' => isset($this->contrato->frecuencia_recargo_dias) ? (int) $this->contrato->frecuencia_recargo_dias : null,
+                'tipo_recargo' => (string) ($this->contrato->tipo_recargo ?? 'fijo'),
+                'valor_recargo' => isset($this->contrato->valor_recargo) ? (float) $this->contrato->valor_recargo : 0,
                 'estatus' => (string) ($this->contrato->estatus ?? 'activo'),
             ];
 
             $saldoAnterior = (float) ($this->contrato->saldo_actual ?? 0);
+            $estatusAnterior = (string) ($this->contrato->estatus ?? 'activo');
 
             $this->contrato->cliente_id = (int) $this->cliente_id;
+            $this->contrato->estatus = (string) $this->nuevo_estatus;
+            $this->contrato->liquidado_at = match (true) {
+                $this->nuevo_estatus === 'liquidado' && $estatusAnterior !== 'liquidado' => now(),
+                $this->nuevo_estatus === 'liquidado' => $this->contrato->liquidado_at,
+                default => null,
+            };
 
             if (isset($this->contrato->fecha_inicio)) {
                 $this->contrato->fecha_inicio = $this->nueva_fecha_inicio
@@ -155,12 +244,55 @@ class Edit extends Component
                 $this->contrato->monto_pago = (float) $this->nuevo_monto_pago;
             }
 
+            if (isset($this->contrato->precio_total)) {
+                $this->contrato->precio_total = $this->nuevo_precio_total !== null
+                    ? (float) $this->nuevo_precio_total
+                    : null;
+            }
+
+            if (isset($this->contrato->enganche)) {
+                $this->contrato->enganche = $this->nuevo_enganche !== null
+                    ? (float) $this->nuevo_enganche
+                    : 0;
+            }
+
+            if (isset($this->contrato->saldo_inicial)) {
+                $this->contrato->saldo_inicial = $this->nuevo_saldo_inicial !== null
+                    ? (float) $this->nuevo_saldo_inicial
+                    : null;
+            }
+
+            if (isset($this->contrato->saldo_actual)) {
+                $this->contrato->saldo_actual = $this->nuevo_saldo_actual !== null
+                    ? (float) $this->nuevo_saldo_actual
+                    : null;
+            }
+
+            if (isset($this->contrato->dias_gracia)) {
+                $diasGracia = $this->dias_gracia !== null
+                    ? (int) $this->dias_gracia
+                    : 0;
+
+                $this->contrato->dias_gracia = $diasGracia;
+                $this->contrato->frecuencia_recargo_dias = Contrato::frecuenciaRecargoDiasPorGracia($diasGracia);
+            }
+
+            if (isset($this->contrato->tipo_recargo)) {
+                $this->contrato->tipo_recargo = (string) $this->tipo_recargo;
+            }
+
+            if (isset($this->contrato->valor_recargo)) {
+                $this->contrato->valor_recargo = $this->valor_recargo !== null
+                    ? (float) $this->valor_recargo
+                    : 0;
+            }
+
             $this->contrato->save();
 
             $cuotasEliminadas = 0;
             $cuotasCreadas = 0;
 
-            if ($cambiaCalendarioOMonto) {
+            if ($requiereReestructura) {
                 [$cuotasEliminadas, $cuotasCreadas] = $this->reestructurarSoloPendientesEnAdelante();
             }
 
@@ -174,7 +306,14 @@ class Edit extends Component
                 'dia_mes' => isset($this->contrato->dia_mes) ? (int) $this->contrato->dia_mes : null,
                 'dia_semana' => isset($this->contrato->dia_semana) ? (int) $this->contrato->dia_semana : null,
                 'monto_pago' => isset($this->contrato->monto_pago) ? (float) $this->contrato->monto_pago : null,
+                'precio_total' => isset($this->contrato->precio_total) ? (float) $this->contrato->precio_total : null,
+                'enganche' => isset($this->contrato->enganche) ? (float) $this->contrato->enganche : null,
+                'saldo_inicial' => isset($this->contrato->saldo_inicial) ? (float) $this->contrato->saldo_inicial : null,
                 'saldo_actual' => (float) ($this->contrato->saldo_actual ?? 0),
+                'dias_gracia' => isset($this->contrato->dias_gracia) ? (int) $this->contrato->dias_gracia : 0,
+                'frecuencia_recargo_dias' => isset($this->contrato->frecuencia_recargo_dias) ? (int) $this->contrato->frecuencia_recargo_dias : null,
+                'tipo_recargo' => (string) ($this->contrato->tipo_recargo ?? 'fijo'),
+                'valor_recargo' => isset($this->contrato->valor_recargo) ? (float) $this->contrato->valor_recargo : 0,
                 'estatus' => (string) ($this->contrato->estatus ?? 'activo'),
             ];
 
@@ -191,14 +330,32 @@ class Edit extends Component
                 ($cuotasEliminadas > 0 || $cuotasCreadas > 0)
             );
 
+            $cambioFinanciero = (
+                ((float) ($antes['precio_total'] ?? 0) !== (float) ($despues['precio_total'] ?? 0)) ||
+                ((float) ($antes['enganche'] ?? 0) !== (float) ($despues['enganche'] ?? 0)) ||
+                ((float) ($antes['saldo_inicial'] ?? 0) !== (float) ($despues['saldo_inicial'] ?? 0)) ||
+                ((float) ($antes['saldo_actual'] ?? 0) !== (float) ($despues['saldo_actual'] ?? 0)) ||
+                ((int) ($antes['dias_gracia'] ?? 0) !== (int) ($despues['dias_gracia'] ?? 0)) ||
+                ((int) ($antes['frecuencia_recargo_dias'] ?? 0) !== (int) ($despues['frecuencia_recargo_dias'] ?? 0)) ||
+                ((string) ($antes['tipo_recargo'] ?? 'fijo') !== (string) ($despues['tipo_recargo'] ?? 'fijo')) ||
+                ((float) ($antes['valor_recargo'] ?? 0) !== (float) ($despues['valor_recargo'] ?? 0))
+            );
+
+            $cambioEstatus =
+                ((string) ($antes['estatus'] ?? '') !== (string) ($despues['estatus'] ?? ''));
+
             $tipo = 'edicion_contrato';
 
-            if ($cambioCliente && $cambioCalendario) {
+            if ($cambioEstatus) {
+                $tipo = 'cambio_estatus';
+            } elseif ($cambioCliente && $cambioCalendario) {
                 $tipo = 'ambos';
             } elseif ($cambioCliente) {
                 $tipo = 'cambio_cliente';
             } elseif ($cambioCalendario) {
                 $tipo = 'cambio_calendario';
+            } elseif ($cambioFinanciero) {
+                $tipo = 'cambio_financiero';
             }
 
             ContratoHistorial::create([
@@ -211,7 +368,7 @@ class Edit extends Component
                 'saldo_nuevo' => $saldoNuevo,
                 'cuotas_eliminadas' => $cuotasEliminadas,
                 'cuotas_creadas' => $cuotasCreadas,
-                'nota' => $cambiaCalendarioOMonto
+                'nota' => $requiereReestructura
                     ? 'Edicion de contrato de servicio con regeneracion de cuotas pendientes.'
                     : 'Edicion de datos del contrato de servicio sin regeneracion de cuotas.',
             ]);

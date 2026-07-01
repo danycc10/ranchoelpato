@@ -7,17 +7,30 @@ use App\Models\ContratoHistorial;
 use App\Models\Cuota;
 use App\Models\Recibo;
 use App\Services\Contratos\ContratoCuotasReprogramarService;
+use App\Services\Contratos\ContratoWordService;
 use App\Services\Contratos\CuotaPagoRollbackService;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Show extends Component
 {
+    use WithFileUploads;
+
     public Contrato $contrato;
+
+    public $documentoScan;
+
+    public bool $modalContratoOpen = false;
+
+    public ?string $documentoAccion = null;
+
+    public string $documentoTipoSeleccionado = 'contrato';
 
     // ✅ Reprogramar
     public bool $showReprogramar = false;
@@ -28,6 +41,8 @@ class Show extends Component
     public bool $showAnularPago = false;
 
     public ?int $cuotaAnularId = null;
+
+    public ?array $anularPreview = null;
 
     public string $motivoAnulacion = 'Corrección de pago/recibo';
 
@@ -51,9 +66,11 @@ class Show extends Component
     {
         $this->contrato = $contrato->load([
             'cliente',
-            'lote',
+            'lote.fraccionamiento',
+            'lote.fraccionamiento.propietario',
+            'promocion',
             'contratoBase.cliente',
-            'contratoBase.lote',
+            'contratoBase.lote.fraccionamiento',
             'historial' => fn ($q) => $q->with('user')->latest('id')->limit(100),
         ]);
     }
@@ -75,6 +92,204 @@ class Show extends Component
         return Cuota::query()
             ->where('contrato_id', $this->contrato->id)
             ->orderBy('numero');
+    }
+
+    // ===================== DOCUMENTOS LEGALES =====================
+
+    public function abrirModalContrato(): void
+    {
+        abort_unless(auth()->user()?->can('sistema.ver'), 403);
+
+        $this->contrato->refresh();
+        $this->loadContrato($this->contrato);
+
+        $this->documentoAccion = null;
+        $this->documentoTipoSeleccionado = 'contrato';
+        $this->resetDocumentoUpload();
+
+        $this->modalContratoOpen = true;
+    }
+
+    public function cerrarModalContrato(): void
+    {
+        $this->modalContratoOpen = false;
+        $this->documentoAccion = null;
+        $this->documentoTipoSeleccionado = 'contrato';
+        $this->resetDocumentoUpload();
+    }
+
+    public function seleccionarAccionDocumento(string $accion): void
+    {
+        abort_unless(auth()->user()?->can('sistema.ver'), 403);
+
+        if (! in_array($accion, ['descargar', 'subir'], true)) {
+            return;
+        }
+
+        $this->documentoAccion = $accion;
+        $this->resetDocumentoUpload();
+    }
+
+    public function seleccionarDocumentoContrato(string $tipo): void
+    {
+        abort_unless(auth()->user()?->can('sistema.ver'), 403);
+
+        if (! ContratoWordService::documentType($tipo)) {
+            return;
+        }
+
+        $this->documentoTipoSeleccionado = $tipo;
+        $this->resetDocumentoUpload();
+    }
+
+    public function volverAccionesDocumento(): void
+    {
+        $this->documentoAccion = null;
+        $this->resetDocumentoUpload();
+    }
+
+    public function subirArchivoContrato(): void
+    {
+        abort_unless(auth()->user()?->can('sistema.ver'), 403);
+
+        $documento = $this->documentoSeleccionadoConfig();
+
+        $this->validate([
+            'documentoScan' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+        ], [
+            'documentoScan.required' => 'Debes seleccionar un archivo PDF.',
+            'documentoScan.mimes' => 'El archivo debe ser un PDF.',
+            'documentoScan.max' => 'El PDF no debe pesar mas de 10 MB.',
+        ]);
+
+        $field = $documento['scan_field'];
+        $archivoAnterior = $this->contrato->{$field};
+
+        if (! empty($archivoAnterior) && Storage::disk('private')->exists($archivoAnterior)) {
+            Storage::disk('private')->delete($archivoAnterior);
+        }
+
+        $path = $this->documentoScan->storeAs(
+            $this->buildDocumentoDirectory(),
+            $documento['scan_filename'],
+            'private'
+        );
+
+        $this->contrato->update([
+            $field => $path,
+            'archivo_contrato_disk' => 'private',
+        ]);
+
+        $this->registrarHistorialDocumento(
+            $documento,
+            $archivoAnterior,
+            $path,
+            'Se subio o reemplazo el PDF escaneado de '.$documento['label'].'.'
+        );
+
+        $this->resetDocumentoUpload();
+
+        $this->contrato->refresh();
+        $this->loadContrato($this->contrato);
+
+        $this->dispatch('toast', type: 'success', message: 'El PDF escaneado se guardo correctamente.');
+    }
+
+    public function eliminarArchivoContrato(): void
+    {
+        abort_unless(auth()->user()?->can('sistema.ver'), 403);
+
+        $documento = $this->documentoSeleccionadoConfig();
+        $field = $documento['scan_field'];
+        $archivoAnterior = $this->contrato->{$field};
+
+        if (! $archivoAnterior) {
+            return;
+        }
+
+        if (Storage::disk('private')->exists($archivoAnterior)) {
+            Storage::disk('private')->delete($archivoAnterior);
+        }
+
+        $this->contrato->update([
+            $field => null,
+        ]);
+
+        $this->registrarHistorialDocumento(
+            $documento,
+            $archivoAnterior,
+            null,
+            'Se elimino el PDF escaneado de '.$documento['label'].'.'
+        );
+
+        $this->resetDocumentoUpload();
+
+        $this->contrato->refresh();
+        $this->loadContrato($this->contrato);
+
+        $this->dispatch('toast', type: 'success', message: 'El PDF escaneado fue eliminado correctamente.');
+    }
+
+    private function documentoSeleccionadoConfig(): array
+    {
+        $documento = ContratoWordService::documentType($this->documentoTipoSeleccionado);
+
+        abort_unless($documento, 404);
+
+        return $documento;
+    }
+
+    private function resetDocumentoUpload(): void
+    {
+        $this->reset('documentoScan');
+        $this->resetErrorBag('documentoScan');
+        $this->resetValidation('documentoScan');
+    }
+
+    private function buildDocumentoDirectory(): string
+    {
+        $this->contrato->loadMissing([
+            'lote.fraccionamiento',
+        ]);
+
+        $nombreFinca = trim((string) ($this->contrato->lote?->fraccionamiento?->nombre ?? 'sin-finca'));
+        $nombreLote = trim((string) (
+            $this->contrato->lote?->lote
+            ?? $this->contrato->lote?->clave
+            ?? ('lote-'.($this->contrato->lote_id ?? $this->contrato->id))
+        ));
+
+        $fincaSlug = Str::slug($nombreFinca) ?: 'sin-finca';
+        $loteSlug = Str::slug($nombreLote) ?: 'sin-lote';
+        $contratoSlug = Str::slug((string) ($this->contrato->folio_contrato ?: $this->contrato->uuid)) ?: $this->contrato->uuid;
+
+        return "contratos/{$fincaSlug}/{$loteSlug}/servicios/{$contratoSlug}";
+    }
+
+    private function registrarHistorialDocumento(
+        array $documento,
+        ?string $archivoAnterior,
+        ?string $archivoNuevo,
+        string $nota
+    ): void {
+        ContratoHistorial::create([
+            'contrato_id' => $this->contrato->id,
+            'user_id' => auth()->id(),
+            'tipo' => 'archivo_documento_contrato',
+            'antes' => [
+                'documento_tipo' => $documento['key'],
+                'documento_label' => $documento['label'],
+                'archivo' => $archivoAnterior,
+            ],
+            'despues' => [
+                'documento_tipo' => $documento['key'],
+                'documento_label' => $documento['label'],
+                'archivo' => $archivoNuevo,
+            ],
+            'saldo_anterior' => (float) ($this->contrato->saldo_actual ?? 0),
+            'saldo_nuevo' => (float) ($this->contrato->saldo_actual ?? 0),
+            'nota' => $nota,
+        ]);
     }
 
     // ===================== REPROGRAMAR =====================
@@ -170,6 +385,18 @@ class Show extends Component
             return;
         }
 
+        $tieneReciboHistorico = Recibo::query()
+            ->where('cuota_id', $cuota->id)
+            ->where('contrato_id', $this->contrato->id)
+            ->where('es_historico', true)
+            ->exists();
+
+        if ($tieneReciboHistorico) {
+            session()->flash('ok', 'La cuota ya tiene un recibo historico activo. Se requiere sincronizar la cuota.');
+
+            return;
+        }
+
         $this->cuotaIdMarcarPagada = $cuotaId;
         $this->observacionPagoHistorico = 'Pago histórico registrado fuera del sistema.';
         $this->showMarcarPagada = true;
@@ -229,6 +456,10 @@ class Show extends Component
             $contrato->update([
                 'saldo_actual' => $saldoNuevo,
             ]);
+
+            $this->actualizarEstatusContratoSiLiquidado($contrato);
+            $contrato->refresh();
+            $saldoNuevo = (float) ($contrato->saldo_actual ?? $saldoNuevo);
 
             ContratoHistorial::create([
                 'contrato_id' => $contrato->id,
@@ -344,13 +575,102 @@ class Show extends Component
         return round((float) $saldoNuevo, 2);
     }
 
+    protected function actualizarEstatusContratoSiLiquidado(Contrato $contrato): void
+    {
+        $tieneCuotasPendientes = Cuota::query()
+            ->where('contrato_id', $contrato->id)
+            ->where('estatus', '!=', 'pagada')
+            ->exists();
+
+        $nuevoEstatus = $tieneCuotasPendientes ? 'activo' : 'liquidado';
+
+        $data = [
+            'estatus' => $nuevoEstatus,
+            'saldo_actual' => $this->recalcularSaldoContrato($contrato->id),
+            'liquidado_at' => $tieneCuotasPendientes
+                ? null
+                : ($contrato->liquidado_at ?: now()),
+        ];
+
+        $contrato->update($data);
+    }
+
     // ===================== ANULAR PAGO / RECIBO =====================
 
     public function confirmarAnularPago(int $cuotaId): void
     {
         abort_unless(auth()->user()?->can('recibos.eliminar'), 403);
 
+        $cuota = Cuota::query()
+            ->where('contrato_id', $this->contrato->id)
+            ->findOrFail($cuotaId);
+
+        $recibos = Recibo::query()
+            ->with([
+                'tipoCobro',
+                'pagosDetalle' => fn ($q) => $q
+                    ->whereNull('anulado_at')
+                    ->whereNull('deleted_at')
+                    ->with([
+                        'formaPago',
+                        'cuentaBancaria',
+                    ]),
+            ])
+            ->where('contrato_id', $this->contrato->id)
+            ->where('cuota_id', $cuotaId)
+            ->whereNull('anulado_at')
+            ->whereNull('deleted_at')
+            ->orderBy('id')
+            ->get();
+
+        if ($recibos->isEmpty()) {
+            session()->flash('ok', 'No se encontraron recibos activos para esa cuota.');
+
+            return;
+        }
+
+        $recibosPreview = $recibos->map(function ($recibo) {
+            $pagos = collect($recibo->pagosDetalle ?? []);
+
+            return [
+                'recibo_id' => (int) $recibo->id,
+                'folio' => (string) $recibo->folio,
+                'concepto' => (string) ($recibo->tipoCobro?->nombre ?? '-'),
+                'monto_recibo' => (float) ($recibo->monto ?? 0),
+                'pagos_count' => (int) $pagos->count(),
+                'pagos_total' => (float) $pagos->sum(fn ($p) => (float) ($p->monto ?? 0)),
+                'pagos' => $pagos->map(function ($p) {
+                    $cuenta = trim(
+                        ($p->cuentaBancaria?->alias ?? '')
+                            .(($p->cuentaBancaria?->banco ?? '') ? ' - '.$p->cuentaBancaria->banco : '')
+                            .(($p->cuentaBancaria?->numero ?? '') ? ' ('.$p->cuentaBancaria->numero.')' : '')
+                    );
+
+                    if ($cuenta === '') {
+                        $cuenta = '-';
+                    }
+
+                    return [
+                        'id' => (int) $p->id,
+                        'fecha' => optional($p->created_at)?->format('d/m/Y H:i'),
+                        'monto' => (float) ($p->monto ?? 0),
+                        'forma_pago' => (string) ($p->formaPago?->nombre ?? '-'),
+                        'cuenta' => $cuenta,
+                        'referencia' => (string) ($p->referencia ?? ''),
+                    ];
+                })->values()->all(),
+            ];
+        })->values();
+
         $this->cuotaAnularId = $cuotaId;
+        $this->anularPreview = [
+            'cuota_id' => (int) $cuota->id,
+            'cuota_numero' => (int) ($cuota->numero ?? 0),
+            'recibos_count' => (int) $recibos->count(),
+            'recibos_total' => (float) $recibos->sum(fn ($r) => (float) ($r->monto ?? 0)),
+            'pagos_total' => (float) $recibosPreview->sum(fn ($r) => (float) ($r['pagos_total'] ?? 0)),
+            'recibos' => $recibosPreview->all(),
+        ];
         $this->motivoAnulacion = 'Corrección de pago/recibo';
         $this->showAnularPago = true;
     }
@@ -403,6 +723,9 @@ class Show extends Component
         ]);
 
         $contrato->refresh();
+        $this->actualizarEstatusContratoSiLiquidado($contrato);
+        $contrato->refresh();
+        $saldoNuevo = (float) ($contrato->saldo_actual ?? $saldoNuevo);
 
         $cuota2 = Cuota::query()
             ->where('contrato_id', $contrato->id)
@@ -434,6 +757,7 @@ class Show extends Component
 
         $this->showAnularPago = false;
         $this->cuotaAnularId = null;
+        $this->anularPreview = null;
         $this->motivoAnulacion = 'Corrección de pago/recibo';
 
         session()->flash('ok', 'Pago/recibo anulado correctamente.');
@@ -445,6 +769,7 @@ class Show extends Component
 
         return view('livewire.admin.contratos-servicios.show', [
             'cuotas' => $cuotas,
+            'documentosContrato' => ContratoWordService::documentTypes(),
         ])->layout('layouts.app');
     }
 }

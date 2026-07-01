@@ -56,11 +56,13 @@ class Edit extends Component
 
     public bool $confirmar_cancelacion = false;
 
+    public bool $confirmar_descancelacion = false;
+
     public function mount(string $uuid): void
     {
         $this->uuid = $uuid;
 
-        $this->contrato = Contrato::query()
+        $this->contrato = Contrato::withTrashed()
             ->with(['cliente', 'lote.fraccionamiento'])
             ->where('uuid', $uuid)
             ->firstOrFail();
@@ -542,6 +544,156 @@ class Edit extends Component
         });
 
         $this->dispatch('toast', type: 'success', message: 'Contrato cancelado correctamente.');
+        $this->redirectRoute('admin.contratos.show', $this->contrato->uuid);
+    }
+
+    public function descancelarContrato(): void
+    {
+        $this->resetErrorBag('confirmar_descancelacion');
+
+        if (! $this->confirmar_descancelacion) {
+            $this->addError('confirmar_descancelacion', 'Debes confirmar la descancelacion del contrato.');
+
+            return;
+        }
+
+        $this->contrato = Contrato::withTrashed()
+            ->with(['cliente', 'lote.fraccionamiento'])
+            ->where('uuid', $this->uuid)
+            ->firstOrFail();
+
+        $estaCancelado = ((string) ($this->contrato->estatus ?? '') === 'cancelado')
+            || $this->contrato->trashed();
+
+        if (! $estaCancelado) {
+            $this->dispatch('toast', type: 'warning', message: 'Este contrato no esta cancelado.');
+
+            return;
+        }
+
+        $existeOtroContratoActivo = Contrato::query()
+            ->where('id', '!=', $this->contrato->id)
+            ->where('lote_id', $this->contrato->lote_id)
+            ->where('tipo', 'terreno')
+            ->whereIn('estatus', ['activo', 'moroso', 'liquidado', 'donacion'])
+            ->exists();
+
+        if ($existeOtroContratoActivo) {
+            $this->dispatch(
+                'toast',
+                type: 'warning',
+                message: 'No se puede descancelar: el lote ya tiene otro contrato activo.'
+            );
+
+            return;
+        }
+
+        if ((float) ($this->contrato->saldo_actual ?? 0) > 0 && (float) ($this->contrato->monto_pago ?? 0) <= 0) {
+            $this->dispatch(
+                'toast',
+                type: 'warning',
+                message: 'No se puede descancelar: el contrato no tiene monto de pago para regenerar cuotas.'
+            );
+
+            return;
+        }
+
+        DB::transaction(function () {
+            $contrato = Contrato::withTrashed()
+                ->lockForUpdate()
+                ->with(['lote'])
+                ->where('id', $this->contrato->id)
+                ->firstOrFail();
+
+            $historialCancelacion = ContratoHistorial::query()
+                ->where('contrato_id', $contrato->id)
+                ->where('tipo', 'cancelacion_contrato')
+                ->latest('id')
+                ->first();
+
+            $estatusAnterior = (string) data_get($historialCancelacion?->antes, 'estatus_contrato', 'activo');
+            $estatusRestaurar = in_array($estatusAnterior, ['activo', 'moroso', 'donacion'], true)
+                ? $estatusAnterior
+                : 'activo';
+
+            $loteEstatusAnterior = (string) data_get($historialCancelacion?->antes, 'lote_estatus', '');
+            $loteEstatusRestaurar = in_array($loteEstatusAnterior, ['vendido', 'donacion'], true)
+                ? $loteEstatusAnterior
+                : ($estatusRestaurar === 'donacion' ? 'donacion' : 'vendido');
+
+            $antes = [
+                'estatus_contrato' => (string) ($contrato->estatus ?? 'cancelado'),
+                'lote_estatus' => (string) ($contrato->lote?->estatus ?? 'disponible'),
+                'saldo_actual' => (float) ($contrato->saldo_actual ?? 0),
+                'deleted_at' => $contrato->deleted_at?->toDateTimeString(),
+                'cuotas_pendientes' => (int) Cuota::query()
+                    ->where('contrato_id', $contrato->id)
+                    ->where('estatus', '!=', 'pagada')
+                    ->count(),
+            ];
+
+            if ($contrato->trashed()) {
+                $contrato->restore();
+            }
+
+            $contrato->estatus = $estatusRestaurar;
+            $contrato->liquidado_at = null;
+            $contrato->save();
+
+            if ($contrato->lote && isset($contrato->lote->estatus)) {
+                $contrato->lote->estatus = $loteEstatusRestaurar;
+                $contrato->lote->save();
+            }
+
+            $this->contrato = $contrato->fresh(['cliente', 'lote.fraccionamiento']);
+            $this->nuevo_monto_pago = (float) ($this->contrato->monto_pago ?? 0);
+            $this->nueva_frecuencia = (string) ($this->contrato->frecuencia ?? 'mensual');
+            $this->nuevo_dia_mes = isset($this->contrato->dia_mes) ? (int) $this->contrato->dia_mes : null;
+            $this->nuevo_dia_semana = isset($this->contrato->dia_semana) ? (int) $this->contrato->dia_semana : null;
+            $this->nueva_fecha_primera_cuota = $this->resolverFechaInicialSugerida();
+
+            $cuotasAntesRegenerar = (int) Cuota::query()
+                ->where('contrato_id', $this->contrato->id)
+                ->where('estatus', '!=', 'pagada')
+                ->count();
+
+            [$cuotasEliminadas, $cuotasCreadas] = [0, 0];
+
+            if ((float) ($this->contrato->saldo_actual ?? 0) > 0) {
+                [$cuotasEliminadas, $cuotasCreadas] = $this->reestructurarSoloPendientesEnAdelante();
+            }
+
+            $this->contrato->refresh();
+            $this->contrato->load(['cliente', 'lote.fraccionamiento']);
+
+            $despues = [
+                'estatus_contrato' => (string) ($this->contrato->estatus ?? $estatusRestaurar),
+                'lote_estatus' => (string) ($this->contrato->lote?->estatus ?? $loteEstatusRestaurar),
+                'saldo_actual' => (float) ($this->contrato->saldo_actual ?? 0),
+                'deleted_at' => $this->contrato->deleted_at?->toDateTimeString(),
+                'fecha_primera_cuota' => $this->nueva_fecha_primera_cuota,
+                'cuotas_pendientes_antes_regenerar' => $cuotasAntesRegenerar,
+                'cuotas_pendientes_despues' => (int) Cuota::query()
+                    ->where('contrato_id', $this->contrato->id)
+                    ->where('estatus', '!=', 'pagada')
+                    ->count(),
+            ];
+
+            ContratoHistorial::create([
+                'contrato_id' => $this->contrato->id,
+                'user_id' => auth()->id(),
+                'tipo' => 'descancelacion_contrato',
+                'antes' => $antes,
+                'despues' => $despues,
+                'saldo_anterior' => (float) ($antes['saldo_actual'] ?? 0),
+                'saldo_nuevo' => (float) ($despues['saldo_actual'] ?? 0),
+                'cuotas_eliminadas' => $cuotasEliminadas,
+                'cuotas_creadas' => $cuotasCreadas,
+                'nota' => 'Contrato descancelado. Se restauro deleted_at, se recupero el estatus del contrato y lote, y se regeneraron cuotas pendientes.',
+            ]);
+        });
+
+        $this->dispatch('toast', type: 'success', message: 'Contrato descancelado correctamente.');
         $this->redirectRoute('admin.contratos.show', $this->contrato->uuid);
     }
 

@@ -183,10 +183,12 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
 
         Route::get('/contratos/{contrato}', ContratosShow::class)
             ->name('contratos.show')
-            ->middleware('permission:contratos.ver_detalle');
+            ->middleware('permission:contratos.ver_detalle')
+            ->withTrashed();
 
         Route::get('/contratos/{contrato}/pdf', [ContratosPdfController::class, 'download'])
-            ->name('contratos.pdf');
+            ->name('contratos.pdf')
+            ->withTrashed();
 
         Route::get('/contratos/{uuid}/editar', ContratosEdit::class)
             ->name('contratos.edit');
@@ -229,7 +231,8 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
             ->middleware('permission:contratos_servicios.ver_detalle');
 
         Route::get('/contratos-servicios/{uuid}/edit', ContratosServiciosEdit::class)
-            ->name('contratos-servicios.edit');
+            ->name('contratos-servicios.edit')
+            ->middleware('permission:contratos_servicios.editar');
 
         /*
         | Cobranza / Recibos

@@ -9,8 +9,12 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class ContratosPdfController extends Controller
 {
-    public function download(Contrato $contrato)
+    public function download(string $contrato)
     {
+        $contrato = Contrato::withTrashed()
+            ->where('uuid', $contrato)
+            ->firstOrFail();
+
         $contrato->load([
             'cliente',
             'lote.fraccionamiento.propietario',

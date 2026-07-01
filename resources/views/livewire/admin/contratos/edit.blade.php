@@ -1,4 +1,7 @@
 <div class="space-y-6">
+    @php
+        $contratoCancelado = strtolower((string) ($contrato->estatus ?? '')) === 'cancelado' || filled($contrato->deleted_at);
+    @endphp
 
     {{-- Header --}}
     <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -140,6 +143,36 @@
             </div>
         </div>
     </div>
+
+    @if($contratoCancelado)
+        <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
+            <div class="font-black text-emerald-950">Descancelar contrato</div>
+            <div class="text-sm text-emerald-900 mt-1">
+                Esta accion restaurara el contrato, volvera a marcar el lote como vendido y regenerara cuotas pendientes con el saldo actual.
+            </div>
+
+            <label class="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-emerald-950">
+                <input type="checkbox" class="rounded" wire:model.live="confirmar_descancelacion">
+                Confirmo descancelar este contrato
+            </label>
+
+            @error('confirmar_descancelacion')
+                <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+            @enderror
+
+            <div class="mt-4">
+                <button
+                    type="button"
+                    wire:click="descancelarContrato"
+                    wire:loading.attr="disabled"
+                    wire:target="descancelarContrato"
+                    class="px-5 py-2.5 rounded-xl bg-emerald-700 text-white font-bold hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span wire:loading.remove wire:target="descancelarContrato">Descancelar contrato</span>
+                    <span wire:loading wire:target="descancelarContrato">Descancelando...</span>
+                </button>
+            </div>
+        </div>
+    @endif
 
     {{-- Formulario --}}
     <div class="bg-white rounded-2xl border p-5 space-y-6">
@@ -560,7 +593,7 @@
                     <button wire:click="cancelarContrato"
                         wire:loading.attr="disabled"
                         wire:target="cancelarContrato"
-                        @disabled(($contrato->estatus ?? null) === 'liquidado' || (float)($contrato->saldo_actual ?? 0) <= 0)
+                        @disabled($contratoCancelado || ($contrato->estatus ?? null) === 'liquidado' || (float)($contrato->saldo_actual ?? 0) <= 0)
                         class="px-5 py-2.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">
                         <span wire:loading.remove wire:target="cancelarContrato">Cancelar contrato</span>
                         <span wire:loading wire:target="cancelarContrato">Cancelando...</span>
@@ -572,6 +605,7 @@
                 <button wire:click="guardarCambios"
                     wire:loading.attr="disabled"
                     wire:target="guardarCambios"
+                    @disabled($contratoCancelado)
                     class="w-full sm:w-auto px-6 py-3 rounded-xl bg-black text-white font-bold disabled:opacity-50">
                     <span wire:loading.remove wire:target="guardarCambios">Guardar cambios</span>
                     <span wire:loading wire:target="guardarCambios">Guardando...</span>

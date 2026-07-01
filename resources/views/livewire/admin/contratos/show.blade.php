@@ -83,12 +83,49 @@
                 </button>
             @endcan
 
+            @can('contratos.editar')
+                <a href="{{ route('admin.contratos.edit', $contrato->uuid) }}"
+                    class="px-4 py-2 rounded-xl font-bold {{ $contratoCancelado ? 'bg-red-700 text-white hover:bg-red-800' : 'border hover:bg-gray-50' }}">
+                    {{ $contratoCancelado ? 'Editar / descancelar' : 'Editar' }}
+                </a>
+            @endcan
+
             <a href="{{ route('admin.contratos.index') }}" class="px-4 py-2 rounded-xl border">Volver</a>
         </div>
     </div>
 
     @if($contratoCancelado)
-        <div class="mb-4 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800">
+        <div class="mb-4 overflow-hidden rounded-2xl border-2 border-red-300 bg-red-50">
+            <div class="bg-red-700 px-4 py-3 text-white">
+                <div class="text-lg font-black uppercase tracking-wide">Contrato cancelado</div>
+                <div class="text-sm text-red-100">
+                    Registro restaurable: las acciones operativas estan bloqueadas hasta descancelarlo.
+                </div>
+            </div>
+
+            <div class="grid gap-3 p-4 text-sm text-red-950 sm:grid-cols-3">
+                <div>
+                    <div class="text-xs font-bold uppercase text-red-700">Estatus</div>
+                    <div class="font-black">{{ ucfirst($contrato->estatus ?? 'cancelado') }}</div>
+                </div>
+
+                <div>
+                    <div class="text-xs font-bold uppercase text-red-700">Cancelado el</div>
+                    <div class="font-black">{{ optional($contrato->deleted_at)->format('d/m/Y H:i') ?? '-' }}</div>
+                </div>
+
+                <div class="sm:text-right">
+                    @can('contratos.editar')
+                        <a href="{{ route('admin.contratos.edit', $contrato->uuid) }}"
+                            class="inline-flex px-4 py-2 rounded-xl bg-red-700 text-white font-bold hover:bg-red-800">
+                            Ir a descancelar
+                        </a>
+                    @endcan
+                </div>
+            </div>
+        </div>
+
+        <div class="hidden">
             <div class="font-black">Contrato cancelado</div>
             <div class="text-sm mt-1">
                 Este contrato está en estatus cancelado. Todas las acciones operativas han sido deshabilitadas.
@@ -302,6 +339,8 @@
                                 'pago_historico' => 'bg-emerald-100 text-emerald-800',
                                 'archivo_contrato' => 'bg-sky-100 text-sky-800',
                                 'archivo_documento_contrato' => 'bg-sky-100 text-sky-800',
+                                'cancelacion_contrato' => 'bg-red-100 text-red-800',
+                                'descancelacion_contrato' => 'bg-emerald-100 text-emerald-800',
                                 default => 'bg-gray-100 text-gray-700',
                             };
 
@@ -354,6 +393,20 @@
                                         ({{ $antes['estatus'] ?? '—' }} → {{ $despues['estatus'] ?? '—' }})
                                         <br>
                                         <b>Origen:</b> {{ $despues['origen_pago'] ?? '—' }}
+                                    </div>
+                                @elseif(in_array($tipo, ['cancelacion_contrato', 'descancelacion_contrato'], true))
+                                    <div class="text-xs">
+                                        <b>Contrato:</b>
+                                        {{ $antes['estatus_contrato'] ?? '-' }}
+                                        -> {{ $despues['estatus_contrato'] ?? '-' }}
+                                        <br>
+                                        <b>Lote:</b>
+                                        {{ $antes['lote_estatus'] ?? '-' }}
+                                        -> {{ $despues['lote_estatus'] ?? '-' }}
+                                        <br>
+                                        <b>Cuotas creadas:</b> {{ $h->cuotas_creadas ?? 0 }}
+                                        |
+                                        <b>Cuotas eliminadas:</b> {{ $h->cuotas_eliminadas ?? 0 }}
                                     </div>
                                 @elseif(in_array($tipo, ['archivo_contrato', 'archivo_documento_contrato'], true))
                                     @php

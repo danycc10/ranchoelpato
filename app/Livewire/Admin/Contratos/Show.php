@@ -55,9 +55,13 @@ class Show extends Component
 
     public string $observacionPagoHistorico = 'Pago histórico registrado fuera del sistema.';
 
-    public function mount(Contrato $contrato): void
+    public function mount(string $contrato): void
     {
-        $this->loadContrato($contrato);
+        $contratoModel = Contrato::withTrashed()
+            ->where('uuid', $contrato)
+            ->firstOrFail();
+
+        $this->loadContrato($contratoModel);
     }
 
     private function loadContrato(Contrato $contrato): void

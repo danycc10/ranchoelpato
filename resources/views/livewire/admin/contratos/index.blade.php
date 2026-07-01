@@ -168,6 +168,16 @@ TABLA (md+)
             <tbody>
 
                 @forelse($items as $it)
+                @php
+                    $estatusClase = match($it->estatus) {
+                        'activo' => 'bg-green-100 text-green-800',
+                        'cancelado' => 'bg-red-100 text-red-800',
+                        'liquidado' => 'bg-blue-100 text-blue-800',
+                        'moroso' => 'bg-yellow-100 text-yellow-800',
+                        'donacion' => 'bg-purple-100 text-purple-800',
+                        default => 'bg-gray-100 text-gray-700',
+                    };
+                @endphp
 
                 <tr class="border-t hover:bg-gray-50" wire:key="contrato-row-{{ $it->id }}">
 
@@ -193,10 +203,7 @@ TABLA (md+)
 
                     <td class="p-3">
 
-                        <span class="px-2 py-1 rounded-full text-xs font-bold
-            {{ $it->estatus === 'activo'
-            ? 'bg-green-100 text-green-800'
-            : 'bg-gray-100 text-gray-700' }}">
+                        <span class="px-2 py-1 rounded-full text-xs font-bold {{ $estatusClase }}">
 
                             {{ ucfirst($it->estatus) }}
 
@@ -253,6 +260,14 @@ TABLA (md+)
         $inicio = optional($it->fecha_inicio)->format('d/m/Y') ?? '—';
         $saldo = '$'.number_format((float)$it->saldo_actual, 2);
         $estatus = ucfirst($it->estatus);
+        $estatusClase = match($it->estatus) {
+            'activo' => 'bg-green-100 text-green-800',
+            'cancelado' => 'bg-red-100 text-red-800',
+            'liquidado' => 'bg-blue-100 text-blue-800',
+            'moroso' => 'bg-yellow-100 text-yellow-800',
+            'donacion' => 'bg-purple-100 text-purple-800',
+            default => 'bg-gray-100 text-gray-700',
+        };
         @endphp
 
         <div class="rounded-2xl border bg-white p-4 overflow-hidden" wire:key="contrato-card-{{ $it->id }}">
@@ -272,8 +287,7 @@ TABLA (md+)
                     <div class="font-black">{{ $saldo }}</div>
 
                     <div class="mt-2 text-xs text-gray-500">Estatus</div>
-                    <span class="inline-flex px-2 py-1 rounded-full text-xs font-bold
-                            {{ $it->estatus === 'activo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700' }}">
+                    <span class="inline-flex px-2 py-1 rounded-full text-xs font-bold {{ $estatusClase }}">
                         {{ $estatus }}
                     </span>
                 </div>

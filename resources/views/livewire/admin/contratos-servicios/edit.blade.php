@@ -187,6 +187,24 @@
                 @enderror
             </div>
 
+            {{-- Estatus --}}
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">Estatus del contrato</label>
+                <select wire:model.live="nuevo_estatus"
+                        class="mt-1 w-full border rounded-xl px-3 py-3">
+                    <option value="activo">Activo</option>
+                    <option value="moroso">Moroso</option>
+                    <option value="liquidado">Liquidado</option>
+                </select>
+                @error('nuevo_estatus')
+                    <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                @enderror
+
+                <div class="text-xs text-gray-500 mt-1">
+                    El estatus cancelado se aplica desde el bloque de cancelacion.
+                </div>
+            </div>
+
             {{-- Fecha inicio --}}
             <div>
                 <label class="text-xs text-gray-500 font-semibold">Nueva fecha de inicio</label>
@@ -263,6 +281,89 @@
                 <div class="text-xs text-gray-500 mt-1">
                     Si cambias frecuencia, día o monto, se recalculan solo cuotas pendientes en adelante.
                 </div>
+            </div>
+
+            {{-- Datos financieros --}}
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">Precio total</label>
+                <input type="number"
+                       step="0.01"
+                       wire:model.debounce.350ms="nuevo_precio_total"
+                       class="mt-1 w-full border rounded-xl px-3 py-3">
+                @error('nuevo_precio_total')
+                    <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">Enganche</label>
+                <input type="number"
+                       step="0.01"
+                       wire:model.debounce.350ms="nuevo_enganche"
+                       class="mt-1 w-full border rounded-xl px-3 py-3">
+                @error('nuevo_enganche')
+                    <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">Saldo inicial</label>
+                <input type="number"
+                       step="0.01"
+                       wire:model.debounce.350ms="nuevo_saldo_inicial"
+                       class="mt-1 w-full border rounded-xl px-3 py-3">
+                @error('nuevo_saldo_inicial')
+                    <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">Saldo actual</label>
+                <input type="number"
+                       step="0.01"
+                       wire:model.debounce.350ms="nuevo_saldo_actual"
+                       class="mt-1 w-full border rounded-xl px-3 py-3">
+                @error('nuevo_saldo_actual')
+                    <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                @enderror
+                <div class="text-xs text-gray-500 mt-1">
+                    Si cambias este saldo se regenera el calendario pendiente.
+                </div>
+            </div>
+
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">Tipo recargo</label>
+                <select wire:model.live="tipo_recargo"
+                        class="mt-1 w-full border rounded-xl px-3 py-3">
+                    <option value="fijo">Fijo</option>
+                    <option value="porcentaje">Porcentaje</option>
+                </select>
+                @error('tipo_recargo')
+                    <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">Valor recargo</label>
+                <input type="number"
+                       step="0.01"
+                       wire:model.debounce.350ms="valor_recargo"
+                       class="mt-1 w-full border rounded-xl px-3 py-3">
+                @error('valor_recargo')
+                    <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">Dias de gracia</label>
+                <input type="number"
+                       min="0"
+                       max="365"
+                       wire:model.debounce.350ms="dias_gracia"
+                       class="mt-1 w-full border rounded-xl px-3 py-3">
+                @error('dias_gracia')
+                    <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                @enderror
             </div>
 
             {{-- Aviso + confirmación edición --}}
