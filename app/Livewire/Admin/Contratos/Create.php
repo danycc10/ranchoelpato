@@ -1205,7 +1205,7 @@ class Create extends Component
             );
 
             return redirect()->route('admin.contratos.show', [
-                'contrato' => $contrato->uuid,
+                'uuid' => $contrato->uuid,
             ]);
         } catch (\Throwable $e) {
             report($e);

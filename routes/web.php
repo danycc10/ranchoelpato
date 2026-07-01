@@ -181,14 +181,12 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
             ->name('contratos.create')
             ->middleware('permission:contratos.editar');
 
-        Route::get('/contratos/{contrato}', ContratosShow::class)
+        Route::get('/contratos/{uuid}', ContratosShow::class)
             ->name('contratos.show')
-            ->middleware('permission:contratos.ver_detalle')
-            ->withTrashed();
+            ->middleware('permission:contratos.ver_detalle');
 
-        Route::get('/contratos/{contrato}/pdf', [ContratosPdfController::class, 'download'])
-            ->name('contratos.pdf')
-            ->withTrashed();
+        Route::get('/contratos/{uuid}/pdf', [ContratosPdfController::class, 'download'])
+            ->name('contratos.pdf');
 
         Route::get('/contratos/{uuid}/editar', ContratosEdit::class)
             ->name('contratos.edit');
