@@ -61,7 +61,7 @@ class MonthlyIncomeActiveContractsSheet implements FromCollection, WithColumnFor
             )
 
             ->whereNotNull('cuotas.contrato_id')
-            ->where('contratos.estatus', 'activo')
+            ->whereIn('contratos.estatus', ['activo', 'liquidado'])
             ->where('contratos.tipo', 'terreno')
             ->whereBetween('cuotas.fecha_vencimiento', [$start->toDateString(), $end->toDateString()])
 
