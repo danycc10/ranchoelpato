@@ -86,7 +86,7 @@ class MonthlyIncomeDetailSheet implements FromCollection, WithColumnFormatting, 
             })
             ->where('recibos.afecta_reportes', true)
             ->where('recibos.folio', 'not like', 'REC%')
-            ->where('contratos.estatus', 'activo')
+            ->whereIn('contratos.estatus', ['activo', 'liquidado'])
 
             ->when(
                 $this->propietarioId,

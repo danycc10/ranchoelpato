@@ -72,7 +72,7 @@ class MonthlyIncomeHistoricDetailSheet implements FromCollection, WithColumnForm
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
             ->whereNull('recibos.deleted_at')
             ->whereNull('recibos.anulado_at')
-            ->where('contratos.estatus', 'activo')
+            ->whereIn('contratos.estatus', ['activo', 'liquidado'])
             ->where('recibos.es_historico', true)
             ->where('tipos_cobro.nombre', 'MENSUALIDAD')
             ->where('contratos.tipo', 'terreno')

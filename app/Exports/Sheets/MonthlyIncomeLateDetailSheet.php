@@ -71,7 +71,7 @@ class MonthlyIncomeLateDetailSheet implements FromCollection, WithColumnFormatti
             })
             ->where('recibos.afecta_reportes', true)
             ->where('recibos.folio', 'not like', 'REC%')
-            ->where('contratos.estatus', 'activo')
+            ->whereIn('contratos.estatus', ['activo', 'liquidado'])
             ->where('contratos.tipo', 'terreno')
             ->where('tipos_cobro.nombre', 'MENSUALIDAD')
 
