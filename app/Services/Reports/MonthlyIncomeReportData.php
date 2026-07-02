@@ -66,13 +66,6 @@ class MonthlyIncomeReportData
             ->whereBetween('cuotas.fecha_vencimiento', [$start, $end])
             ->where('contratos.tipo', 'terreno')
             ->whereIn('cuotas.estatus', ['pendiente', 'parcial', 'pagada', 'vencida'])
-            ->whereNotExists(function ($q) {
-                $q->select(DB::raw(1))
-                    ->from('pagos')
-                    ->whereColumn('pagos.cuota_id', 'cuotas.id')
-                    ->whereNull('pagos.anulado_at')
-                    ->whereRaw('UPPER(pagos.referencia) LIKE ?', ['%IMPORT%']);
-            })
             ->groupBy('fraccionamientos.id', 'fraccionamientos.nombre')
             ->selectRaw('
                 fraccionamientos.id as finca_id,
