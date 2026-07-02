@@ -877,23 +877,50 @@ class Edit extends Component
             $day = 31;
         }
 
-        $base = $proximaPendiente?->fecha_vencimiento
-            ? Carbon::parse($proximaPendiente->fecha_vencimiento)->startOfDay()
-            : ($this->contrato->fecha_inicio
-                ? Carbon::parse($this->contrato->fecha_inicio)->startOfDay()
-                : now()->startOfDay());
+        if ($proximaPendiente?->fecha_vencimiento) {
+            $basePendiente = Carbon::parse($proximaPendiente->fecha_vencimiento)->startOfDay();
 
+            if ($ultimaPagada?->fecha_vencimiento) {
+                $basePagada = Carbon::parse($ultimaPagada->fecha_vencimiento)->startOfDay();
+
+                if ($basePendiente->lte($basePagada)) {
+                    return $this->fechaMensualDesdeBase($basePagada, $day, true)->toDateString();
+                }
+            }
+
+            return $this->fechaMensualDesdeBase($basePendiente, $day, false)->toDateString();
+        }
+
+        if ($ultimaPagada?->fecha_vencimiento) {
+            $base = Carbon::parse($ultimaPagada->fecha_vencimiento)->startOfDay();
+
+            return $this->fechaMensualDesdeBase($base, $day, true)->toDateString();
+        }
+
+        $base = $this->contrato->fecha_inicio
+            ? Carbon::parse($this->contrato->fecha_inicio)->startOfDay()
+            : now()->startOfDay();
+
+        return $this->fechaMensualDesdeBase($base, $day, false)->toDateString();
+    }
+
+    protected function fechaMensualDesdeBase(Carbon $base, int $day, bool $estrictamenteDespues): Carbon
+    {
         $candidate = $base->copy()->startOfMonth();
         $useDay = min($day, $candidate->daysInMonth);
         $candidate->day($useDay)->startOfDay();
 
-        if ($candidate->lt($base)) {
+        $debeAvanzar = $estrictamenteDespues
+            ? $candidate->lte($base)
+            : $candidate->lt($base);
+
+        if ($debeAvanzar) {
             $candidate = $base->copy()->addMonthNoOverflow()->startOfMonth();
             $useDay = min($day, $candidate->daysInMonth);
             $candidate->day($useDay)->startOfDay();
         }
 
-        return $candidate->toDateString();
+        return $candidate;
     }
 
     public function getFraccionamientosProperty()
