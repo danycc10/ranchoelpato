@@ -108,9 +108,31 @@
                 </select>
             </div>
 
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">Validación</label>
+                <select
+                    wire:model.live="validacion"
+                    class="mt-1 w-full border rounded-xl px-3 py-3 text-sm">
+                    <option value="">Todos</option>
+                    <option value="validado">Validados</option>
+                    <option value="sin_validar">Sin validar</option>
+                </select>
+            </div>
+
         </div>
 
-        <div class="mt-4 flex justify-end">
+        <div class="mt-4 flex items-center justify-between gap-3">
+            <button
+                wire:click="exportExcel"
+                wire:loading.attr="disabled"
+                wire:target="exportExcel"
+                class="px-5 py-2 border rounded-xl font-semibold hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Exportar Excel
+            </button>
+
             <button
                 wire:click="limpiarFiltros"
                 class="px-5 py-2 border rounded-xl font-semibold hover:bg-gray-50">
@@ -135,6 +157,7 @@
                         <th class="p-2.5 text-left w-[150px] whitespace-nowrap">Tipo cobro</th>
                         <th class="p-2.5 text-left w-[220px] whitespace-nowrap">Pagos</th>
                         <th class="p-2.5 text-left w-[90px] whitespace-nowrap">Ev.</th>
+                        <th class="p-2.5 text-left w-[110px] whitespace-nowrap">Val.</th>
                         <th class="p-2.5 text-left w-[90px] whitespace-nowrap">Firma</th>
                         <th class="p-2.5 text-left w-[90px] whitespace-nowrap">Estado</th>
                         <th class="p-2.5 text-center w-[150px] whitespace-nowrap">Acc.</th>
@@ -146,9 +169,21 @@
                     @php
                     $pagos = $recibo->pagosDetalle ?? collect();
                     $primerPago = $pagos->first();
+                    $pagosConEv = $pagos->filter(fn($p) => (bool)($p->formaPago?->requiere_cuenta) && !empty($p->evidencia_path));
+                    $totalConEv = $pagosConEv->count();
+                    $validadosRow = $pagosConEv->filter(fn($p) => $p->validado_at)->count();
+                    if ($recibo->trashed()) {
+                        $rowClass = 'bg-red-50/40';
+                    } elseif ($totalConEv === 0) {
+                        $rowClass = '';
+                    } elseif ($validadosRow === $totalConEv) {
+                        $rowClass = 'bg-emerald-50/60';
+                    } else {
+                        $rowClass = 'bg-amber-50/60';
+                    }
                     @endphp
 
-                    <tr class="border-t hover:bg-gray-50 {{ $recibo->trashed() ? 'bg-red-50/40' : '' }}">
+                    <tr class="border-t hover:brightness-95 {{ $rowClass }}">
                         <td class="p-2.5 font-semibold align-middle">
                             {{ $recibo->folio }}
                         </td>
@@ -242,24 +277,27 @@
                             <span class="text-xs text-gray-400">—</span>
                             @else
                             @if($tieneEvidencia)
-                            <button
-                                type="button"
-                                wire:click="abrirModalEvidencia({{ $pago->id }})"
-                                class="block"
-                                title="Ver evidencia">
-                                @if($pago->evidencia_mime === 'application/pdf')
-                                <div class="inline-flex h-9 w-9 items-center justify-center rounded-lg border bg-red-50 text-red-700 hover:opacity-90">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 21h-15A2.25 2.25 0 0 1 2.25 18.75V5.25A2.25 2.25 0 0 1 4.5 3h9.879a2.25 2.25 0 0 1 1.591.659l3.371 3.371A2.25 2.25 0 0 1 20 8.621v10.129A2.25 2.25 0 0 1 17.75 21Z" />
-                                    </svg>
-                                </div>
-                                @else
-                                <img
-                                    src="{{ route('admin.recibo-pagos.evidencia.show', $pago->id) }}?v={{ urlencode($pago->evidencia_path) }}"
-                                    alt="Evidencia"
-                                    class="h-10 w-10 rounded-lg object-cover border hover:opacity-90">
-                                @endif
-                            </button>
+                            <div class="relative inline-block">
+                                <button
+                                    type="button"
+                                    wire:click="abrirModalEvidencia({{ $pago->id }})"
+                                    class="block"
+                                    title="{{ $pago->validado_at ? 'Validado · Ver evidencia' : 'No validado · Ver evidencia' }}">
+                                    @if($pago->evidencia_mime === 'application/pdf')
+                                    <div class="inline-flex h-9 w-9 items-center justify-center rounded-lg border bg-red-50 text-red-700 hover:opacity-90">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 21h-15A2.25 2.25 0 0 1 2.25 18.75V5.25A2.25 2.25 0 0 1 4.5 3h9.879a2.25 2.25 0 0 1 1.591.659l3.371 3.371A2.25 2.25 0 0 1 20 8.621v10.129A2.25 2.25 0 0 1 17.75 21Z" />
+                                        </svg>
+                                    </div>
+                                    @else
+                                    <img
+                                        src="{{ route('admin.recibo-pagos.evidencia.show', $pago->id) }}?v={{ urlencode($pago->evidencia_path) }}"
+                                        alt="Evidencia"
+                                        class="h-10 w-10 rounded-lg object-cover border hover:opacity-90">
+                                    @endif
+                                </button>
+                                <span class="absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-white {{ $pago->validado_at ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>
+                            </div>
                             @else
                             <button
                                 type="button"
@@ -288,22 +326,25 @@
                                     —
                                 </span>
                                 @elseif($tieneEvidencia)
-                                <button
-                                    type="button"
-                                    wire:click="abrirModalEvidencia({{ $pago->id }})"
-                                    title="{{ $pago->formaPago?->nombre ?? 'Pago' }} · Ver evidencia"
-                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-white text-emerald-600 hover:bg-gray-50 overflow-hidden">
-                                    @if($pago->evidencia_mime === 'application/pdf')
-                                      <div class="h-14 w-14 rounded-lg border bg-red-50 text-red-700 flex items-center justify-center text-[10px] font-bold hover:opacity-90">
-                                    PDF
+                                <div class="relative inline-block">
+                                    <button
+                                        type="button"
+                                        wire:click="abrirModalEvidencia({{ $pago->id }})"
+                                        title="{{ $pago->formaPago?->nombre ?? 'Pago' }} · {{ $pago->validado_at ? 'Validado' : 'No validado' }} · Ver evidencia"
+                                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-white text-emerald-600 hover:bg-gray-50 overflow-hidden">
+                                        @if($pago->evidencia_mime === 'application/pdf')
+                                        <div class="h-14 w-14 rounded-lg border bg-red-50 text-red-700 flex items-center justify-center text-[10px] font-bold hover:opacity-90">
+                                            PDF
+                                        </div>
+                                        @else
+                                        <img
+                                            src="{{ route('admin.recibo-pagos.evidencia.show', $pago->id) }}?v={{ urlencode($pago->evidencia_path) }}"
+                                            alt="Evidencia"
+                                            class="h-8 w-8 object-cover">
+                                        @endif
+                                    </button>
+                                    <span class="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full border-2 border-white {{ $pago->validado_at ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>
                                 </div>
-                                    @else
-                                    <img
-                                        src="{{ route('admin.recibo-pagos.evidencia.show', $pago->id) }}?v={{ urlencode($pago->evidencia_path) }}"
-                                        alt="Evidencia"
-                                        class="h-8 w-8 object-cover">
-                                    @endif
-                                </button>
                                 @else
                                 <button
                                     type="button"
@@ -323,6 +364,32 @@
                                 </span>
                                 @endif
                             </div>
+                            @endif
+                        </td>
+
+                        <td class="p-2.5 align-middle">
+                            @php
+                            $pagosConEvidencia = $pagos->filter(fn($p) => (bool)($p->formaPago?->requiere_cuenta) && !empty($p->evidencia_path));
+                            $totalConEv = $pagosConEvidencia->count();
+                            $validados = $pagosConEvidencia->filter(fn($p) => $p->validado_at)->count();
+                            @endphp
+                            @if($totalConEv === 0)
+                            <span class="text-xs text-gray-400">—</span>
+                            @elseif($validados === $totalConEv)
+                            <span class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-700">
+                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                Validado
+                            </span>
+                            @elseif($validados === 0)
+                            <span class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-full bg-amber-100 text-amber-700">
+                                <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                                Sin validar
+                            </span>
+                            @else
+                            <span class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-full bg-yellow-100 text-yellow-700">
+                                <span class="h-1.5 w-1.5 rounded-full bg-yellow-400"></span>
+                                {{ $validados }}/{{ $totalConEv }}
+                            </span>
                             @endif
                         </td>
 
@@ -539,6 +606,41 @@
                         @endif
                     </div>
                 </div>
+
+                {{-- Validación --}}
+                @if($reciboEvidenciaPath)
+                <div class="flex items-center gap-3 p-3 rounded-xl {{ $reciboEvidenciaValidado ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200' }}">
+                    <span class="h-2.5 w-2.5 rounded-full flex-shrink-0 {{ $reciboEvidenciaValidado ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>
+                    <div class="flex-1 min-w-0">
+                        @if($reciboEvidenciaValidado)
+                        <p class="text-sm font-semibold text-emerald-800">Validado</p>
+                        <p class="text-xs text-emerald-600">{{ $reciboEvidenciaValidadoAt }}{{ $reciboEvidenciaValidadoPor ? ' · ' . $reciboEvidenciaValidadoPor : '' }}</p>
+                        @else
+                        <p class="text-sm font-semibold text-amber-800">No validado</p>
+                        <p class="text-xs text-amber-600">Pendiente de cotejar con movimientos bancarios</p>
+                        @endif
+                    </div>
+                    @if($reciboEvidenciaValidado)
+                    <button
+                        type="button"
+                        wire:click="desvalidarPago"
+                        wire:loading.attr="disabled"
+                        wire:target="desvalidarPago"
+                        class="text-xs text-emerald-700 hover:text-red-600 underline whitespace-nowrap">
+                        Quitar validación
+                    </button>
+                    @else
+                    <button
+                        type="button"
+                        wire:click="validarPago"
+                        wire:loading.attr="disabled"
+                        wire:target="validarPago"
+                        class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 whitespace-nowrap">
+                        Marcar validado
+                    </button>
+                    @endif
+                </div>
+                @endif
 
                 <div class="flex flex-col sm:flex-row gap-2 sm:justify-end">
                     @if($reciboEvidenciaEditable && $reciboEvidenciaPath)

@@ -23,6 +23,8 @@ class ReciboPago extends Model
         'evidencia_disk',
         'evidencia_mime',
         'evidencia_size',
+        'validado_at',
+        'validado_por_user_id',
         'orden',
         'capturado_por_user_id',
         'anulado_at',
@@ -32,7 +34,13 @@ class ReciboPago extends Model
 
     protected $casts = [
         'monto' => 'decimal:2',
+        'validado_at' => 'datetime',
     ];
+
+    public function getEstaValidadoAttribute(): bool
+    {
+        return $this->validado_at !== null;
+    }
 
     public function recibo()
     {
@@ -52,5 +60,10 @@ class ReciboPago extends Model
     public function capturadoPor()
     {
         return $this->belongsTo(User::class, 'capturado_por_user_id');
+    }
+
+    public function validadoPor()
+    {
+        return $this->belongsTo(User::class, 'validado_por_user_id');
     }
 }

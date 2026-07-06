@@ -2,12 +2,14 @@
 
 namespace App\Livewire\Admin\Recibos;
 
+use App\Exports\RecibosExport;
 use App\Models\CuentaBancaria;
 use App\Models\FormaPago;
 use App\Models\Propietario;
 use App\Models\Recibo;
 use App\Models\ReciboPago;
 use App\Models\TipoCobro;
+use Maatwebsite\Excel\Facades\Excel;
 use App\Services\ImageUploadService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +45,9 @@ class Index extends Component
     // activos | eliminados | todos
     public string $verEliminados = 'activos';
 
+    // '' | 'validado' | 'sin_validar'
+    public string $validacion = '';
+
     // ===== Evidencia por recibo_pago =====
     public bool $modalEvidenciaOpen = false;
 
@@ -61,6 +66,12 @@ class Index extends Component
     public ?string $reciboEvidenciaCuenta = null;
 
     public bool $reciboEvidenciaEditable = false;
+
+    public bool $reciboEvidenciaValidado = false;
+
+    public ?string $reciboEvidenciaValidadoAt = null;
+
+    public ?string $reciboEvidenciaValidadoPor = null;
 
     public ?TemporaryUploadedFile $nuevaEvidencia = null;
 
@@ -89,6 +100,7 @@ class Index extends Component
         'forma_pago_id' => ['except' => null],
         'cuenta_id' => ['except' => null],
         'verEliminados' => ['except' => 'activos'],
+        'validacion' => ['except' => ''],
     ];
 
     public function mount(): void
@@ -176,6 +188,7 @@ class Index extends Component
             'forma_pago_id',
             'cuenta_id',
             'verEliminados',
+            'validacion',
         ]);
 
         $this->mes = now()->format('Y-m');
@@ -183,6 +196,25 @@ class Index extends Component
 
         $this->aplicarRangoPorMes();
         $this->resetPage();
+    }
+
+    public function exportExcel()
+    {
+        $timestamp = now()->format('Y-m-d_H-i-s');
+
+        return Excel::download(
+            new RecibosExport(
+                propietarioId: $this->propietario_id,
+                desde: $this->desde,
+                hasta: $this->hasta,
+                tipoCobroid: $this->tipo_cobro_id,
+                formaPagoId: $this->forma_pago_id,
+                cuentaId: $this->cuenta_id,
+                validacion: $this->validacion,
+                verEliminados: $this->verEliminados,
+            ),
+            "recibos_{$timestamp}.xlsx"
+        );
     }
 
     // =========================
@@ -210,6 +242,10 @@ class Index extends Component
         $this->reciboEvidenciaCuenta = $reciboPago->cuentaBancaria?->alias;
         $this->reciboEvidenciaEditable = $this->reciboPagoPermiteEvidencia($reciboPago);
 
+        $this->reciboEvidenciaValidado = (bool) $reciboPago->validado_at;
+        $this->reciboEvidenciaValidadoAt = $reciboPago->validado_at?->format('d/m/Y H:i');
+        $this->reciboEvidenciaValidadoPor = $reciboPago->validadoPor?->name;
+
         $this->nuevaEvidencia = null;
         $this->nuevaEvidenciaPreviewUrl = null;
 
@@ -228,9 +264,52 @@ class Index extends Component
             'reciboEvidenciaFormaPago',
             'reciboEvidenciaCuenta',
             'reciboEvidenciaEditable',
+            'reciboEvidenciaValidado',
+            'reciboEvidenciaValidadoAt',
+            'reciboEvidenciaValidadoPor',
             'nuevaEvidencia',
             'nuevaEvidenciaPreviewUrl',
         ]);
+    }
+
+    public function validarPago(): void
+    {
+        if (! $this->reciboPagoEvidenciaId) {
+            return;
+        }
+
+        $reciboPago = ReciboPago::findOrFail($this->reciboPagoEvidenciaId);
+
+        $reciboPago->update([
+            'validado_at' => now(),
+            'validado_por_user_id' => auth()->id(),
+        ]);
+
+        $this->reciboEvidenciaValidado = true;
+        $this->reciboEvidenciaValidadoAt = now()->format('d/m/Y H:i');
+        $this->reciboEvidenciaValidadoPor = auth()->user()?->name;
+
+        $this->dispatch('toast', type: 'success', message: 'Pago marcado como validado.');
+    }
+
+    public function desvalidarPago(): void
+    {
+        if (! $this->reciboPagoEvidenciaId) {
+            return;
+        }
+
+        $reciboPago = ReciboPago::findOrFail($this->reciboPagoEvidenciaId);
+
+        $reciboPago->update([
+            'validado_at' => null,
+            'validado_por_user_id' => null,
+        ]);
+
+        $this->reciboEvidenciaValidado = false;
+        $this->reciboEvidenciaValidadoAt = null;
+        $this->reciboEvidenciaValidadoPor = null;
+
+        $this->dispatch('toast', type: 'warning', message: 'Validación removida.');
     }
 
     public function eliminarEvidencia(ImageUploadService $imageUploadService): void
@@ -578,6 +657,12 @@ class Index extends Component
                 $this->hasta,
                 fn ($q) => $q->whereDate('fecha', '<=', $this->hasta)
             )
+            ->when($this->validacion === 'validado', function ($q) {
+                $q->whereHas('pagosDetalle', fn ($rp) => $rp->whereNotNull('validado_at'));
+            })
+            ->when($this->validacion === 'sin_validar', function ($q) {
+                $q->whereHas('pagosDetalle', fn ($rp) => $rp->whereNotNull('evidencia_path')->whereNull('validado_at'));
+            })
             ->when($term !== '', function ($q) use ($term, $tokens) {
                 $q->where(function ($qq) use ($term, $tokens) {
                     $qq->where('folio', 'like', "%{$term}%")
