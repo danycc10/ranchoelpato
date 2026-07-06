@@ -492,8 +492,8 @@
     {{-- MODAL EVIDENCIA --}}
     @if($modalEvidenciaOpen)
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="bg-white w-full max-w-3xl rounded-2xl shadow-xl overflow-hidden">
-            <div class="px-5 py-4 border-b flex items-center justify-between">
+        <div class="bg-white w-full max-w-3xl rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+            <div class="px-5 py-4 border-b flex items-center justify-between flex-shrink-0">
                 <div>
                     <h2 class="text-lg font-black">Evidencia del pago</h2>
                     <p class="text-sm text-gray-500">
@@ -515,12 +515,12 @@
                 </button>
             </div>
 
-            <div class="p-5 space-y-5">
+            <div class="p-5 space-y-5 overflow-y-auto flex-1">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
                     <div>
                         <div class="text-sm font-bold mb-2">Actual</div>
 
-                        <div class="rounded-2xl border bg-gray-50 min-h-[280px] flex items-center justify-center overflow-hidden">
+                        <div class="rounded-2xl border bg-gray-50 min-h-[200px] flex items-center justify-center overflow-hidden">
                             @if($reciboEvidenciaPath)
                             @php
                             $evidenciaUrl = route('admin.recibo-pagos.evidencia.show', $reciboPagoEvidenciaId) . '?v=' . urlencode($reciboEvidenciaPath);
@@ -545,7 +545,7 @@
                                     wire:key="evidencia-modal-{{ md5((string) $reciboEvidenciaPath) }}"
                                     src="{{ $evidenciaUrl }}"
                                     alt="Evidencia actual"
-                                    class="max-h-[420px] w-auto object-contain">
+                                    class="max-h-[280px] w-auto object-contain">
                             </a>
                             @endif
                             @else
@@ -572,12 +572,12 @@
                             Procesando archivo...
                         </div>
 
-                        <div class="mt-3 rounded-2xl border bg-gray-50 min-h-[220px] flex items-center justify-center overflow-hidden">
+                        <div class="mt-3 rounded-2xl border bg-gray-50 min-h-[160px] flex items-center justify-center overflow-hidden">
                             @if($nuevaEvidenciaPreviewUrl)
                             <img
                                 src="{{ $nuevaEvidenciaPreviewUrl }}"
                                 alt="Vista previa nueva"
-                                class="max-h-[320px] w-auto object-contain">
+                                class="max-h-[200px] w-auto object-contain">
                             @elseif($nuevaEvidencia && strtolower($nuevaEvidencia->getClientOriginalExtension()) === 'pdf')
                             <div class="text-sm text-gray-500 px-4 text-center">
                                 PDF cargado correctamente.
