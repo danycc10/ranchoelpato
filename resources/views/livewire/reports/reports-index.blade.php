@@ -38,5 +38,13 @@
                 Flujo esperado vs recibido por finca, diferencia y desglose por método de pago (Año/Mes + Propietario).
             </div>
         </a>
+
+        <a href="{{ route('reportes.pagadores.adelantados') }}"
+           class="block rounded-2xl border p-5 bg-white hover:bg-gray-50 transition">
+            <div class="text-lg font-bold">Pagadores adelantados</div>
+            <div class="text-gray-600 mt-1">
+                Clientes mensuales que pagaron antes del día 10, y semanales con 2 o más pagos antes del día 10 del mes.
+            </div>
+        </a>
     </div>
 </div>

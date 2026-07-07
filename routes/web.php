@@ -50,6 +50,7 @@ use App\Livewire\Reports\BankMovementsReport;
 */
 use App\Livewire\Reports\CustomerPaymentsReport;
 use App\Livewire\Reports\DailyReceiptsReport;
+use App\Livewire\Reports\EarlyPayersReport;
 use App\Livewire\Reports\MonthlyIncomeReport;
 use App\Livewire\Reports\ReportsIndex;
 use Illuminate\Support\Facades\Route;
@@ -101,6 +102,9 @@ Route::middleware(['auth', 'verified', 'permission:reportes.ver'])->group(functi
         Route::get('/movimientos-bancarios', BankMovementsReport::class)
             ->name('movimientos.bancarios')
             ->middleware('permission:reportes.movimientos_bancarios');
+
+        Route::get('/pagadores-adelantados', EarlyPayersReport::class)
+            ->name('pagadores.adelantados');
     });
 });
 
