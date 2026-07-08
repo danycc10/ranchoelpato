@@ -90,6 +90,15 @@
             font-weight: 800;
             color: #000;
         }
+
+        /* Sombreado alternado por mes (solo contratos semanales) */
+        .band-b {
+            background-color: #EFF6FF;
+        }
+
+        .month-change td {
+            border-top: 2px solid #93C5FD !important;
+        }
     </style>
 </head>
 
@@ -98,8 +107,6 @@
     @php
         $finca = strtoupper($contrato->lote?->fraccionamiento?->nombre ?? 'CONTRATO');
         $cliente = strtoupper($contrato->cliente?->nombre_completo ?? '—');
-        $saldo = (float) $contrato->saldo_inicial;
-        $prevMonth = null;
 
         $diaPago = '—';
 
@@ -217,6 +224,7 @@
             @php
                 $saldo = (float) $contrato->saldo_inicial;
                 $prevMonth = null;
+                $monthBand = false; // false = blanco, true = azul claro
             @endphp
 
             @foreach($contrato->cuotas as $c)
@@ -236,12 +244,24 @@
 
                     $saldo = $resto;
 
-                    $highlight = $prevMonth && $month !== $prevMonth;
+                    $monthChanged = $prevMonth !== null && $month !== $prevMonth;
+
+                    if ($contrato->frecuencia === 'semanal' && $monthChanged) {
+                        $monthBand = !$monthBand;
+                    }
 
                     $prevMonth = $month;
+
+                    $rowClass = '';
+                    if ($contrato->frecuencia === 'semanal') {
+                        $rowClass = $monthBand ? 'band-b' : '';
+                        if ($monthChanged) {
+                            $rowClass .= ' month-change';
+                        }
+                    }
                 @endphp
 
-                <tr class="{{ $highlight ? 'highlight' : '' }}">
+                <tr class="{{ trim($rowClass) }}">
 
                     {{-- NUMERO --}}
                     <td class="center">
