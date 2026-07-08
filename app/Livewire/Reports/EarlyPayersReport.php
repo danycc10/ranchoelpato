@@ -49,7 +49,7 @@ class EarlyPayersReport extends Component
             $rows = $rows->concat($this->querySemanales());
         }
 
-        return $rows->sortBy(['fraccionamiento', 'lote', 'cliente'])->values();
+        return $rows->sortBy('cliente')->values();
     }
 
     protected function queryMensuales(): Collection
@@ -57,13 +57,13 @@ class EarlyPayersReport extends Component
         $inicio = now()->setDate($this->anio, $this->mes, 1)->toDateString();
         $fin    = now()->setDate($this->anio, $this->mes, 1)->endOfMonth()->toDateString();
 
-        return DB::table('recibos_pagos as rp')
+        $raw = DB::table('recibos_pagos as rp')
             ->join('recibos as r',   'r.id',  '=', 'rp.recibo_id')
             ->join('cuotas as cu',   'cu.id', '=', 'r.cuota_id')
             ->join('contratos as c', 'c.id',  '=', 'cu.contrato_id')
             ->join('clientes as cl', 'cl.id', '=', 'c.cliente_id')
-            ->leftJoin('lotes as l',              'l.id',  '=', 'c.lote_id')
-            ->leftJoin('fraccionamientos as f',   'f.id',  '=', 'l.fraccionamiento_id')
+            ->leftJoin('lotes as l',            'l.id', '=', 'c.lote_id')
+            ->leftJoin('fraccionamientos as f', 'f.id', '=', 'l.fraccionamiento_id')
             ->whereNull('rp.deleted_at')
             ->whereNull('r.deleted_at')
             ->whereNull('r.anulado_at')
@@ -73,30 +73,40 @@ class EarlyPayersReport extends Component
             ->whereIn('c.estatus', ['activo', 'liquidado'])
             ->where('cu.es_anualidad', 0)
             ->whereBetween('cu.fecha_vencimiento', [$inicio, $fin])
-            // pagaron antes del día 10 del mes de vencimiento
             ->whereRaw("rp.fecha_efectiva < DATE_FORMAT(cu.fecha_vencimiento, '%Y-%m-10')")
             ->when($this->propietarioId, fn ($q) => $q->where('f.propietario_id', $this->propietarioId))
             ->select([
                 DB::raw("'mensual' as frecuencia"),
-                'c.folio_contrato',
+                'cl.id as cliente_id',
                 DB::raw("CONCAT_WS(' ', cl.nombres, cl.apellidos) as cliente"),
                 DB::raw("COALESCE(f.nombre, 'Sin finca') as fraccionamiento"),
-                DB::raw("COALESCE(l.lote, '—') as lote"),
-                'cu.numero as cuota_num',
-                'cu.fecha_vencimiento',
                 'rp.fecha_efectiva as fecha_pago',
                 DB::raw('DAY(rp.fecha_efectiva) as dia_pago'),
                 'rp.monto',
-                DB::raw('NULL as cuotas_anticipadas'),
+                'c.id as contrato_id',
             ])
-            ->orderBy('f.nombre')
-            ->orderBy('l.lote')
             ->get();
+
+        // Un registro por cliente: suma montos, toma el día más temprano, lista fincas únicas
+        return $raw->groupBy('cliente_id')->map(function ($filas) {
+            $primero = $filas->sortBy('dia_pago')->first();
+            return (object) [
+                'frecuencia'          => 'mensual',
+                'cliente_id'          => $primero->cliente_id,
+                'cliente'             => $primero->cliente,
+                'fraccionamiento'     => $filas->pluck('fraccionamiento')->unique()->sort()->join(', '),
+                'contratos_count'     => $filas->pluck('contrato_id')->unique()->count(),
+                'fecha_pago'          => $filas->min('fecha_pago'),
+                'dia_pago'            => $filas->min('dia_pago'),
+                'monto'               => $filas->sum('monto'),
+                'cuotas_anticipadas'  => null,
+            ];
+        })->values();
     }
 
     protected function querySemanales(): Collection
     {
-        return DB::table('recibos_pagos as rp')
+        $raw = DB::table('recibos_pagos as rp')
             ->join('recibos as r',   'r.id',  '=', 'rp.recibo_id')
             ->join('cuotas as cu',   'cu.id', '=', 'r.cuota_id')
             ->join('contratos as c', 'c.id',  '=', 'cu.contrato_id')
@@ -118,24 +128,34 @@ class EarlyPayersReport extends Component
             ->when($this->propietarioId, fn ($q) => $q->where('f.propietario_id', $this->propietarioId))
             ->select([
                 DB::raw("'semanal' as frecuencia"),
-                'c.folio_contrato',
+                'cl.id as cliente_id',
                 DB::raw("CONCAT_WS(' ', cl.nombres, cl.apellidos) as cliente"),
                 DB::raw("COALESCE(f.nombre, 'Sin finca') as fraccionamiento"),
-                DB::raw("COALESCE(l.lote, '—') as lote"),
-                DB::raw('NULL as cuota_num'),
-                DB::raw('NULL as fecha_vencimiento'),
                 DB::raw('MIN(rp.fecha_efectiva) as fecha_pago'),
                 DB::raw('MIN(DAY(rp.fecha_efectiva)) as dia_pago'),
                 DB::raw('SUM(rp.monto) as monto'),
                 DB::raw('COUNT(DISTINCT cu.id) as cuotas_anticipadas'),
+                'c.id as contrato_id',
             ])
-            ->groupBy('c.id', 'cl.id', 'f.id', 'l.id',
-                      'c.folio_contrato', 'cl.nombres', 'cl.apellidos',
-                      'f.nombre', 'l.lote')
+            ->groupBy('c.id', 'cl.id', 'f.id', 'cl.nombres', 'cl.apellidos', 'f.nombre')
             ->havingRaw('COUNT(DISTINCT cu.id) >= 2')
-            ->orderBy('f.nombre')
-            ->orderBy('l.lote')
             ->get();
+
+        // Un registro por cliente: suma cuotas y montos de todos sus contratos que califican
+        return $raw->groupBy('cliente_id')->map(function ($filas) {
+            $primero = $filas->sortBy('dia_pago')->first();
+            return (object) [
+                'frecuencia'         => 'semanal',
+                'cliente_id'         => $primero->cliente_id,
+                'cliente'            => $primero->cliente,
+                'fraccionamiento'    => $filas->pluck('fraccionamiento')->unique()->sort()->join(', '),
+                'contratos_count'    => $filas->pluck('contrato_id')->unique()->count(),
+                'fecha_pago'         => $filas->min('fecha_pago'),
+                'dia_pago'           => $filas->min('dia_pago'),
+                'monto'              => $filas->sum('monto'),
+                'cuotas_anticipadas' => $filas->sum('cuotas_anticipadas'),
+            ];
+        })->values();
     }
 
     public function exportExcel()

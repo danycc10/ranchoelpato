@@ -72,17 +72,15 @@
         </div>
 
         <div class="overflow-x-auto">
-            <table class="min-w-[900px] w-full text-sm">
+            <table class="min-w-[700px] w-full text-sm">
                 <thead class="bg-gray-100 text-xs uppercase text-gray-600">
                     <tr>
                         <th class="p-2.5 text-left w-[100px]">Frecuencia</th>
                         <th class="p-2.5 text-left">Cliente</th>
-                        <th class="p-2.5 text-left w-[200px]">Fraccionamiento</th>
-                        <th class="p-2.5 text-left w-[80px]">Lote</th>
-                        <th class="p-2.5 text-left w-[90px]">Cuota</th>
-                        <th class="p-2.5 text-left w-[120px]">Vence</th>
-                        <th class="p-2.5 text-left w-[120px]">Fecha pago</th>
-                        <th class="p-2.5 text-left w-[80px]">Día</th>
+                        <th class="p-2.5 text-left w-[220px]">Finca(s)</th>
+                        <th class="p-2.5 text-center w-[90px]">Contratos</th>
+                        <th class="p-2.5 text-left w-[120px]">Primer pago</th>
+                        <th class="p-2.5 text-center w-[70px]">Día</th>
                         <th class="p-2.5 text-right w-[120px]">Monto</th>
                         <th class="p-2.5 text-center w-[110px]">Cuotas ant.</th>
                     </tr>
@@ -101,22 +99,21 @@
                             </span>
                             @endif
                         </td>
-                        <td class="p-2.5 align-middle font-semibold">
-                            {{ $fila->cliente }}
-                            <div class="text-[11px] text-gray-400 font-normal">{{ $fila->folio_contrato }}</div>
+                        <td class="p-2.5 align-middle font-semibold">{{ $fila->cliente }}</td>
+                        <td class="p-2.5 align-middle text-gray-600 text-xs">{{ $fila->fraccionamiento }}</td>
+                        <td class="p-2.5 align-middle text-center">
+                            @if((int)$fila->contratos_count > 1)
+                            <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gray-200 text-gray-700 text-xs font-bold">
+                                {{ $fila->contratos_count }}
+                            </span>
+                            @else
+                            <span class="text-gray-400">1</span>
+                            @endif
                         </td>
-                        <td class="p-2.5 align-middle text-gray-700">{{ $fila->fraccionamiento }}</td>
-                        <td class="p-2.5 align-middle text-gray-700">{{ $fila->lote }}</td>
-                        <td class="p-2.5 align-middle text-gray-500">
-                            {{ $fila->cuota_num !== null ? '#' . $fila->cuota_num : '—' }}
-                        </td>
-                        <td class="p-2.5 align-middle text-gray-500">
-                            {{ $fila->fecha_vencimiento ? \Carbon\Carbon::parse($fila->fecha_vencimiento)->format('d/m/Y') : '—' }}
-                        </td>
-                        <td class="p-2.5 align-middle">
+                        <td class="p-2.5 align-middle text-gray-700">
                             {{ \Carbon\Carbon::parse($fila->fecha_pago)->format('d/m/Y') }}
                         </td>
-                        <td class="p-2.5 align-middle">
+                        <td class="p-2.5 align-middle text-center">
                             <span class="inline-flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold
                                 {{ (int)$fila->dia_pago <= 5 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">
                                 {{ $fila->dia_pago }}
@@ -137,7 +134,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="10" class="p-8 text-center text-gray-400">
+                        <td colspan="8" class="p-8 text-center text-gray-400">
                             No se encontraron pagadores adelantados para este periodo.
                         </td>
                     </tr>

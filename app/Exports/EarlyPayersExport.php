@@ -22,13 +22,10 @@ class EarlyPayersExport implements FromCollection, WithColumnFormatting, WithEve
     {
         return [
             'FRECUENCIA',
-            'CONTRATO',
             'CLIENTE',
-            'FRACCIONAMIENTO',
-            'LOTE',
-            'CUOTA_NUM',
-            'FECHA_VENCIMIENTO',
-            'FECHA_PAGO',
+            'FINCA(S)',
+            'CONTRATOS',
+            'PRIMER_PAGO',
             'DIA_PAGO',
             'MONTO',
             'CUOTAS_ANTICIPADAS',
@@ -39,12 +36,9 @@ class EarlyPayersExport implements FromCollection, WithColumnFormatting, WithEve
     {
         return $this->filas->map(fn ($r) => [
             mb_strtoupper((string) ($r->frecuencia ?? '')),
-            (string) ($r->folio_contrato ?? ''),
             (string) ($r->cliente ?? ''),
             (string) ($r->fraccionamiento ?? ''),
-            (string) ($r->lote ?? ''),
-            $r->cuota_num !== null ? (string) $r->cuota_num : '',
-            (string) ($r->fecha_vencimiento ?? ''),
+            (int) ($r->contratos_count ?? 1),
             (string) ($r->fecha_pago ?? ''),
             (int) ($r->dia_pago ?? 0),
             (float) ($r->monto ?? 0),
@@ -55,7 +49,7 @@ class EarlyPayersExport implements FromCollection, WithColumnFormatting, WithEve
     public function columnFormats(): array
     {
         return [
-            'J' => '"$"#,##0.00',
+            'G' => '"$"#,##0.00',
         ];
     }
 
@@ -98,19 +92,16 @@ class EarlyPayersExport implements FromCollection, WithColumnFormatting, WithEve
                     }
                 }
 
-                $sheet->getStyle("J3:J{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle("G3:G{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
                 $sheet->getColumnDimension('A')->setWidth(12);
-                $sheet->getColumnDimension('B')->setWidth(22);
-                $sheet->getColumnDimension('C')->setWidth(28);
-                $sheet->getColumnDimension('D')->setWidth(26);
-                $sheet->getColumnDimension('E')->setWidth(10);
-                $sheet->getColumnDimension('F')->setWidth(12);
-                $sheet->getColumnDimension('G')->setWidth(16);
-                $sheet->getColumnDimension('H')->setWidth(14);
-                $sheet->getColumnDimension('I')->setWidth(10);
-                $sheet->getColumnDimension('J')->setWidth(14);
-                $sheet->getColumnDimension('K')->setWidth(18);
+                $sheet->getColumnDimension('B')->setWidth(30);
+                $sheet->getColumnDimension('C')->setWidth(30);
+                $sheet->getColumnDimension('D')->setWidth(12);
+                $sheet->getColumnDimension('E')->setWidth(14);
+                $sheet->getColumnDimension('F')->setWidth(10);
+                $sheet->getColumnDimension('G')->setWidth(14);
+                $sheet->getColumnDimension('H')->setWidth(18);
 
                 $sheet->setShowGridlines(false);
             },
