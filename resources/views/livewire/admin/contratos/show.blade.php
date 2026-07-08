@@ -511,6 +511,43 @@
                         <div class="rounded-2xl border bg-gray-50 p-4 text-sm text-gray-600">
                             Scans cargados: <b>{{ $documentosScanCargados }} de {{ $documentosTotal }}</b>.
                         </div>
+
+                        @php
+                            $tieneConvenioScan = filled($contrato->archivo_convenio_pago)
+                                || filled($contrato->archivo_convenio_pago_reconocimiento_adeudo);
+                        @endphp
+
+                        @if($tieneConvenioScan)
+                        <div class="rounded-2xl border p-4 flex items-center justify-between gap-4
+                            {{ $contrato->alerta_convenio ? 'border-amber-300 bg-amber-50' : 'bg-white' }}">
+                            <div>
+                                <div class="font-semibold text-sm {{ $contrato->alerta_convenio ? 'text-amber-900' : 'text-gray-800' }}">
+                                    Alerta de convenio al generar recibos
+                                </div>
+                                <div class="text-xs mt-0.5 {{ $contrato->alerta_convenio ? 'text-amber-700' : 'text-gray-500' }}">
+                                    @if($contrato->alerta_convenio)
+                                        Activa — se mostrará un aviso al intentar registrar un recibo de este contrato.
+                                    @else
+                                        Desactivada — actívala para que aparezca un aviso al registrar recibos.
+                                    @endif
+                                </div>
+                            </div>
+
+                            <button type="button"
+                                wire:click="toggleAlertaConvenio"
+                                wire:loading.attr="disabled"
+                                wire:target="toggleAlertaConvenio"
+                                class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none
+                                    {{ $contrato->alerta_convenio ? 'bg-amber-500' : 'bg-gray-300' }}"
+                                role="switch"
+                                aria-checked="{{ $contrato->alerta_convenio ? 'true' : 'false' }}">
+                                <span class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+                                    {{ $contrato->alerta_convenio ? 'translate-x-5' : 'translate-x-0' }}">
+                                </span>
+                            </button>
+                        </div>
+                        @endif
+
                     @elseif($documentoAccion === 'descargar')
                         <div class="flex items-center justify-between gap-3">
                             <div>

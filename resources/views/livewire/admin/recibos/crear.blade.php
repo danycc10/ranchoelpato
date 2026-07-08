@@ -632,6 +632,16 @@
                     <div><span class="text-gray-500">Lote:</span> <b>{{ $infoLote['lote'] ?? '—' }}</b></div>
                 </div>
             </div>
+
+            @if($alertaConvenioActiva && !$alertaConvenioAceptada)
+            <div class="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex items-center gap-2 text-sm text-amber-800">
+                <svg class="h-4 w-4 flex-shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+                </svg>
+                Este contrato tiene un <b class="mx-1">convenio de pago</b> activo. Debes revisar y confirmar el aviso para continuar.
+            </div>
+            @endif
+
             @endif
         </div>
     </div>
@@ -879,6 +889,48 @@
                     Listo
                 </button>
             </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- Modal alerta convenio de pago --}}
+    @if($alertaConvenioActiva && !$alertaConvenioAceptada)
+    <div
+        wire:key="alerta-convenio-modal"
+        class="fixed inset-0 z-[9999] bg-black/70 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+
+            <div class="bg-amber-500 px-5 py-4 flex items-center gap-3">
+                <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/20">
+                    <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-lg font-black text-white">Convenio de pago activo</h2>
+                    <p class="text-sm text-amber-100">Este contrato tiene un convenio firmado</p>
+                </div>
+            </div>
+
+            <div class="px-6 py-5 space-y-3 text-sm text-gray-700">
+                <p>
+                    Antes de registrar un recibo, verifica que el pago corresponde a las condiciones
+                    establecidas en el <strong>convenio de pago</strong> del contrato.
+                </p>
+                <p class="text-gray-500">
+                    Revisa montos, fechas y condiciones especiales pactadas antes de continuar.
+                </p>
+            </div>
+
+            <div class="px-6 pb-6">
+                <button
+                    wire:click="aceptarAlertaConvenio"
+                    type="button"
+                    class="w-full rounded-xl bg-amber-500 px-4 py-3 font-black text-white hover:bg-amber-600 transition text-sm">
+                    Entendido, continuar con el recibo
+                </button>
+            </div>
+
         </div>
     </div>
     @endif

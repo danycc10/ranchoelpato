@@ -52,6 +52,7 @@ class Contrato extends Model
         'archivo_convenio_pago_docx',
         'archivo_convenio_pago_reconocimiento_adeudo',
         'archivo_convenio_pago_reconocimiento_adeudo_docx',
+        'alerta_convenio',
 
         'comprador_ine_frente',
         'comprador_ine_reverso',
@@ -89,6 +90,7 @@ class Contrato extends Model
         'dia_semana' => 'integer',
         'dia_mes' => 'integer',
         'es_financiamiento_instalacion' => 'boolean',
+        'alerta_convenio' => 'boolean',
 
         'area_m2_snapshot' => 'decimal:2',
         'medida_norte_snapshot' => 'decimal:2',

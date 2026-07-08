@@ -150,6 +150,10 @@ class Crear extends Component
 
     public bool $guardarConRecargoConfirmado = false;
 
+    public bool $alertaConvenioActiva = false;
+
+    public bool $alertaConvenioAceptada = false;
+
     public bool $imprimirPendiente = false;
 
     public ?string $mensajeConfirmacionRecargo = null;
@@ -998,6 +1002,9 @@ class Crear extends Component
             'fecha_inicio' => $contrato->fecha_inicio ?? ($contrato->created_at?->toDateTimeString()),
         ];
 
+        $this->alertaConvenioActiva = (bool) ($contrato->alerta_convenio ?? false);
+        $this->alertaConvenioAceptada = false;
+
         $l = $contrato->lote;
         $this->infoLote = [
             'clave' => $l?->clave,
@@ -1580,6 +1587,10 @@ class Crear extends Component
 
     public function guardar(bool $imprimir = false, ?ImageUploadService $imageUploadService = null): void
     {
+        if ($this->alertaConvenioActiva && ! $this->alertaConvenioAceptada) {
+            return;
+        }
+
         if (
             ! $this->guardarConRecargoConfirmado &&
             $this->recargoModo !== 'condonar' &&
@@ -2115,6 +2126,11 @@ class Crear extends Component
         Log::info('NO ABRE MODAL → SE VA A GUARDAR DIRECTO');
 
         $this->guardar($imprimir);
+    }
+
+    public function aceptarAlertaConvenio(): void
+    {
+        $this->alertaConvenioAceptada = true;
     }
 
     public function confirmarGuardarConRecargo(): void

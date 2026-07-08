@@ -162,10 +162,13 @@ class Show extends Component
             'private'
         );
 
-        $this->contrato->update([
-            $field => $path,
-            'archivo_contrato_disk' => 'private',
-        ]);
+        $updates = [$field => $path, 'archivo_contrato_disk' => 'private'];
+
+        if (str_starts_with($documento['key'], 'convenio_')) {
+            $updates['alerta_convenio'] = true;
+        }
+
+        $this->contrato->update($updates);
 
         $this->registrarHistorialDocumento(
             $documento,
@@ -215,6 +218,15 @@ class Show extends Component
         $this->loadContrato($this->contrato);
 
         $this->dispatch('toast', type: 'success', message: 'El PDF escaneado fue eliminado correctamente.');
+    }
+
+    public function toggleAlertaConvenio(): void
+    {
+        $this->contrato->update(['alerta_convenio' => ! $this->contrato->alerta_convenio]);
+        $this->contrato->refresh();
+
+        $estado = $this->contrato->alerta_convenio ? 'activada' : 'desactivada';
+        $this->dispatch('toast', type: 'success', message: "Alerta de convenio {$estado}.");
     }
 
     private function documentoSeleccionadoConfig(): array
