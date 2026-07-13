@@ -161,7 +161,7 @@ class EarlyPayersReport extends Component
     public function exportExcel()
     {
         $timestamp = now()->format('Y-m-d_H-i-s');
-        $file = "pagadores_adelantados_{$this->anio}_" . str_pad($this->mes, 2, '0', STR_PAD_LEFT) . "_{$timestamp}.xlsx";
+        $file = "participantes_rifa_{$this->anio}_" . str_pad($this->mes, 2, '0', STR_PAD_LEFT) . "_{$timestamp}.xlsx";
 
         return Excel::download(
             new EarlyPayersExport(

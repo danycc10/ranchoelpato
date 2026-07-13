@@ -63,7 +63,7 @@ class EarlyPayersExport implements FromCollection, WithColumnFormatting, WithEve
 
                 $sheet->insertNewRowBefore(1, 1);
                 $sheet->mergeCells("A1:{$highestCol}1");
-                $sheet->setCellValue('A1', 'PAGADORES ADELANTADOS · ' . $this->mesNombre);
+                $sheet->setCellValue('A1', 'PARTICIPANTES DE RIFA · ' . $this->mesNombre);
 
                 $sheet->getStyle("A1:{$highestCol}1")->applyFromArray([
                     'font' => ['name' => 'Dubai Medium', 'bold' => true, 'size' => 14, 'color' => ['rgb' => 'FFFFFF']],

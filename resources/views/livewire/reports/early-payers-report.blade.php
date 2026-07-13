@@ -2,7 +2,7 @@
 
     <div class="flex items-start justify-between">
         <div>
-            <h1 class="text-2xl font-black">Pagadores adelantados</h1>
+            <h1 class="text-2xl font-black">Participantes de rifa</h1>
             <p class="text-gray-500 text-sm">Mensuales que pagaron antes del día 10 · Semanales con 2+ pagos antes del día 10.</p>
         </div>
 
@@ -135,7 +135,7 @@
                     @empty
                     <tr>
                         <td colspan="8" class="p-8 text-center text-gray-400">
-                            No se encontraron pagadores adelantados para este periodo.
+                            No se encontraron participantes de rifa para este periodo.
                         </td>
                     </tr>
                     @endforelse

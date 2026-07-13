@@ -41,9 +41,9 @@
 
         <a href="{{ route('reportes.pagadores.adelantados') }}"
            class="block rounded-2xl border p-5 bg-white hover:bg-gray-50 transition">
-            <div class="text-lg font-bold">Pagadores adelantados</div>
+            <div class="text-lg font-bold">Participantes de rifa</div>
             <div class="text-gray-600 mt-1">
-                Clientes mensuales que pagaron antes del día 10, y semanales con 2 o más pagos antes del día 10 del mes.
+                Clientes que pagaron antes del día 10 del mes (mensual) o con 2+ pagos antes del día 10 (semanal).
             </div>
         </a>
     </div>
