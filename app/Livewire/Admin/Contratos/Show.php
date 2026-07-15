@@ -55,6 +55,15 @@ class Show extends Component
 
     public string $observacionPagoHistorico = 'Pago histórico registrado fuera del sistema.';
 
+    // ✅ Abono a capital
+    public bool $showAbonoCapital = false;
+
+    public string $abonoCapitalMonto = '';
+
+    public string $abonoCapitalFecha = '';
+
+    public string $abonoCapitalObservaciones = '';
+
     public function mount(string $uuid): void
     {
         $contratoModel = Contrato::withTrashed()
@@ -218,6 +227,99 @@ class Show extends Component
         $this->loadContrato($this->contrato);
 
         $this->dispatch('toast', type: 'success', message: 'El PDF escaneado fue eliminado correctamente.');
+    }
+
+    public function abrirAbonoCapital(): void
+    {
+        $this->abonoCapitalMonto = '';
+        $this->abonoCapitalFecha = now()->toDateString();
+        $this->abonoCapitalObservaciones = '';
+        $this->resetErrorBag();
+        $this->showAbonoCapital = true;
+    }
+
+    public function confirmarAbonoCapital(): void
+    {
+        abort_unless(auth()->user()?->can('contratos.editar'), 403);
+
+        $saldoActual = (float) ($this->contrato->saldo_actual ?? 0);
+
+        $this->validate([
+            'abonoCapitalMonto' => [
+                'required',
+                'numeric',
+                'min:0.01',
+                "max:{$saldoActual}",
+            ],
+            'abonoCapitalFecha' => ['required', 'date'],
+            'abonoCapitalObservaciones' => ['nullable', 'string', 'max:500'],
+        ], [
+            'abonoCapitalMonto.required' => 'El monto es requerido.',
+            'abonoCapitalMonto.numeric'  => 'El monto debe ser numérico.',
+            'abonoCapitalMonto.min'      => 'El monto debe ser mayor a cero.',
+            'abonoCapitalMonto.max'      => "El monto no puede exceder el saldo actual (\${$saldoActual}).",
+            'abonoCapitalFecha.required' => 'La fecha es requerida.',
+            'abonoCapitalFecha.date'     => 'La fecha no es válida.',
+        ]);
+
+        DB::transaction(function () {
+            $contrato = Contrato::query()
+                ->lockForUpdate()
+                ->findOrFail($this->contrato->id);
+
+            $monto         = round((float) $this->abonoCapitalMonto, 2);
+            $saldoAnterior = round((float) ($contrato->saldo_actual ?? 0), 2);
+            $saldoNuevo    = round(max(0, $saldoAnterior - $monto), 2);
+
+            $contrato->update(['saldo_actual' => $saldoNuevo]);
+
+            // Eliminar cuotas del final hasta consumir el abono
+            $cuotasPendientes = Cuota::where('contrato_id', $contrato->id)
+                ->whereIn('estatus', ['pendiente', 'vencida'])
+                ->where('es_anualidad', 0)
+                ->where(fn ($q) => $q->whereNull('pagado_total')->orWhere('pagado_total', 0))
+                ->orderByDesc('fecha_vencimiento')
+                ->orderByDesc('numero')
+                ->lockForUpdate()
+                ->get();
+
+            $abonoRestante    = $monto;
+            $cuotasEliminadas = 0;
+
+            foreach ($cuotasPendientes as $cuota) {
+                if ($abonoRestante <= 0) break;
+
+                $pendiente = round((float) $cuota->monto - (float) ($cuota->pagado_total ?? 0), 2);
+
+                if ($abonoRestante >= $pendiente) {
+                    $cuota->delete();
+                    $cuotasEliminadas++;
+                    $abonoRestante = round($abonoRestante - $pendiente, 2);
+                } else {
+                    // El abono cubre solo parte de esta cuota: reducir su monto
+                    $cuota->update(['monto' => round($pendiente - $abonoRestante, 2)]);
+                    $abonoRestante = 0;
+                }
+            }
+
+            $this->actualizarEstatusContratoSiLiquidado($contrato);
+            $contrato->refresh();
+
+            ContratoHistorial::create([
+                'contrato_id' => $contrato->id,
+                'user_id'     => auth()->id(),
+                'tipo'        => 'abono_capital',
+                'antes'       => ['saldo_actual' => $saldoAnterior],
+                'despues'     => ['saldo_actual' => $saldoNuevo, 'monto_abono' => $monto, 'cuotas_eliminadas' => $cuotasEliminadas],
+                'saldo_anterior' => $saldoAnterior,
+                'saldo_nuevo'    => $saldoNuevo,
+                'nota'        => $this->abonoCapitalObservaciones ?: null,
+            ]);
+        });
+
+        $this->showAbonoCapital = false;
+        $this->loadContrato($this->contrato->refresh());
+        $this->dispatch('toast', type: 'success', message: 'Abono a capital registrado correctamente.');
     }
 
     public function toggleAlertaConvenio(): void

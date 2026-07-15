@@ -73,6 +73,16 @@
                 </a>
             @endif
 
+            @can('contratos.editar')
+                <button
+                    @unless($contratoCancelado) wire:click="abrirAbonoCapital" @endunless
+                    type="button"
+                    @disabled($contratoCancelado)
+                    class="px-4 py-2 rounded-xl border font-bold {{ $contratoCancelado ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60' : 'border-emerald-400 text-emerald-700 hover:bg-emerald-50' }}">
+                    Abono a capital
+                </button>
+            @endcan
+
             @can('sistema.ver')
                 <button
                     @unless($contratoCancelado) wire:click="abrirReprogramar" @endunless
@@ -235,7 +245,7 @@
                 </thead>
                 <tbody>
                     @php
-                        $saldoPlaneado = (float) ($contrato->saldo_inicial ?? 0);
+                        $saldoPlaneado = (float) $contrato->cuotas->sum('monto');
                     @endphp
 
                     @forelse($contrato->cuotas as $c)
@@ -337,6 +347,7 @@
                                 'reestructura_b' => 'bg-yellow-100 text-yellow-800',
                                 'ambos' => 'bg-green-100 text-green-800',
                                 'pago_historico' => 'bg-emerald-100 text-emerald-800',
+                                'abono_capital' => 'bg-teal-100 text-teal-800',
                                 'archivo_contrato' => 'bg-sky-100 text-sky-800',
                                 'archivo_documento_contrato' => 'bg-sky-100 text-sky-800',
                                 'cancelacion_contrato' => 'bg-red-100 text-red-800',
@@ -393,6 +404,22 @@
                                         ({{ $antes['estatus'] ?? '—' }} → {{ $despues['estatus'] ?? '—' }})
                                         <br>
                                         <b>Origen:</b> {{ $despues['origen_pago'] ?? '—' }}
+                                    </div>
+                                @elseif($tipo === 'abono_capital')
+                                    <div class="text-xs">
+                                        <b>Monto abonado:</b>
+                                        ${{ number_format((float) ($despues['monto_abono'] ?? 0), 2) }}
+                                        <br>
+                                        <b>Saldo:</b>
+                                        ${{ number_format((float) ($h->saldo_anterior ?? 0), 2) }}
+                                        → ${{ number_format((float) ($h->saldo_nuevo ?? 0), 2) }}
+                                        @if(($despues['cuotas_eliminadas'] ?? 0) > 0)
+                                            <br>
+                                            <b>Cuotas eliminadas:</b> {{ $despues['cuotas_eliminadas'] }}
+                                        @endif
+                                        @if($h->nota)
+                                            <br><span class="text-gray-500">{{ $h->nota }}</span>
+                                        @endif
                                     </div>
                                 @elseif(in_array($tipo, ['cancelacion_contrato', 'descancelacion_contrato'], true))
                                     <div class="text-xs">
@@ -746,6 +773,87 @@
                         Guardar
                     </button>
                 </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- MODAL ABONO A CAPITAL --}}
+    @if($showAbonoCapital)
+        <div class="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-2xl w-full max-w-md p-6 space-y-4">
+
+                <div>
+                    <div class="text-xl font-black text-emerald-700">Abono a capital</div>
+                    <div class="text-sm text-gray-500 mt-1">
+                        El monto se descontará directamente del saldo del contrato y quedará registrado en el historial.
+                    </div>
+                </div>
+
+                <div class="rounded-xl bg-gray-50 border px-4 py-3 text-sm">
+                    <span class="text-gray-500">Saldo actual:</span>
+                    <span class="font-black text-gray-900 ml-1">${{ number_format((float) ($contrato->saldo_actual ?? 0), 2) }}</span>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700">Monto del abono <span class="text-red-500">*</span></label>
+                        <input
+                            type="number"
+                            wire:model.defer="abonoCapitalMonto"
+                            min="0.01"
+                            step="0.01"
+                            max="{{ (float) ($contrato->saldo_actual ?? 0) }}"
+                            placeholder="0.00"
+                            class="mt-1 w-full rounded-xl border px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-400 focus:outline-none">
+                        @error('abonoCapitalMonto')
+                            <div class="text-red-600 text-xs mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700">Fecha <span class="text-red-500">*</span></label>
+                        <input
+                            type="date"
+                            wire:model.defer="abonoCapitalFecha"
+                            class="mt-1 w-full rounded-xl border px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-400 focus:outline-none">
+                        @error('abonoCapitalFecha')
+                            <div class="text-red-600 text-xs mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700">Observaciones</label>
+                        <textarea
+                            wire:model.defer="abonoCapitalObservaciones"
+                            rows="2"
+                            placeholder="Ej: Pago extra acordado con el cliente"
+                            class="mt-1 w-full rounded-xl border px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-400 focus:outline-none resize-none"></textarea>
+                        @error('abonoCapitalObservaciones')
+                            <div class="text-red-600 text-xs mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-1">
+                    <button
+                        type="button"
+                        wire:click="$set('showAbonoCapital', false)"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmarAbonoCapital"
+                        class="px-4 py-2 rounded-xl border text-sm disabled:opacity-50">
+                        Cancelar
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="confirmarAbonoCapital"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmarAbonoCapital"
+                        class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 disabled:opacity-50">
+                        <span wire:loading.remove wire:target="confirmarAbonoCapital">Registrar abono</span>
+                        <span wire:loading wire:target="confirmarAbonoCapital">Procesando...</span>
+                    </button>
+                </div>
+
             </div>
         </div>
     @endif
