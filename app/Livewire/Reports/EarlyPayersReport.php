@@ -115,7 +115,7 @@ class EarlyPayersReport extends Component
             ->whereIn('c.estatus', ['activo', 'liquidado'])
             ->where('cu.es_anualidad', 0)
             ->whereRaw("DATE_FORMAT(cu.fecha_vencimiento, '%Y-%m') = ?", [$yearMonth])
-            ->whereRaw('DAY(rp.fecha_efectiva) < 10')
+            ->whereRaw("rp.fecha_efectiva < DATE_FORMAT(cu.fecha_vencimiento, '%Y-%m-10')")
             ->when($this->propietarioId, fn ($q) => $q->where('f.propietario_id', $this->propietarioId))
             ->select([
                 DB::raw("'semanal' as frecuencia"),
