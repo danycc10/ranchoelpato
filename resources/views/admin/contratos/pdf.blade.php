@@ -222,27 +222,32 @@
         <tbody>
 
             @php
-                $saldo = (float) $contrato->saldo_inicial;
-                $prevMonth = null;
-                $monthBand = false; // false = blanco, true = azul claro
+                $saldo           = (float) $contrato->saldo_inicial;
+                $saldoActualReal = (float) ($contrato->saldo_actual ?? 0);
+                $primerPendiente = true;
+                $prevMonth       = null;
+                $monthBand       = false; // false = blanco, true = azul claro
             @endphp
 
             @foreach($contrato->cuotas as $c)
 
                 @php
+                    $esPagada = strtolower((string)$c->estatus) === 'pagada';
+
+                    // Al llegar a la primera cuota no pagada, saltar al saldo actual
+                    // real del contrato (incorpora abonos a capital y otros ajustes)
+                    if (!$esPagada && $primerPendiente) {
+                        $saldo           = $saldoActualReal;
+                        $primerPendiente = false;
+                    }
+
                     $vence = $c->fecha_vencimiento;
                     $month = $vence?->format('Y-m');
 
                     $activo = $saldo;
-
-                    $monto = (float) $c->monto;
-
-                    $resto = max(
-                        0,
-                        round($saldo - $monto, 2)
-                    );
-
-                    $saldo = $resto;
+                    $monto  = (float) $c->monto;
+                    $resto  = max(0, round($saldo - $monto, 2));
+                    $saldo  = $resto;
 
                     $monthChanged = $prevMonth !== null && $month !== $prevMonth;
 
