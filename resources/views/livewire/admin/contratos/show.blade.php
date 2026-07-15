@@ -245,13 +245,24 @@
                 </thead>
                 <tbody>
                     @php
-                        $saldoPlaneado = (float) $contrato->cuotas->sum('monto');
+                        $saldoPlaneado   = (float) ($contrato->saldo_inicial ?? 0);
+                        $saldoActualReal = (float) ($contrato->saldo_actual ?? 0);
+                        $primerPendiente = true;
                     @endphp
 
                     @forelse($contrato->cuotas as $c)
                         @php
+                            $esPagada = strtolower((string)$c->estatus) === 'pagada';
+
+                            // Al llegar a la primera cuota no pagada, saltar al saldo actual
+                            // real del contrato (incorpora abonos a capital y otros ajustes)
+                            if (!$esPagada && $primerPendiente) {
+                                $saldoPlaneado   = $saldoActualReal;
+                                $primerPendiente = false;
+                            }
+
                             $saldoPlaneado = max(0, round($saldoPlaneado - (float)$c->monto, 2));
-                            $tienePago = ((float)($c->pagado_total ?? 0) > 0) || (strtolower((string)$c->estatus) === 'pagada');
+                            $tienePago = ((float)($c->pagado_total ?? 0) > 0) || $esPagada;
                         @endphp
 
                         <tr class="border-t">
