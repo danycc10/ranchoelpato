@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -204,6 +205,13 @@ class Recibo extends Model
     public function pagosDetalle()
     {
         return $this->hasMany(ReciboPago::class, 'recibo_id')->orderBy('orden');
+    }
+
+    public function sincronizarFechaEfectivaPagos(string $fecha): int
+    {
+        return $this->pagosDetalle()->update([
+            'fecha_efectiva' => Carbon::parse($fecha)->toDateString(),
+        ]);
     }
 
     public function propietarioContable()

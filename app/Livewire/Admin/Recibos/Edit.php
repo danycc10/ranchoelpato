@@ -604,15 +604,21 @@ class Edit extends Component
 
             $totalNuevo = collect($data['pagos'])->sum(fn ($p) => (float) $p['monto']);
             $primerPago = collect($data['pagos'])->first();
+            $fechaNueva = Carbon::parse($data['fecha']);
 
             $this->recibo->update([
-                'fecha' => $data['fecha'],
+                'fecha' => $fechaNueva->toDateString(),
+                'anio' => (int) $fechaNueva->year,
+                'semana_del_anio' => (int) $fechaNueva->weekOfYear,
+                'mes_del_anio' => (int) $fechaNueva->month,
                 'tipos_cobro_id' => $data['tipos_cobro_id'],
                 'monto' => $totalNuevo,
                 'observaciones' => $data['observaciones'] ?? null,
                 'forma_pago_id' => count($data['pagos']) === 1 ? ($primerPago['forma_pago_id'] ?? null) : null,
                 'cuenta_bancaria_id' => count($data['pagos']) === 1 ? ($primerPago['cuentas_bancarias_id'] ?? null) : null,
             ]);
+
+            $this->recibo->sincronizarFechaEfectivaPagos($fechaNueva->toDateString());
 
             foreach ($data['pagos'] as $pagoData) {
                 $pago = $this->recibo->pagosDetalle()
