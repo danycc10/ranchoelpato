@@ -7,6 +7,35 @@ use Carbon\Carbon;
 
 class ContratoPlanService
 {
+    /**
+     * Calcula el saldo que queda después de cada cuota del plan vigente.
+     *
+     * El punto de partida es la suma de las cuotas, no saldo_actual, porque
+     * los abonos a capital pueden haber reducido o eliminado cuotas finales.
+     * De esta forma el último pago del calendario siempre termina en cero.
+     *
+     * @param  iterable<int, int|float|string|null>  $montos
+     * @return array<int, float>
+     */
+    public static function calcularSaldosPlaneados(iterable $montos): array
+    {
+        $montosNormalizados = [];
+
+        foreach ($montos as $monto) {
+            $montosNormalizados[] = round(max(0, (float) $monto), 2);
+        }
+
+        $saldo = round(array_sum($montosNormalizados), 2);
+        $saldos = [];
+
+        foreach ($montosNormalizados as $monto) {
+            $saldo = round(max(0, $saldo - $monto), 2);
+            $saldos[] = $saldo;
+        }
+
+        return $saldos;
+    }
+
     public static function diasSemana(): array
     {
         return [

@@ -159,21 +159,19 @@
             </thead>
             <tbody>
                 @php
-                    $saldoPlaneado = (float) ($contrato->saldo_inicial ?? 0);
+                    $saldosPlaneados = \App\Services\Contratos\ContratoPlanService::calcularSaldosPlaneados(
+                        $contrato->cuotas->pluck('monto')
+                    );
                 @endphp
 
-                @forelse($contrato->cuotas as $c)
-                    @php
-                        // ✅ monto planeado: baja por el monto de la cuota (no por pagado)
-                        $saldoPlaneado = max(0, round($saldoPlaneado - (float)$c->monto, 2));
-                    @endphp
+                @forelse($contrato->cuotas as $indiceCuota => $c)
                     <tr>
                         <td>{{ $c->numero }}</td>
                         <td>{{ optional($c->fecha_vencimiento)->format('d/m/Y') }}</td>
                         <td class="right">${{ number_format((float)$c->monto,2) }}</td>
                         <td class="right">${{ number_format((float)$c->pagado_total,2) }}</td>
                         <td class="right">${{ number_format((float)$c->recargo_aplicado,2) }}</td>
-                        <td class="right"><b>${{ number_format((float)$saldoPlaneado,2) }}</b></td>
+                        <td class="right"><b>${{ number_format($saldosPlaneados[$indiceCuota] ?? 0,2) }}</b></td>
                         <td>{{ ucfirst($c->estatus) }}</td>
                     </tr>
                 @empty

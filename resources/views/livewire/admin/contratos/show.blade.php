@@ -245,23 +245,14 @@
                 </thead>
                 <tbody>
                     @php
-                        $saldoPlaneado   = (float) ($contrato->saldo_inicial ?? 0);
-                        $saldoActualReal = (float) ($contrato->saldo_actual ?? 0);
-                        $primerPendiente = true;
+                        $saldosPlaneados = \App\Services\Contratos\ContratoPlanService::calcularSaldosPlaneados(
+                            $contrato->cuotas->pluck('monto')
+                        );
                     @endphp
 
-                    @forelse($contrato->cuotas as $c)
+                    @forelse($contrato->cuotas as $indiceCuota => $c)
                         @php
                             $esPagada = strtolower((string)$c->estatus) === 'pagada';
-
-                            // Al llegar a la primera cuota no pagada, saltar al saldo actual
-                            // real del contrato (incorpora abonos a capital y otros ajustes)
-                            if (!$esPagada && $primerPendiente) {
-                                $saldoPlaneado   = $saldoActualReal;
-                                $primerPendiente = false;
-                            }
-
-                            $saldoPlaneado = max(0, round($saldoPlaneado - (float)$c->monto, 2));
                             $tienePago = ((float)($c->pagado_total ?? 0) > 0) || $esPagada;
                         @endphp
 
@@ -273,7 +264,7 @@
                             <td class="p-3">${{ number_format((float)$c->recargo_aplicado,2) }}</td>
 
                             <td class="p-3 font-semibold text-gray-800">
-                                ${{ number_format($saldoPlaneado, 2) }}
+                                ${{ number_format($saldosPlaneados[$indiceCuota] ?? 0, 2) }}
                             </td>
 
                             <td class="p-3">
