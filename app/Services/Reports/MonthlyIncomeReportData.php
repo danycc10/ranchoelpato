@@ -34,6 +34,18 @@ class MonthlyIncomeReportData
         };
     }
 
+    public static function aplicarVigenciaHistoricaContrato($query)
+    {
+        return $query
+            ->whereIn('contratos.estatus', self::REPORTABLE_CONTRACT_STATUSES)
+            ->orWhere(function ($cancelado) {
+                $cancelado
+                    ->where('contratos.estatus', 'cancelado')
+                    ->whereNotNull('contratos.deleted_at')
+                    ->whereColumn('contratos.deleted_at', '>=', 'cuotas.fecha_vencimiento');
+            });
+    }
+
     public function metodosPago(): Collection
     {
         if ($this->metodosPagoCache !== null) {
@@ -67,8 +79,7 @@ class MonthlyIncomeReportData
             )
             ->whereBetween('cuotas.fecha_vencimiento', [$start, $end])
             ->where('contratos.tipo', 'terreno')
-            ->whereNull('contratos.deleted_at')
-            ->whereIn('contratos.estatus', self::REPORTABLE_CONTRACT_STATUSES)
+            ->where(fn ($q) => self::aplicarVigenciaHistoricaContrato($q))
             ->whereIn('cuotas.estatus', ['pendiente', 'parcial', 'pagada', 'vencida'])
             ->groupBy('fraccionamientos.id', 'fraccionamientos.nombre')
             ->selectRaw('

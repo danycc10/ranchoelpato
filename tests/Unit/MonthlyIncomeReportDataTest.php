@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Exports\Sheets\MonthlyIncomePendingSheet;
 use App\Services\Reports\MonthlyIncomeReportData;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class MonthlyIncomeReportDataTest extends TestCase
@@ -43,5 +44,17 @@ class MonthlyIncomeReportDataTest extends TestCase
         foreach ($report->consultasDeIngresosSql() as $sql) {
             $this->assertStringNotContainsString('contratos`.`estatus', $sql);
         }
+    }
+
+    public function test_el_esperado_incluye_cuotas_anteriores_a_la_cancelacion(): void
+    {
+        $query = DB::table('cuotas')
+            ->join('contratos', 'contratos.id', '=', 'cuotas.contrato_id')
+            ->where(fn ($q) => MonthlyIncomeReportData::aplicarVigenciaHistoricaContrato($q));
+
+        $sql = str_replace(['`', '"'], '', $query->toSql());
+
+        $this->assertStringContainsString('contratos.deleted_at >= cuotas.fecha_vencimiento', $sql);
+        $this->assertContains('cancelado', $query->getBindings());
     }
 }
