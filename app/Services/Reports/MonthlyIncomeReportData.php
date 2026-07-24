@@ -410,7 +410,6 @@ class MonthlyIncomeReportData
             })
             ->where('recibos.afecta_reportes', true)
             ->where('recibos.folio', 'not like', 'REC%')
-            ->whereIn('contratos.estatus', self::REPORTABLE_CONTRACT_STATUSES)
             ->whereBetween('recibos_pagos.fecha_efectiva', [$start, $end])
             ->where(function ($q) use ($start, $end) {
                 $q->where(function ($sub) use ($start, $end) {
@@ -449,7 +448,6 @@ class MonthlyIncomeReportData
             ->whereNull('recibos_pagos.deleted_at')
             ->whereNull('recibos.deleted_at')
             ->whereNull('recibos.anulado_at')
-            ->whereIn('contratos.estatus', self::REPORTABLE_CONTRACT_STATUSES)
             ->where(function ($q) use ($start, $end) {
                 $q->where(function ($sub) use ($start, $end) {
                     $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
@@ -481,7 +479,6 @@ class MonthlyIncomeReportData
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
             ->whereNull('recibos.deleted_at')
             ->whereNull('recibos.anulado_at')
-            ->whereIn('contratos.estatus', self::REPORTABLE_CONTRACT_STATUSES)
             ->where('recibos.es_historico', true)
             ->where('tipos_cobro.nombre', 'MENSUALIDAD')
             ->where('contratos.tipo', 'terreno')
@@ -520,7 +517,6 @@ class MonthlyIncomeReportData
             })
             ->where('recibos.afecta_reportes', true)
             ->where('recibos.folio', 'not like', 'REC%')
-            ->whereIn('contratos.estatus', self::REPORTABLE_CONTRACT_STATUSES)
             ->where('tipos_cobro.nombre', 'MENSUALIDAD')
             ->where('contratos.tipo', 'terreno')
             ->whereBetween('recibos_pagos.fecha_efectiva', [$start, $end])

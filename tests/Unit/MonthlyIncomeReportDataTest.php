@@ -4,7 +4,7 @@ namespace Tests\Unit;
 
 use App\Exports\Sheets\MonthlyIncomePendingSheet;
 use App\Services\Reports\MonthlyIncomeReportData;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class MonthlyIncomeReportDataTest extends TestCase
 {
@@ -23,5 +23,25 @@ class MonthlyIncomeReportDataTest extends TestCase
         );
 
         $this->assertSame('CUOTA PENDIENTE', $sheet->headings()[0]);
+    }
+
+    public function test_los_ingresos_no_dependen_del_estatus_actual_del_contrato(): void
+    {
+        $report = new class(2026, 4, null, 'como_va_mes') extends MonthlyIncomeReportData
+        {
+            public function consultasDeIngresosSql(): array
+            {
+                return [
+                    $this->baseJoinRecibos()->toSql(),
+                    $this->baseJoinRecibosFlujoReal()->toSql(),
+                    $this->baseJoinRecibosHistoricosComoVaMes()->toSql(),
+                    $this->baseJoinRecibosMensualidadPorFechaPago()->toSql(),
+                ];
+            }
+        };
+
+        foreach ($report->consultasDeIngresosSql() as $sql) {
+            $this->assertStringNotContainsString('contratos`.`estatus', $sql);
+        }
     }
 }

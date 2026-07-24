@@ -2,7 +2,6 @@
 
 namespace App\Exports\Sheets;
 
-use App\Services\Reports\MonthlyIncomeReportData;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
@@ -87,7 +86,6 @@ class MonthlyIncomeDetailSheet implements FromCollection, WithColumnFormatting, 
             })
             ->where('recibos.afecta_reportes', true)
             ->where('recibos.folio', 'not like', 'REC%')
-            ->whereIn('contratos.estatus', MonthlyIncomeReportData::REPORTABLE_CONTRACT_STATUSES)
 
             ->when($this->propietarioId, function ($query) {
                 $query->where(function ($scope) {
