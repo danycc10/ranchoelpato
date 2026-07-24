@@ -2,6 +2,7 @@
 
 namespace App\Exports\Sheets;
 
+use App\Services\Reports\MonthlyIncomeReportData;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
@@ -119,7 +120,7 @@ class MonthlyIncomeAdvanceDetailSheet implements FromCollection, WithColumnForma
             })
             ->where('recibos.afecta_reportes', true)
             ->where('recibos.folio', 'not like', 'REC%')
-            ->whereIn('contratos.estatus', ['activo', 'liquidado'])
+            ->whereIn('contratos.estatus', MonthlyIncomeReportData::REPORTABLE_CONTRACT_STATUSES)
             ->where('contratos.tipo', 'terreno')
             ->where('tipos_cobro.nombre', 'MENSUALIDAD')
 

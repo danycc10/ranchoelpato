@@ -2,6 +2,7 @@
 
 namespace App\Exports\Sheets;
 
+use App\Services\Reports\MonthlyIncomeReportData;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -61,7 +62,7 @@ class MonthlyIncomeActiveContractsSheet implements FromCollection, WithColumnFor
             )
 
             ->whereNotNull('cuotas.contrato_id')
-            ->whereIn('contratos.estatus', ['activo', 'liquidado'])
+            ->whereIn('contratos.estatus', MonthlyIncomeReportData::REPORTABLE_CONTRACT_STATUSES)
             ->where('contratos.tipo', 'terreno')
             ->whereBetween('cuotas.fecha_vencimiento', [$start->toDateString(), $end->toDateString()])
 

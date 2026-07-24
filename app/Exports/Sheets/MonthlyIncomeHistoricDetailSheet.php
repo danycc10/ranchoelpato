@@ -2,6 +2,7 @@
 
 namespace App\Exports\Sheets;
 
+use App\Services\Reports\MonthlyIncomeReportData;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
@@ -72,14 +73,14 @@ class MonthlyIncomeHistoricDetailSheet implements FromCollection, WithColumnForm
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
             ->whereNull('recibos.deleted_at')
             ->whereNull('recibos.anulado_at')
-            ->whereIn('contratos.estatus', ['activo', 'liquidado'])
+            ->whereIn('contratos.estatus', MonthlyIncomeReportData::REPORTABLE_CONTRACT_STATUSES)
             ->where('recibos.es_historico', true)
             ->where('tipos_cobro.nombre', 'MENSUALIDAD')
             ->where('contratos.tipo', 'terreno')
             ->whereBetween('cuotas.fecha_vencimiento', [$start, $end])
             ->when(
                 $this->propietarioId,
-                fn ($qq) => $qq->where('recibos.propietario_contable_id', $this->propietarioId)
+                fn ($qq) => $qq->where('fraccionamientos.propietario_id', $this->propietarioId)
             )
             ->orderBy('cuotas.fecha_vencimiento')
             ->orderBy('fraccionamientos.nombre')

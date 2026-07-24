@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 
 class MonthlyIncomeReportData
 {
+    public const REPORTABLE_CONTRACT_STATUSES = ['activo', 'moroso', 'liquidado'];
+
     protected ?Collection $metodosPagoCache = null;
 
     protected ?Collection $filasCache = null;
@@ -65,6 +67,8 @@ class MonthlyIncomeReportData
             )
             ->whereBetween('cuotas.fecha_vencimiento', [$start, $end])
             ->where('contratos.tipo', 'terreno')
+            ->whereNull('contratos.deleted_at')
+            ->whereIn('contratos.estatus', self::REPORTABLE_CONTRACT_STATUSES)
             ->whereIn('cuotas.estatus', ['pendiente', 'parcial', 'pagada', 'vencida'])
             ->groupBy('fraccionamientos.id', 'fraccionamientos.nombre')
             ->selectRaw('
@@ -406,7 +410,7 @@ class MonthlyIncomeReportData
             })
             ->where('recibos.afecta_reportes', true)
             ->where('recibos.folio', 'not like', 'REC%')
-            ->whereIn('contratos.estatus', ['activo', 'liquidado'])
+            ->whereIn('contratos.estatus', self::REPORTABLE_CONTRACT_STATUSES)
             ->whereBetween('recibos_pagos.fecha_efectiva', [$start, $end])
             ->where(function ($q) use ($start, $end) {
                 $q->where(function ($sub) use ($start, $end) {
@@ -422,7 +426,7 @@ class MonthlyIncomeReportData
             })
             ->when(
                 $this->propietarioId,
-                fn ($q) => $q->where('recibos.propietario_contable_id', $this->propietarioId)
+                fn ($q) => $this->aplicarFiltroPropietarioPorConcepto($q)
             );
     }
 
@@ -445,7 +449,7 @@ class MonthlyIncomeReportData
             ->whereNull('recibos_pagos.deleted_at')
             ->whereNull('recibos.deleted_at')
             ->whereNull('recibos.anulado_at')
-            ->whereIn('contratos.estatus', ['activo', 'liquidado'])
+            ->whereIn('contratos.estatus', self::REPORTABLE_CONTRACT_STATUSES)
             ->where(function ($q) use ($start, $end) {
                 $q->where(function ($sub) use ($start, $end) {
                     $sub->where('tipos_cobro.nombre', 'MENSUALIDAD')
@@ -461,7 +465,7 @@ class MonthlyIncomeReportData
             })
             ->when(
                 $this->propietarioId,
-                fn ($q) => $q->where('recibos.propietario_contable_id', $this->propietarioId)
+                fn ($q) => $this->aplicarFiltroPropietarioPorConcepto($q)
             );
     }
 
@@ -477,14 +481,14 @@ class MonthlyIncomeReportData
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
             ->whereNull('recibos.deleted_at')
             ->whereNull('recibos.anulado_at')
-            ->whereIn('contratos.estatus', ['activo', 'liquidado'])
+            ->whereIn('contratos.estatus', self::REPORTABLE_CONTRACT_STATUSES)
             ->where('recibos.es_historico', true)
             ->where('tipos_cobro.nombre', 'MENSUALIDAD')
             ->where('contratos.tipo', 'terreno')
             ->whereBetween('cuotas.fecha_vencimiento', [$start, $end])
             ->when(
                 $this->propietarioId,
-                fn ($q) => $q->where('recibos.propietario_contable_id', $this->propietarioId)
+                fn ($q) => $q->where('fraccionamientos.propietario_id', $this->propietarioId)
             );
     }
 
@@ -516,14 +520,33 @@ class MonthlyIncomeReportData
             })
             ->where('recibos.afecta_reportes', true)
             ->where('recibos.folio', 'not like', 'REC%')
-            ->whereIn('contratos.estatus', ['activo', 'liquidado'])
+            ->whereIn('contratos.estatus', self::REPORTABLE_CONTRACT_STATUSES)
             ->where('tipos_cobro.nombre', 'MENSUALIDAD')
             ->where('contratos.tipo', 'terreno')
             ->whereBetween('recibos_pagos.fecha_efectiva', [$start, $end])
             ->when(
                 $this->propietarioId,
-                fn ($q) => $q->where('recibos.propietario_contable_id', $this->propietarioId)
+                fn ($q) => $q->where('fraccionamientos.propietario_id', $this->propietarioId)
             );
+    }
+
+    protected function aplicarFiltroPropietarioPorConcepto($query)
+    {
+        return $query->where(function ($scope) {
+            $scope->where(function ($mensualidad) {
+                $mensualidad
+                    ->where('tipos_cobro.nombre', 'MENSUALIDAD')
+                    ->where('fraccionamientos.propietario_id', $this->propietarioId);
+            })->orWhere(function ($otrosConceptos) {
+                $otrosConceptos
+                    ->where(function ($concepto) {
+                        $concepto
+                            ->whereNull('tipos_cobro.nombre')
+                            ->orWhere('tipos_cobro.nombre', '!=', 'MENSUALIDAD');
+                    })
+                    ->where('recibos.propietario_contable_id', $this->propietarioId);
+            });
+        });
     }
 
     protected function baseJoinRecibosAdelantado()

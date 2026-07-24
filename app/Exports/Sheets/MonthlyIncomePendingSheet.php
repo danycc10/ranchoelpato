@@ -2,6 +2,7 @@
 
 namespace App\Exports\Sheets;
 
+use App\Services\Reports\MonthlyIncomeReportData;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -38,7 +39,7 @@ class MonthlyIncomePendingSheet implements FromCollection, WithColumnFormatting,
     public function headings(): array
     {
         return [
-            'CUOTA_NUM',
+            'CUOTA PENDIENTE',
             'VENCE',
             'AÑO',
             'MES',
@@ -66,7 +67,11 @@ class MonthlyIncomePendingSheet implements FromCollection, WithColumnFormatting,
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
             ->when($this->propietarioId, fn ($qq) => $qq->where('fraccionamientos.propietario_id', $this->propietarioId))
             ->whereBetween('cuotas.fecha_vencimiento', [$start->toDateString(), $end->toDateString()])
-            ->where('cuotas.estatus', '!=', 'pagada')
+            ->whereNull('contratos.deleted_at')
+            ->where('contratos.tipo', 'terreno')
+            ->whereIn('contratos.estatus', MonthlyIncomeReportData::REPORTABLE_CONTRACT_STATUSES)
+            ->where('cuotas.estatus', '!=', 'anulada')
+            ->whereRaw('COALESCE(cuotas.pagado_total, 0) < COALESCE(cuotas.monto, 0)')
             ->orderBy('cuotas.fecha_vencimiento')
             ->orderBy('cuotas.id')
             ->select([
@@ -96,7 +101,7 @@ class MonthlyIncomePendingSheet implements FromCollection, WithColumnFormatting,
             }
 
             return [
-                (string) ($r->numero ?? ''),
+                'Cuota #'.(string) ($r->numero ?? ''),
                 (string) ($r->fecha_vencimiento ?? ''),
                 (string) ($r->anio ?? ''),
                 (string) ($r->mes ?? ''),

@@ -2,6 +2,7 @@
 
 namespace App\Exports\Sheets;
 
+use App\Services\Reports\MonthlyIncomeReportData;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
@@ -72,6 +73,8 @@ class MonthlyIncomeExpectedDetailSheet implements FromCollection, WithColumnForm
             )
             ->whereBetween('cuotas.fecha_vencimiento', [$start, $end])
             ->where('contratos.tipo', 'terreno')
+            ->whereNull('contratos.deleted_at')
+            ->whereIn('contratos.estatus', MonthlyIncomeReportData::REPORTABLE_CONTRACT_STATUSES)
             ->whereIn('cuotas.estatus', ['pendiente', 'parcial', 'pagada', 'vencida'])
             ->orderBy('fraccionamientos.nombre')
             ->orderBy('cuotas.fecha_vencimiento')
