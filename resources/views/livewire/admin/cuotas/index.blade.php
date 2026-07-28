@@ -1,3 +1,7 @@
+@php
+    $puedeImprimir = (bool) auth()->user()?->can('recibos.imprimir');
+@endphp
+
 <div class="max-w-6xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
 
     {{-- Header --}}
@@ -7,10 +11,21 @@
             <p class="text-gray-500">Busca una cuota y genera/imprime su recibo.</p>
         </div>
 
-        <a href="{{ route('admin.recibos.crear') }}"
-           class="w-full sm:w-auto text-center px-4 py-2 rounded-xl bg-black text-white text-sm font-semibold">
-            Crear recibo
-        </a>
+        <div class="grid grid-cols-2 sm:flex gap-2">
+            @if($puedeImprimir)
+                <button type="button"
+                        wire:click="alternarModoSeleccionMultiple"
+                        class="px-3 py-2 rounded-xl border text-sm font-semibold transition hover:bg-gray-50
+                               {{ $modoSeleccionMultiple ? 'border-gray-900 bg-gray-100' : 'border-gray-300 bg-white' }}">
+                    {{ $modoSeleccionMultiple ? 'Cerrar selección' : 'Imprimir varios' }}
+                </button>
+            @endif
+
+            <a href="{{ route('admin.recibos.crear') }}"
+               class="text-center px-4 py-2 rounded-xl bg-black text-white text-sm font-semibold">
+                Crear recibo
+            </a>
+        </div>
     </div>
 
     {{-- Filtros --}}
@@ -60,11 +75,81 @@
         </button>
     </div>
 
+    @php
+        $seleccionadasIds = collect($cuotasSeleccionadas ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $todasVisiblesSeleccionadas = count($cuotasImprimiblesIds ?? []) > 0
+            && collect($cuotasImprimiblesIds)->diff($seleccionadasIds)->isEmpty();
+    @endphp
+
+    @if($puedeImprimir && $modoSeleccionMultiple)
+        {{-- Selección múltiple --}}
+        <div class="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-lg" aria-hidden="true">
+                        🧾
+                    </div>
+                    <div>
+                        <div class="font-black text-gray-900">Imprimir varios recibos</div>
+                        <div class="text-sm text-gray-500">
+                            {{ count($cuotasSeleccionadas ?? []) }}
+                            {{ count($cuotasSeleccionadas ?? []) === 1 ? 'cuota seleccionada' : 'cuotas seleccionadas' }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:flex gap-2">
+                    <button type="button"
+                            wire:click='alternarCuotasVisibles(@json($cuotasImprimiblesIds ?? []))'
+                            wire:loading.attr="disabled"
+                            wire:target="alternarCuotasVisibles"
+                            @disabled(empty($cuotasImprimiblesIds))
+                            class="{{ count($cuotasSeleccionadas ?? []) === 0 ? 'col-span-2' : '' }}
+                                   px-3 py-2 rounded-xl border text-sm font-semibold transition
+                                   disabled:cursor-not-allowed disabled:opacity-40 hover:bg-gray-50">
+                        {{ $todasVisiblesSeleccionadas ? 'Quitar visibles' : 'Elegir visibles' }}
+                    </button>
+
+                    @if(count($cuotasSeleccionadas ?? []) > 0)
+                        <button type="button"
+                                wire:click="limpiarSeleccion"
+                                class="px-3 py-2 rounded-xl border text-sm font-semibold hover:bg-gray-50 transition">
+                            Limpiar
+                        </button>
+                    @endif
+
+                    <button type="button"
+                            wire:click="imprimirRecibosSeleccionados"
+                            wire:loading.attr="disabled"
+                            wire:target="imprimirRecibosSeleccionados"
+                            @disabled(count($cuotasSeleccionadas ?? []) === 0)
+                            class="col-span-2 px-4 py-2 rounded-xl bg-black text-white text-sm font-bold transition
+                                   hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300">
+                        <span wire:loading.remove wire:target="imprimirRecibosSeleccionados">Imprimir selección</span>
+                        <span wire:loading wire:target="imprimirRecibosSeleccionados">Preparando…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- TABLA (md+) --}}
     <div class="hidden md:block overflow-x-auto rounded-2xl border bg-white">
         <table class="w-full text-sm">
             <thead class="bg-gray-50">
                 <tr class="text-left">
+                    @if($puedeImprimir && $modoSeleccionMultiple)
+                        <th class="p-3 w-12">
+                            <input type="checkbox"
+                                   class="rounded border-gray-300 text-black focus:ring-black"
+                                   aria-label="Elegir todas las cuotas visibles con recibo"
+                                   wire:click='alternarCuotasVisibles(@json($cuotasImprimiblesIds ?? []))'
+                                   @checked($todasVisiblesSeleccionadas)
+                                   @disabled(empty($cuotasImprimiblesIds))>
+                        </th>
+                    @endif
                     <th class="p-3">Cliente</th>
                     <th class="p-3">Contrato</th>
                     <th class="p-3">Lote</th>
@@ -102,6 +187,20 @@
                     <tr wire:key="cuota-row-{{ $cuota->id }}"
                         class="border-t transition
                             {{ $esAnualidad ? 'bg-purple-50 hover:bg-purple-100' : ($esServicio ? 'bg-blue-50 hover:bg-blue-100' : 'bg-white hover:bg-gray-50') }}">
+
+                        @if($puedeImprimir && $modoSeleccionMultiple)
+                            <td class="p-3">
+                                @if($tieneRecibo)
+                                    <input type="checkbox"
+                                           value="{{ $cuota->id }}"
+                                           wire:model.live="cuotasSeleccionadas"
+                                           class="rounded border-gray-300 text-black focus:ring-black"
+                                           aria-label="Elegir cuota {{ $cuota->numero }} de {{ $cliente?->nombre_completo }}">
+                                @else
+                                    <span class="block w-4 text-center text-gray-300" aria-hidden="true">—</span>
+                                @endif
+                            </td>
+                        @endif
 
                         <td class="p-3">
                             <div class="font-semibold text-gray-900">{{ $cliente?->nombre_completo }}</div>
@@ -200,7 +299,7 @@
                                     @endif
                                 @endif
 
-                                @if($esPagada && $tieneRecibo)
+                                @if($puedeImprimir && $tieneRecibo)
                                     <button class="px-3 py-1.5 rounded-xl bg-black text-white hover:bg-gray-800 font-semibold transition"
                                             wire:click="imprimirReciboDeCuota({{ $cuota->id }})">
                                         Imprimir recibo
@@ -211,7 +310,10 @@
                     </tr>
                 @empty
                     <tr>
-                        <td class="p-6 text-gray-500 text-center" colspan="8">No hay cuotas.</td>
+                        <td class="p-6 text-gray-500 text-center"
+                            colspan="{{ $puedeImprimir && $modoSeleccionMultiple ? 9 : 8 }}">
+                            No hay cuotas.
+                        </td>
                     </tr>
                 @endforelse
             </tbody>
@@ -245,9 +347,18 @@
             <div wire:key="cuota-card-{{ $cuota->id }}"
                  class="rounded-2xl border bg-white p-4
                     {{ $esServicio ? 'border-blue-200' : '' }}
-                    {{ $esAnualidad ? 'border-purple-200 bg-purple-50' : '' }}">
+                    {{ $esAnualidad ? 'border-purple-200 bg-purple-50' : '' }}
+                    {{ $modoSeleccionMultiple && in_array((int) $cuota->id, $seleccionadasIds, true) ? 'ring-2 ring-black ring-offset-1' : '' }}">
 
                 <div class="flex items-start justify-between gap-3">
+                    @if($puedeImprimir && $modoSeleccionMultiple && $tieneRecibo)
+                        <input type="checkbox"
+                               value="{{ $cuota->id }}"
+                               wire:model.live="cuotasSeleccionadas"
+                               class="mt-1 rounded border-gray-300 text-black focus:ring-black"
+                               aria-label="Elegir cuota {{ $cuota->numero }} de {{ $cliente?->nombre_completo }}">
+                    @endif
+
                     <div class="min-w-0">
                         <div class="font-black leading-tight truncate">{{ $cliente?->nombre_completo }}</div>
 
@@ -345,7 +456,7 @@
                             @endif
                         @endif
 
-                        @if($esPagada && $tieneRecibo)
+                        @if($puedeImprimir && $tieneRecibo)
                             <button class="px-3 py-2 rounded-xl bg-black text-white hover:bg-gray-800 font-semibold"
                                     wire:click="imprimirReciboDeCuota({{ $cuota->id }})">
                                 Imprimir

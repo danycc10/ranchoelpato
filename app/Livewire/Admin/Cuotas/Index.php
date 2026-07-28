@@ -9,6 +9,7 @@ use App\Models\Propietario;
 use App\Models\Recibo;
 use App\Models\TipoCobro;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -40,6 +41,10 @@ class Index extends Component
 
     public ?string $urlImprimirRecargo = null;
 
+    public array $cuotasSeleccionadas = [];
+
+    public bool $modoSeleccionMultiple = false;
+
     protected $queryString = [
         'q' => ['except' => ''],
         'propietario_id' => ['except' => null],
@@ -65,6 +70,7 @@ class Index extends Component
         if (in_array($name, [
             'q', 'propietario_id', 'estatus', 'mes', 'desde', 'hasta', 'tipo_contrato', 'tipo_servicio_id',
         ], true)) {
+            $this->cuotasSeleccionadas = [];
             $this->resetPage();
         }
     }
@@ -285,27 +291,124 @@ class Index extends Component
     // =========================================================
     public function imprimirReciboDeCuota(int $cuotaId): void
     {
-        $principalUuid = $this->buscarReciboPrincipalUuid($cuotaId);
+        $this->autorizarImpresion();
 
-        if (! $principalUuid) {
+        $principal = $this->buscarReciboPrincipal($cuotaId);
+
+        if (! $principal) {
             $this->dispatch('toast', type: 'warning', message: 'Esa cuota aún no tiene recibo.');
 
             return;
         }
 
-        $recargoUuid = $this->buscarReciboRecargoUuid($cuotaId);
+        $recargo = $this->buscarReciboRecargo($cuotaId);
 
-        $urlPrincipal = route('admin.recibos.imprimir', ['recibo' => $principalUuid]);
+        $urlPrincipal = route('admin.recibos.imprimir', ['recibo' => $principal->uuid]);
 
-        if (! $recargoUuid) {
+        if (! $recargo) {
             $this->dispatch('open-print-tab', url: $urlPrincipal);
 
             return;
         }
 
         $this->urlImprimirPrincipal = $urlPrincipal;
-        $this->urlImprimirRecargo = route('admin.recibos.imprimir', ['recibo' => $recargoUuid]);
+        $this->urlImprimirRecargo = route('admin.recibos.imprimir', ['recibo' => $recargo->uuid]);
         $this->modalImprimir = true;
+    }
+
+    public function updatedCuotasSeleccionadas(): void
+    {
+        $this->cuotasSeleccionadas = $this->normalizarIds($this->cuotasSeleccionadas);
+    }
+
+    public function alternarCuotasVisibles(array $cuotaIds): void
+    {
+        $visibles = $this->cuotasConReciboIds($cuotaIds);
+
+        if ($visibles === []) {
+            $this->dispatch('toast', type: 'warning', message: 'No hay recibos disponibles en esta página.');
+
+            return;
+        }
+
+        $seleccionadas = $this->normalizarIds($this->cuotasSeleccionadas);
+        $todasSeleccionadas = collect($visibles)->diff($seleccionadas)->isEmpty();
+
+        $this->cuotasSeleccionadas = $todasSeleccionadas
+            ? array_values(array_diff($seleccionadas, $visibles))
+            : array_values(array_unique([...$seleccionadas, ...$visibles]));
+    }
+
+    public function alternarModoSeleccionMultiple(): void
+    {
+        $this->autorizarImpresion();
+
+        $this->modoSeleccionMultiple = ! $this->modoSeleccionMultiple;
+
+        if (! $this->modoSeleccionMultiple) {
+            $this->cuotasSeleccionadas = [];
+        }
+    }
+
+    public function limpiarSeleccion(): void
+    {
+        $this->cuotasSeleccionadas = [];
+    }
+
+    public function imprimirRecibosSeleccionados(): void
+    {
+        $this->autorizarImpresion();
+
+        $cuotaIds = $this->cuotasConReciboIds($this->cuotasSeleccionadas);
+
+        if ($cuotaIds === []) {
+            $this->cuotasSeleccionadas = [];
+            $this->dispatch('toast', type: 'warning', message: 'Selecciona al menos una cuota que tenga recibo.');
+
+            return;
+        }
+
+        $reciboIds = [];
+
+        foreach ($cuotaIds as $cuotaId) {
+            $principal = $this->buscarReciboPrincipal($cuotaId);
+            $recargo = $this->buscarReciboRecargo($cuotaId);
+
+            if ($principal) {
+                $reciboIds[] = (int) $principal->id;
+            }
+
+            if ($recargo) {
+                $reciboIds[] = (int) $recargo->id;
+            }
+        }
+
+        $reciboIds = array_values(array_unique($reciboIds));
+
+        if ($reciboIds === []) {
+            $this->cuotasSeleccionadas = [];
+            $this->dispatch('toast', type: 'warning', message: 'No se encontraron recibos vigentes para imprimir.');
+
+            return;
+        }
+
+        $token = Str::random(40);
+
+        cache()->put(
+            'print_batch:'.$token,
+            [
+                'user_id' => auth()->id(),
+                'recibo_ids' => $reciboIds,
+            ],
+            now()->addMinutes(30)
+        );
+
+        $this->cuotasSeleccionadas = [];
+        $this->modoSeleccionMultiple = false;
+        $this->dispatch(
+            'open-print-tab',
+            url: route('admin.recibos.print-lote', ['token' => $token])
+        );
     }
 
     public function cerrarModalImprimir(): void
@@ -317,6 +420,8 @@ class Index extends Component
 
     public function confirmarImpresion(string $tipo): void
     {
+        $this->autorizarImpresion();
+
         $principal = $this->urlImprimirPrincipal;
         $recargo = $this->urlImprimirRecargo;
 
@@ -363,7 +468,12 @@ class Index extends Component
         $this->cerrarModalImprimir();
     }
 
-    protected function buscarReciboPrincipalUuid(int $cuotaId): ?string
+    protected function autorizarImpresion(): void
+    {
+        abort_unless(auth()->user()?->can('recibos.imprimir'), 403);
+    }
+
+    protected function buscarReciboPrincipal(int $cuotaId): ?Recibo
     {
         $recargoTipoCobroId = $this->obtenerTipoCobroRecargoId();
 
@@ -386,8 +496,8 @@ class Index extends Component
             ->latest('id')
             ->first();
 
-        if ($pago?->recibo?->uuid) {
-            return $pago->recibo->uuid;
+        if ($pago?->recibo) {
+            return $pago->recibo;
         }
 
         // 2) Flujo histórico directo por recibos
@@ -399,12 +509,12 @@ class Index extends Component
                     ->orWhereRaw('UPPER(observaciones) NOT LIKE ?', ['%RECARGO%']);
             })
             ->latest('id')
-            ->first(['uuid']);
+            ->first(['id', 'uuid']);
 
-        return $recibo?->uuid ?: null;
+        return $recibo;
     }
 
-    protected function buscarReciboRecargoUuid(int $cuotaId): ?string
+    protected function buscarReciboRecargo(int $cuotaId): ?Recibo
     {
         $recargoTipoCobroId = $this->obtenerTipoCobroRecargoId();
 
@@ -426,8 +536,8 @@ class Index extends Component
             ->latest('id')
             ->first();
 
-        if ($pago?->recibo?->uuid) {
-            return $pago->recibo->uuid;
+        if ($pago?->recibo) {
+            return $pago->recibo;
         }
 
         // 2) Flujo directo por recibos
@@ -441,9 +551,44 @@ class Index extends Component
                 $x->orWhereRaw('UPPER(observaciones) LIKE ?', ['%RECARGO%']);
             })
             ->latest('id')
-            ->first(['uuid']);
+            ->first(['id', 'uuid']);
 
-        return $recibo?->uuid ?: null;
+        return $recibo;
+    }
+
+    protected function normalizarIds(array $ids): array
+    {
+        return collect($ids)
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function cuotasConReciboIds(array $ids): array
+    {
+        $ids = $this->normalizarIds($ids);
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $disponibles = Cuota::query()
+            ->whereIn('id', $ids)
+            ->where(function ($query) {
+                $query->whereHas('recibos')
+                    ->orWhereHas('pagos', function ($pago) {
+                        $pago->where('estatus', 'confirmado')
+                            ->whereNotNull('recibo_id')
+                            ->whereHas('recibo');
+                    });
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return array_values(array_intersect($ids, $disponibles));
     }
 
     protected function obtenerTipoCobroRecargoId(): ?int
@@ -473,6 +618,8 @@ class Index extends Component
 
         $this->mes = now()->format('Y-m');
         $this->aplicarRangoPorMes(true);
+        $this->cuotasSeleccionadas = [];
+        $this->modoSeleccionMultiple = false;
 
         $this->resetPage();
     }
@@ -487,7 +634,10 @@ class Index extends Component
         $cuotas = Cuota::query()
             ->with(['contrato.cliente', 'contrato.lote.fraccionamiento'])
             ->withExists([
-                'pagos as tiene_pago_recibo' => fn ($q) => $q->whereNotNull('recibo_id'),
+                'pagos as tiene_pago_recibo' => fn ($q) => $q
+                    ->where('estatus', 'confirmado')
+                    ->whereNotNull('recibo_id')
+                    ->whereHas('recibo'),
                 'recibos as tiene_recibo_directo' => fn ($q) => $q,
             ])
 
@@ -570,6 +720,16 @@ class Index extends Component
             ->orderBy('numero', 'asc')
             ->paginate(15);
 
+        $cuotasImprimiblesIds = $cuotas->getCollection()
+            ->filter(fn ($cuota) => (bool) (
+                ($cuota->tiene_pago_recibo ?? false) ||
+                ($cuota->tiene_recibo_directo ?? false)
+            ))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
         $propietarios = Propietario::orderBy('nombre')->get();
 
         $tiposServicio = TipoCobro::query()
@@ -578,7 +738,12 @@ class Index extends Component
             ->orderBy('nombre')
             ->get(['id', 'nombre']);
 
-        return view('livewire.admin.cuotas.index', compact('cuotas', 'propietarios', 'tiposServicio'))
+        return view('livewire.admin.cuotas.index', compact(
+            'cuotas',
+            'cuotasImprimiblesIds',
+            'propietarios',
+            'tiposServicio'
+        ))
             ->layout('layouts.app');
     }
 }

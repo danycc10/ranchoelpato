@@ -116,7 +116,7 @@ class PrivateFileController extends Controller
         );
     }
 
-    public function showContratoDocx(string $uuid)
+    public function showContratoDocx(string $uuid, ContratoWordService $contratoWordService)
     {
         abort_unless(auth()->check(), 403);
         abort_unless(auth()->user()?->can('sistema.ver'), 403);
@@ -132,8 +132,11 @@ class PrivateFileController extends Controller
 
         abort_unless(Storage::disk($disk)->exists($relativePath), 404);
 
+        $absolutePath = Storage::disk($disk)->path($relativePath);
+        $contratoWordService->limpiarMetadatosPersonales($absolutePath);
+
         return response()->file(
-            Storage::disk($disk)->path($relativePath),
+            $absolutePath,
             [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
@@ -177,6 +180,8 @@ class PrivateFileController extends Controller
         }
 
         $absolutePath = Storage::disk($disk)->path($relativePath);
+        $contratoWordService->limpiarMetadatosPersonales($absolutePath);
+
         $nombre = $documento['filename_slug']
             .'-'
             .Str::slug((string) ($contrato->folio_contrato ?: $contrato->uuid))

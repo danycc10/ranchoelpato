@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PhpOffice\PhpWord\TemplateProcessor;
 use RuntimeException;
+use ZipArchive;
 
 class ContratoWordService
 {
@@ -105,8 +106,44 @@ class ContratoWordService
         }
 
         $template->saveAs($absolutePath);
+        $this->limpiarMetadatosPersonales($absolutePath);
 
         return $relativePath;
+    }
+
+    public function limpiarMetadatosPersonales(string $absolutePath): void
+    {
+        $zip = new ZipArchive;
+        $resultado = $zip->open($absolutePath);
+
+        if ($resultado !== true) {
+            throw new RuntimeException('No se pudo abrir el documento Word para limpiar sus metadatos.');
+        }
+
+        try {
+            $coreXml = $zip->getFromName('docProps/core.xml');
+
+            if ($coreXml === false) {
+                return;
+            }
+
+            $coreXmlLimpio = preg_replace(
+                [
+                    '#<dc:creator(?:\s[^>]*)?>.*?</dc:creator>#si',
+                    '#<dc:creator(?:\s[^>]*)?/>#si',
+                    '#<cp:lastModifiedBy(?:\s[^>]*)?>.*?</cp:lastModifiedBy>#si',
+                    '#<cp:lastModifiedBy(?:\s[^>]*)?/>#si',
+                ],
+                '',
+                $coreXml
+            );
+
+            if ($coreXmlLimpio === null || ! $zip->addFromString('docProps/core.xml', $coreXmlLimpio)) {
+                throw new RuntimeException('No se pudieron limpiar los metadatos del documento Word.');
+            }
+        } finally {
+            $zip->close();
+        }
     }
 
     public function generarTodosDocx(Contrato $contrato): array
