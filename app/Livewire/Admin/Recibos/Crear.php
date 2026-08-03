@@ -16,6 +16,7 @@ use App\Models\ReciboPago;
 use App\Models\TipoCobro;
 use App\Services\Contabilidad\PropietarioContableResolver;
 use App\Services\ImageUploadService;
+use App\Services\Recibos\CuotaAntiguedadSelector;
 use App\Services\Recibos\RecargoCuotaCalculator;
 use App\Services\Recibos\ReciboFolioService;
 use App\Services\Recibos\ReciboPagoNormalizer;
@@ -74,6 +75,10 @@ class Crear extends Component
     public array $cuotasOptions = [];
 
     public bool $asociarACuota = false;
+
+    public ?string $avisoOrdenCuotas = null;
+
+    public bool $showAvisoOrdenCuotasModal = false;
 
     public bool $tipoEsServicio = false;
 
@@ -205,8 +210,21 @@ class Crear extends Component
         }
 
         if ($incomingResolvedId) {
-            $cuota = Cuota::with('contrato.cliente', 'contrato.lote.fraccionamiento')
+            $cuotaSolicitada = Cuota::with('contrato.cliente', 'contrato.lote.fraccionamiento')
                 ->findOrFail((int) $incomingResolvedId);
+
+            // Los accesos desde la pantalla de cuotas pueden apuntar al mes visible
+            // (por ejemplo, agosto), aunque exista una mensualidad anterior pendiente.
+            $cuota = $this->resolverCuotaPendienteMasAntiguaEquivalente($cuotaSolicitada);
+
+            if ((int) $cuotaSolicitada->id !== (int) $cuota->id) {
+                $this->avisoOrdenCuotas = 'La cuota #'.$cuotaSolicitada->numero
+                    .' no es la más antigua. Se seleccionó la cuota #'.$cuota->numero
+                    .' con vencimiento '.$cuota->fecha_vencimiento?->format('d/m/Y').'.';
+                $this->showAvisoOrdenCuotasModal = true;
+            }
+
+            $incomingResolvedId = (int) $cuota->id;
 
             $cuotaEsAnualidad = (bool) ($cuota->es_anualidad ?? false)
                 || (mb_strtoupper((string) ($cuota->concepto ?? '')) === 'ANUALIDAD');
@@ -370,6 +388,8 @@ class Crear extends Component
         }
 
         if ($property === 'tipos_cobro_id') {
+            $this->avisoOrdenCuotas = null;
+            $this->showAvisoOrdenCuotasModal = false;
             $this->tipoEsServicio = $this->tipoCobroEsServicio($this->tipos_cobro_id);
             $this->asociarACuota = $this->tipoCobroRequiereAsociarCuota($this->tipos_cobro_id);
 
@@ -403,6 +423,8 @@ class Crear extends Component
         }
 
         if ($property === 'contrato_id') {
+            $this->avisoOrdenCuotas = null;
+            $this->showAvisoOrdenCuotasModal = false;
             $this->cuotaId = null;
             $this->cuotaIds = [];
             $this->cuotasOptions = [];
@@ -457,6 +479,20 @@ class Crear extends Component
             ->unique()
             ->values()
             ->all();
+
+        $seleccionFueAjustada = $this->normalizarSeleccionPorAntiguedad();
+
+        if ($seleccionFueAjustada) {
+            $this->avisoOrdenCuotas = 'Seleccionaste una cuota que no es la más antigua. '
+                .'El sistema incluyó primero todas las cuotas pendientes anteriores.';
+            $this->showAvisoOrdenCuotasModal = true;
+
+            $this->dispatch(
+                'toast',
+                type: 'warning',
+                message: $this->avisoOrdenCuotas
+            );
+        }
 
         $seleccionMultiple = count($this->cuotaIds) > 1;
 
@@ -678,6 +714,8 @@ class Crear extends Component
             return;
         }
 
+        $this->avisoOrdenCuotas = null;
+        $this->showAvisoOrdenCuotasModal = false;
         $this->setCliente($clienteId, $cliente->nombre_completo);
         $this->mostrarResultadosClientes = false;
         $this->clientesResultados = [];
@@ -690,6 +728,11 @@ class Crear extends Component
     public function ocultarResultadosCliente(): void
     {
         $this->mostrarResultadosClientes = false;
+    }
+
+    public function cerrarModalAvisoOrdenCuotas(): void
+    {
+        $this->showAvisoOrdenCuotasModal = false;
     }
 
     protected function openPrintTab(int $reciboId): void
@@ -1108,6 +1151,14 @@ class Crear extends Component
             $this->cuotaIds,
             fn ($id) => array_key_exists((int) $id, $this->cuotasOptions)
         ));
+
+        if ($this->cuotasOptions !== []) {
+            if ($this->cuotaIds === []) {
+                $this->cuotaIds = [(int) array_key_first($this->cuotasOptions)];
+            } else {
+                $this->normalizarSeleccionPorAntiguedad();
+            }
+        }
 
         if (count($this->cuotaIds) === 1) {
             $this->cuotaId = (int) $this->cuotaIds[0];
@@ -1543,6 +1594,68 @@ class Crear extends Component
         });
     }
 
+    protected function resolverCuotaPendienteMasAntiguaEquivalente(Cuota $cuota): Cuota
+    {
+        $esAnualidad = (bool) ($cuota->es_anualidad ?? false)
+            || mb_strtoupper((string) ($cuota->concepto ?? '')) === 'ANUALIDAD';
+
+        $query = Cuota::with('contrato.cliente', 'contrato.lote.fraccionamiento')
+            ->where('contrato_id', $cuota->contrato_id)
+            ->where('estatus', '!=', 'pagada')
+            ->orderBy('fecha_vencimiento')
+            ->orderBy('numero')
+            ->orderBy('id');
+
+        if ($esAnualidad) {
+            $query->where(function ($q) {
+                $q->where('es_anualidad', 1)
+                    ->orWhereRaw("UPPER(COALESCE(concepto,'')) = 'ANUALIDAD'");
+            });
+        } else {
+            $query->where(function ($q) {
+                $q->whereNull('es_anualidad')
+                    ->orWhere('es_anualidad', 0);
+            })->where(function ($q) {
+                $q->whereNull('concepto')
+                    ->orWhereRaw("UPPER(COALESCE(concepto,'')) <> 'ANUALIDAD'");
+            });
+        }
+
+        return $query->first() ?? $cuota;
+    }
+
+    protected function normalizarSeleccionPorAntiguedad(): bool
+    {
+        $idsOrdenados = array_map('intval', array_keys($this->cuotasOptions));
+
+        if ($idsOrdenados === []) {
+            return false;
+        }
+
+        $normalizados = app(CuotaAntiguedadSelector::class)
+            ->prefijoHastaLaUltimaSeleccionada($idsOrdenados, $this->cuotaIds);
+
+        if ($normalizados === []) {
+            $normalizados = [$idsOrdenados[0]];
+        }
+
+        $actuales = collect($this->cuotaIds)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($actuales === $normalizados) {
+            return false;
+        }
+
+        $this->cuotaIds = $normalizados;
+        $this->cuotaId = count($normalizados) === 1 ? $normalizados[0] : null;
+
+        return true;
+    }
+
     protected function obtenerTipoCobroRecargoId(): ?int
     {
         $id = TipoCobro::query()
@@ -1760,9 +1873,34 @@ class Crear extends Component
                 ]);
             }
 
+            $cuotasPendientesQuery = Cuota::query()
+                ->where('contrato_id', $this->contrato_id)
+                ->where('estatus', '!=', 'pagada');
+
+            $cuotasPendientesQuery = $this->scopeCuotasSegunTipoCobro($cuotasPendientesQuery);
+
+            $idsPendientesOrdenados = $cuotasPendientesQuery
+                ->lockForUpdate()
+                ->orderBy('fecha_vencimiento')
+                ->orderBy('numero')
+                ->orderBy('id')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if (! app(CuotaAntiguedadSelector::class)->seleccionEsPrefijo(
+                $idsPendientesOrdenados,
+                $cuotaIds->all()
+            )) {
+                throw ValidationException::withMessages([
+                    'cuotaIds' => 'Debes cobrar primero la cuota pendiente más antigua. Actualiza la selección e inténtalo de nuevo.',
+                ]);
+            }
+
             $cuotas = Cuota::with('contrato')
                 ->whereIn('id', $cuotaIds)
                 ->where('contrato_id', $this->contrato_id)
+                ->where('estatus', '!=', 'pagada')
                 ->lockForUpdate()
                 ->orderBy('fecha_vencimiento')
                 ->get();
@@ -2043,6 +2181,8 @@ class Crear extends Component
             'cuotasSeleccionadasInfo',
             'montoTotalSeleccionado',
             'recargoTotalSeleccionado',
+            'avisoOrdenCuotas',
+            'showAvisoOrdenCuotasModal',
             'pagos',
         ]);
 

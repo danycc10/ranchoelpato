@@ -431,6 +431,25 @@
             @if($asociarACuota)
             <div class="mt-3">
                 <label class="text-xs text-gray-500">Cuotas a pagar / asociar</label>
+                <p class="mt-1 text-xs font-semibold text-amber-700">
+                    Se cobra primero la cuota pendiente más antigua. Si eliges una posterior, también se incluirán las anteriores.
+                </p>
+
+                @if($avisoOrdenCuotas)
+                <div role="alert" class="mt-2 flex items-start justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                    <div>
+                        <span class="font-black">Atención:</span>
+                        {{ $avisoOrdenCuotas }}
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="$set('avisoOrdenCuotas', null)"
+                        class="shrink-0 rounded-lg px-2 py-1 font-bold hover:bg-amber-100"
+                        aria-label="Cerrar aviso">
+                        ×
+                    </button>
+                </div>
+                @endif
 
                 <div class="mt-2 rounded-2xl border divide-y max-h-72 overflow-y-auto">
                     @forelse($cuotasOptions as $id => $label)
@@ -799,6 +818,46 @@
             </button>
         </div>
     </div>
+
+    {{-- Modal de advertencia por orden de cuotas --}}
+    @if($showAvisoOrdenCuotasModal && $avisoOrdenCuotas)
+    <div
+        wire:key="aviso-orden-cuotas-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="aviso-orden-cuotas-titulo"
+        class="fixed inset-0 z-[9997] flex items-center justify-center bg-black/70 p-4">
+        <div class="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div class="flex items-center gap-3 bg-amber-500 px-5 py-4">
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
+                    <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h2 id="aviso-orden-cuotas-titulo" class="text-lg font-black text-white">
+                        Cuota fuera de orden
+                    </h2>
+                    <p class="text-sm text-amber-100">Primero debe cobrarse la cuota más antigua</p>
+                </div>
+            </div>
+
+            <div class="space-y-3 px-6 py-5 text-sm text-gray-700">
+                <p class="font-semibold text-gray-900">{{ $avisoOrdenCuotas }}</p>
+                <p>Revisa las cuotas seleccionadas antes de continuar con el recibo.</p>
+            </div>
+
+            <div class="px-6 pb-6">
+                <button
+                    type="button"
+                    wire:click="cerrarModalAvisoOrdenCuotas"
+                    class="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-black text-white transition hover:bg-amber-600">
+                    Entendido, revisar selección
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
 
     {{-- Modal evidencia por forma de pago --}}
     @if($showPagoEvidenciaModal && $pagoEvidenciaIndex !== null)

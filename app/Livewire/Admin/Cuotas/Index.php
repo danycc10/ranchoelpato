@@ -31,6 +31,8 @@ class Index extends Component
 
     public ?string $hasta = null; // YYYY-MM-DD
 
+    public bool $rangoFechaAutomatico = false;
+
     public string $tipo_contrato = 'todos'; // todos | terreno | servicio
 
     public ?int $tipo_servicio_id = null;
@@ -58,7 +60,9 @@ class Index extends Component
 
     public function mount(): void
     {
-        if (! $this->mes) {
+        $this->rangoFechaAutomatico = ! $this->mes && ! $this->desde && ! $this->hasta;
+
+        if ($this->rangoFechaAutomatico) {
             $this->mes = now()->format('Y-m');
         }
 
@@ -77,12 +81,38 @@ class Index extends Component
 
     public function updatedMes(): void
     {
+        $this->rangoFechaAutomatico = false;
         $this->aplicarRangoPorMes(true);
 
         if ($this->tipo_contrato !== 'servicio') {
             $this->tipo_servicio_id = null;
         }
 
+        $this->resetPage();
+    }
+
+    public function updatedDesde(): void
+    {
+        $this->rangoFechaAutomatico = false;
+    }
+
+    public function updatedHasta(): void
+    {
+        $this->rangoFechaAutomatico = false;
+    }
+
+    public function updatedQ($value): void
+    {
+        if (trim((string) $value) === '' || ! $this->rangoFechaAutomatico) {
+            return;
+        }
+
+        // La búsqueda por cliente debe revisar su historial completo, no limitarse
+        // al mes actual que la pantalla coloca automáticamente al abrirse.
+        $this->mes = null;
+        $this->desde = null;
+        $this->hasta = null;
+        $this->rangoFechaAutomatico = false;
         $this->resetPage();
     }
 
@@ -617,6 +647,7 @@ class Index extends Component
         $this->tipo_contrato = 'todos';
 
         $this->mes = now()->format('Y-m');
+        $this->rangoFechaAutomatico = true;
         $this->aplicarRangoPorMes(true);
         $this->cuotasSeleccionadas = [];
         $this->modoSeleccionMultiple = false;
