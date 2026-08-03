@@ -432,7 +432,7 @@
             <div class="mt-3">
                 <label class="text-xs text-gray-500">Cuotas a pagar / asociar</label>
                 <p class="mt-1 text-xs font-semibold text-amber-700">
-                    Se cobra primero la cuota pendiente más antigua. Si eliges una posterior, también se incluirán las anteriores.
+                    Se recomienda cobrar primero la cuota pendiente más antigua. Las excepciones requieren confirmación.
                 </p>
 
                 @if($avisoOrdenCuotas)
@@ -838,21 +838,29 @@
                     <h2 id="aviso-orden-cuotas-titulo" class="text-lg font-black text-white">
                         Cuota fuera de orden
                     </h2>
-                    <p class="text-sm text-amber-100">Primero debe cobrarse la cuota más antigua</p>
+                    <p class="text-sm text-amber-100">La cuota más antigua es la opción recomendada</p>
                 </div>
             </div>
 
             <div class="space-y-3 px-6 py-5 text-sm text-gray-700">
                 <p class="font-semibold text-gray-900">{{ $avisoOrdenCuotas }}</p>
-                <p>Revisa las cuotas seleccionadas antes de continuar con el recibo.</p>
+                <p>
+                    En una situación especial puedes continuar con la cuota elegida, pero debes confirmar expresamente la excepción.
+                </p>
             </div>
 
-            <div class="px-6 pb-6">
+            <div class="grid gap-2 px-6 pb-6 sm:grid-cols-2">
                 <button
                     type="button"
-                    wire:click="cerrarModalAvisoOrdenCuotas"
+                    wire:click="usarCuotaMasAntigua"
                     class="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-black text-white transition hover:bg-amber-600">
-                    Entendido, revisar selección
+                    Usar la más antigua
+                </button>
+                <button
+                    type="button"
+                    wire:click="continuarConCuotaFueraDeOrden"
+                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50">
+                    Continuar como excepción
                 </button>
             </div>
         </div>

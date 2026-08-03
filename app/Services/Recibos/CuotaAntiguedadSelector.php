@@ -5,37 +5,16 @@ namespace App\Services\Recibos;
 class CuotaAntiguedadSelector
 {
     /**
-     * Devuelve todas las cuotas desde la más antigua hasta la última seleccionada.
-     *
      * @param  array<int, int|string>  $idsOrdenados
      * @param  array<int, int|string>  $idsSeleccionados
-     * @return array<int, int>
      */
-    public function prefijoHastaLaUltimaSeleccionada(array $idsOrdenados, array $idsSeleccionados): array
-    {
-        $ordenados = $this->normalizarIds($idsOrdenados);
-        $seleccionados = $this->normalizarIds($idsSeleccionados);
-
-        if ($ordenados === [] || $seleccionados === []) {
-            return [];
-        }
-
-        $posiciones = array_flip($ordenados);
-        $ultimaPosicion = null;
-
-        foreach ($seleccionados as $id) {
-            if (! array_key_exists($id, $posiciones)) {
-                continue;
-            }
-
-            $ultimaPosicion = max($ultimaPosicion ?? 0, (int) $posiciones[$id]);
-        }
-
-        if ($ultimaPosicion === null) {
-            return [];
-        }
-
-        return array_slice($ordenados, 0, $ultimaPosicion + 1);
+    public function seleccionPermitida(
+        array $idsOrdenados,
+        array $idsSeleccionados,
+        bool $excepcionAutorizada
+    ): bool {
+        return $excepcionAutorizada
+            || $this->seleccionEsPrefijo($idsOrdenados, $idsSeleccionados);
     }
 
     /**
