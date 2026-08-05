@@ -42,6 +42,7 @@ return [
     'whatsapp' => [
         'provider' => env('WHATSAPP_PROVIDER', 'openwa'),
         'provider_switching_enabled' => (bool) env('WHATSAPP_PROVIDER_SWITCHING_ENABLED', false),
+        'comprobantes_admin_enabled' => (bool) env('WHATSAPP_COMPROBANTES_ADMIN_ENABLED', false),
     ],
 
     /*

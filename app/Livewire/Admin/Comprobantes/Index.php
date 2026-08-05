@@ -96,6 +96,8 @@ class Index extends Component
 
     public function mount(): void
     {
+        abort_unless(config('services.whatsapp.comprobantes_admin_enabled', false), 404);
+
         if ($this->comprobanteId) {
             $this->abrir($this->comprobanteId);
         }

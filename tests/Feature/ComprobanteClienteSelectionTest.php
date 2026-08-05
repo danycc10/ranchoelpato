@@ -18,8 +18,18 @@ class ComprobanteClienteSelectionTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
+    public function bloquea_la_bandeja_cuando_esta_deshabilitada_en_el_admin(): void
+    {
+        config()->set('services.whatsapp.comprobantes_admin_enabled', false);
+
+        Livewire::test(Index::class)->assertStatus(404);
+    }
+
+    #[Test]
     public function permite_vincular_manualmente_un_cliente_cuando_openwa_envia_un_lid_sin_telefono(): void
     {
+        config()->set('services.whatsapp.comprobantes_admin_enabled', true);
+
         // Contrato usa SoftDeletes en el modelo; la migración histórica de la
         // base de pruebas no contiene aún esa columna que sí existe en operación.
         Schema::table('contratos', fn (Blueprint $table) => $table->softDeletes());

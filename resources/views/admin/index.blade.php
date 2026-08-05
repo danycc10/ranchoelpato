@@ -12,13 +12,16 @@
             </div>
 
             @php
-            // Pendientes por revisar: sin este número la bandeja pasa desapercibida.
-            $comprobantesPorValidar = \App\Models\ComprobantePago::where('estatus', 'por_validar')->count();
+            $comprobantesWhatsappHabilitados = (bool) config('services.whatsapp.comprobantes_admin_enabled', false);
+            // No consulta la bandeja mientras el módulo está apagado.
+            $comprobantesPorValidar = $comprobantesWhatsappHabilitados
+                ? \App\Models\ComprobantePago::where('estatus', 'por_validar')->count()
+                : 0;
 
             $items = [
             ['title'=>'Cuotas','desc'=>'Calendario y control de pagos.','route'=>'admin.cuotas','icon'=>'clipboard'],
             ['title'=>'Recibos','desc'=>'Consulta y registro de recibos.','route'=>'admin.recibos.index','icon'=>'receipt'],
-            ['title'=>'Comprobantes WhatsApp','desc'=>'Valida los pagos que mandan los clientes por WhatsApp.','route'=>'admin.comprobantes.index','icon'=>'chat','badge'=>$comprobantesPorValidar],
+            ['title'=>'Comprobantes WhatsApp','desc'=>'Valida los pagos que mandan los clientes por WhatsApp.','route'=>'admin.comprobantes.index','icon'=>'chat','badge'=>$comprobantesPorValidar,'disabled'=>!$comprobantesWhatsappHabilitados],
             ['title'=>'Clientes','desc'=>'Altas, bajas y edición.','route'=>'admin.clientes','icon'=>'users'],
             ['title'=>'Contratos','desc'=>'Crear y administrar contratos.','route'=>'admin.contratos.index','icon'=>'document'],
             ['title'=>'Contratos de servicio','desc'=>'Financiamiento de instalación (agua / electricidad).','route'=>'admin.contratos-servicios.index','icon'=>'bolt'],
@@ -72,10 +75,16 @@
 
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-6">
                 @foreach($items as $it)
-                @php $pendientes = (int) ($it['badge'] ?? 0); @endphp
+                @php
+                    $pendientes = (int) ($it['badge'] ?? 0);
+                    $deshabilitado = (bool) ($it['disabled'] ?? false);
+                @endphp
 
-                <a href="{{ route($it['route']) }}"
-                    class="group relative p-5 rounded-2xl bg-white hover:bg-gray-100 hover:shadow-xl transition flex gap-4
+                <{{ $deshabilitado ? 'div' : 'a' }}
+                    @unless($deshabilitado) href="{{ route($it['route']) }}" @endunless
+                    @if($deshabilitado) aria-disabled="true" @endif
+                    class="group relative flex gap-4 rounded-2xl bg-white p-5 transition
+                        {{ $deshabilitado ? 'cursor-not-allowed opacity-50 grayscale' : 'hover:bg-gray-100 hover:shadow-xl' }}
                         {{ $pendientes > 0 ? 'ring-2 ring-amber-400' : '' }}">
 
                     {{-- ICONO --}}
@@ -108,7 +117,13 @@
                         </span>
                     @endif
 
-                </a>
+                    @if($deshabilitado)
+                        <span class="absolute right-3 top-3 rounded-full bg-gray-200 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-gray-600">
+                            Desactivado
+                        </span>
+                    @endif
+
+                </{{ $deshabilitado ? 'div' : 'a' }}>
                 @endforeach
             </div>
 
