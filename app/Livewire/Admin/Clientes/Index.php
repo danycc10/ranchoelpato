@@ -137,7 +137,19 @@ class Index extends Component
 
         $digits = preg_replace('/\D+/', '', $value);
 
-        return $digits !== '' ? $digits : null;
+        if ($digits === '') {
+            return null;
+        }
+
+        if (strlen($digits) === 13 && str_starts_with($digits, '521')) {
+            return substr($digits, 3);
+        }
+
+        if (strlen($digits) === 12 && str_starts_with($digits, '52')) {
+            return substr($digits, 2);
+        }
+
+        return $digits;
     }
 
     protected function rules(): array
@@ -153,12 +165,11 @@ class Index extends Component
                     return;
                 }
 
-                if (strlen($digits) === 12 && str_starts_with($digits, '52')) {
-                    $digits = substr($digits, 2);
-                }
+                $esMexico = strlen($digits) === 10;
+                $esEstadosUnidos = strlen($digits) === 11 && str_starts_with($digits, '1');
 
-                if (strlen($digits) !== 10) {
-                    $fail('El teléfono debe tener 10 dígitos (MX).');
+                if (! $esMexico && ! $esEstadosUnidos) {
+                    $fail('El teléfono debe tener 10 dígitos (México) o 1 + 10 dígitos (EE. UU.).');
                 }
             }],
 
@@ -178,10 +189,6 @@ class Index extends Component
         $this->validate();
 
         $telefono = $this->normalizePhone($this->form['telefono'] ?? null);
-
-        if ($telefono && strlen($telefono) === 12 && str_starts_with($telefono, '52')) {
-            $telefono = substr($telefono, 2);
-        }
 
         $payload = [
             'nombres' => trim((string) $this->form['nombres']),

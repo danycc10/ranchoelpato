@@ -3,7 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Recibo;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Recibos\ReciboPdfService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -18,24 +18,11 @@ class ReciboMail extends Mailable
 
     public function build()
     {
-        $this->recibo->load([
-            'cliente',
-            'contrato',
-            'lote.fraccionamiento',
-            'tipoCobro',
-            'formaPago',
-            'cuentaBancaria',
-            'periodo',
-            'capturadoPor',
-        ]);
+        // Mismo PDF que se manda por WhatsApp: una sola fuente de verdad.
+        $pdfService = app(ReciboPdfService::class);
 
-        // ✅ PDF con tu vista existente
-        $pdf = Pdf::loadView('admin.recibos.imprimir', [
-            'recibo' => $this->recibo,
-            'modo' => 'pdf',
-        ]);
-
-        $filename = 'Recibo-'.($this->recibo->folio ?? $this->recibo->id).'.pdf';
+        $pdfBytes = $pdfService->generar($this->recibo);
+        $filename = $pdfService->nombreArchivo($this->recibo);
 
         // ✅ Link (si quieres mostrar botón "Ver recibo")
         $urlVerRecibo = null;
@@ -50,7 +37,7 @@ class ReciboMail extends Mailable
                 'recibo' => $this->recibo,
                 'urlVerRecibo' => $urlVerRecibo, // opcional
             ])
-            ->attachData($pdf->output(), $filename, [
+            ->attachData($pdfBytes, $filename, [
                 'mime' => 'application/pdf',
             ]);
     }

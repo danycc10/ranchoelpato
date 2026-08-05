@@ -745,7 +745,7 @@ class CobranzaDashboard extends Component
             return;
         }
 
-        $telefono = $this->normalizarTelefonoMexico($cliente->telefono);
+        $telefono = $this->normalizarTelefonoWhatsapp($cliente->telefono);
 
         if (! $telefono) {
             $this->dispatch('toast', type: 'warning', message: 'El teléfono no es válido.');
@@ -759,12 +759,16 @@ class CobranzaDashboard extends Component
         $this->dispatch('open-url', url: $url);
     }
 
-    protected function normalizarTelefonoMexico(?string $telefono): ?string
+    protected function normalizarTelefonoWhatsapp(?string $telefono): ?string
     {
         $digits = preg_replace('/\D+/', '', (string) $telefono);
 
         if (strlen($digits) === 10) {
             return '52'.$digits;
+        }
+
+        if (strlen($digits) === 11 && str_starts_with($digits, '1')) {
+            return $digits;
         }
 
         if (strlen($digits) === 12 && str_starts_with($digits, '52')) {

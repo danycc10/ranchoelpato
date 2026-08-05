@@ -13,9 +13,10 @@ class ReciboFolioService
 
         $ultimo = Recibo::withTrashed()
             ->where('anio', $anio)
-            ->where('folio', 'regexp', '^R-'.$anio.'-[0-9]{6}$')
+            ->where('folio', 'like', 'R-'.$anio.'-%')
             ->orderByDesc('folio')
-            ->value('folio');
+            ->pluck('folio')
+            ->first(fn (string $folio) => preg_match('/^R-'.$anio.'-[0-9]{6}$/', $folio) === 1);
 
         $numero = $ultimo ? ((int) substr($ultimo, -6)) + 1 : 1;
 

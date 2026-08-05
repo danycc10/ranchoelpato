@@ -12,9 +12,13 @@
             </div>
 
             @php
+            // Pendientes por revisar: sin este número la bandeja pasa desapercibida.
+            $comprobantesPorValidar = \App\Models\ComprobantePago::where('estatus', 'por_validar')->count();
+
             $items = [
             ['title'=>'Cuotas','desc'=>'Calendario y control de pagos.','route'=>'admin.cuotas','icon'=>'clipboard'],
             ['title'=>'Recibos','desc'=>'Consulta y registro de recibos.','route'=>'admin.recibos.index','icon'=>'receipt'],
+            ['title'=>'Comprobantes WhatsApp','desc'=>'Valida los pagos que mandan los clientes por WhatsApp.','route'=>'admin.comprobantes.index','icon'=>'chat','badge'=>$comprobantesPorValidar],
             ['title'=>'Clientes','desc'=>'Altas, bajas y edición.','route'=>'admin.clientes','icon'=>'users'],
             ['title'=>'Contratos','desc'=>'Crear y administrar contratos.','route'=>'admin.contratos.index','icon'=>'document'],
             ['title'=>'Contratos de servicio','desc'=>'Financiamiento de instalación (agua / electricidad).','route'=>'admin.contratos-servicios.index','icon'=>'bolt'],
@@ -61,16 +65,21 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 6h9.75m-9.75 0a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 12H7.5m9 6h3.75m-3.75 0a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 18H13.5"/>',
             'bolt' => '
             <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 2.25 4.5 13.5H12l-1.5 8.25L19.5 10.5H12l1.5-8.25Z" />',
+            'chat' => '
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />',
             ];
             @endphp
 
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-6">
                 @foreach($items as $it)
+                @php $pendientes = (int) ($it['badge'] ?? 0); @endphp
+
                 <a href="{{ route($it['route']) }}"
-                    class="group p-5 rounded-2xl bg-white hover:bg-gray-100 hover:shadow-xl transition flex gap-4">
+                    class="group relative p-5 rounded-2xl bg-white hover:bg-gray-100 hover:shadow-xl transition flex gap-4
+                        {{ $pendientes > 0 ? 'ring-2 ring-amber-400' : '' }}">
 
                     {{-- ICONO --}}
-                    <div class="h-11 w-11 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-black transition">
+                    <div class="h-11 w-11 shrink-0 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-black transition">
                         <svg xmlns="http://www.w3.org/2000/svg"
                             fill="none" viewBox="0 0 24 24"
                             stroke-width="1.8"
@@ -89,6 +98,15 @@
                             {{ $it['desc'] }}
                         </div>
                     </div>
+
+                    {{-- PENDIENTES POR REVISAR --}}
+                    @if($pendientes > 0)
+                        <span class="absolute top-3 right-3 min-w-[1.5rem] px-2 py-0.5 rounded-full
+                            bg-amber-500 text-white text-xs font-black text-center"
+                            title="{{ $pendientes }} por validar">
+                            {{ $pendientes > 99 ? '99+' : $pendientes }}
+                        </span>
+                    @endif
 
                 </a>
                 @endforeach
