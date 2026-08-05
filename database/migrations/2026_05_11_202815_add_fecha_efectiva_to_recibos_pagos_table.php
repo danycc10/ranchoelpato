@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -17,12 +18,22 @@ return new class extends Migration
         });
 
         // Rellenar históricos usando la fecha del recibo
-        DB::statement('
-            UPDATE recibos_pagos rp
-            INNER JOIN recibos r ON r.id = rp.recibo_id
-            SET rp.fecha_efectiva = r.fecha
-            WHERE rp.fecha_efectiva IS NULL
-        ');
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement('
+                UPDATE recibos_pagos
+                SET fecha_efectiva = (
+                    SELECT r.fecha FROM recibos r WHERE r.id = recibos_pagos.recibo_id
+                )
+                WHERE fecha_efectiva IS NULL
+            ');
+        } else {
+            DB::statement('
+                UPDATE recibos_pagos rp
+                INNER JOIN recibos r ON r.id = rp.recibo_id
+                SET rp.fecha_efectiva = r.fecha
+                WHERE rp.fecha_efectiva IS NULL
+            ');
+        }
     }
 
     public function down(): void

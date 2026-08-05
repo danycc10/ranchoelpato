@@ -22,15 +22,32 @@ return new class extends Migration
          * Para recibos ya existentes, tomar el propietario real
          * desde lote -> fraccionamiento -> propietario_id
          */
-        DB::statement('
-            UPDATE recibos r
-            INNER JOIN lotes l
-                ON l.id = r.lote_id
-            INNER JOIN fraccionamientos f
-                ON f.id = l.fraccionamiento_id
-            SET r.propietario_contable_id = f.propietario_id
-            WHERE r.propietario_contable_id IS NULL
-        ');
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement('
+                UPDATE recibos
+                SET propietario_contable_id = (
+                    SELECT f.propietario_id
+                    FROM lotes l
+                    INNER JOIN fraccionamientos f ON f.id = l.fraccionamiento_id
+                    WHERE l.id = recibos.lote_id
+                )
+                WHERE propietario_contable_id IS NULL
+                  AND EXISTS (
+                    SELECT 1
+                    FROM lotes l
+                    INNER JOIN fraccionamientos f ON f.id = l.fraccionamiento_id
+                    WHERE l.id = recibos.lote_id
+                  )
+            ');
+        } else {
+            DB::statement('
+                UPDATE recibos r
+                INNER JOIN lotes l ON l.id = r.lote_id
+                INNER JOIN fraccionamientos f ON f.id = l.fraccionamiento_id
+                SET r.propietario_contable_id = f.propietario_id
+                WHERE r.propietario_contable_id IS NULL
+            ');
+        }
     }
 
     public function down(): void

@@ -192,6 +192,64 @@
     const btnPrintLocal = document.getElementById('btnPrintLocal');
     const printStatus = document.getElementById('printStatus');
 
+    function crearDocumentoImpresion(ticketEl)
+    {
+        const printDocument = document.implementation.createHTMLDocument('Recibo');
+        printDocument.documentElement.lang = 'es';
+
+        const meta = printDocument.createElement('meta');
+        meta.setAttribute('charset', 'utf-8');
+        printDocument.head.appendChild(meta);
+
+        const style = printDocument.createElement('style');
+        style.textContent = `
+            @page { size: 80mm auto; margin: 0; }
+            * { box-sizing: border-box; }
+            body {
+                margin: 0;
+                padding: 0;
+                background: #fff;
+                color: #000;
+                font-family: Arial, sans-serif;
+                font-size: 13px;
+                line-height: 1.25;
+            }
+            .ticket { width: 72mm; margin: 0 auto; padding: 8px 8px 10px; }
+            .center { text-align: center; }
+            .right { text-align: right; }
+            .bold { font-weight: 800; }
+            .small, .muted { font-size: 12px; }
+            .muted { color: #000; font-weight: 600; }
+            .hr { border: 0; border-top: 2px solid #000; margin: 8px 0; }
+            .block { margin: 6px 0; }
+            .row { display: table; width: 100%; }
+            .row > div { display: table-cell; vertical-align: top; }
+            .row .right { width: 1%; white-space: nowrap; }
+            .logo-empresa {
+                display: block;
+                max-width: 60mm;
+                max-height: 18mm;
+                object-fit: contain;
+                margin: 0 auto 4px;
+            }
+            .logo-fracc {
+                display: block;
+                max-width: 55mm;
+                max-height: 18mm;
+                object-fit: contain;
+                margin: 6px auto 2px;
+            }
+            table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+            th, td { padding: 4px 0; vertical-align: top; }
+            thead th { border-bottom: 2px solid #000; padding-bottom: 6px; }
+            tfoot th { border-top: 2px solid #000; padding-top: 6px; }
+        `;
+        printDocument.head.appendChild(style);
+        printDocument.body.appendChild(ticketEl.cloneNode(true));
+
+        return '<!doctype html>' + printDocument.documentElement.outerHTML;
+    }
+
     async function getJsonOrThrow(response)
     {
         const raw = await response.text();
@@ -240,115 +298,11 @@
             }
 
             const ticketEl = document.getElementById('ticket-print-area');
-
-            const html = `
-                <!doctype html>
-                <html lang="es">
-                <head>
-                    <meta charset="utf-8">
-                    <style>
-                        body{
-                            margin:0;
-                            padding:0;
-                            background:#fff;
-                            color:#000;
-                            font-family:Arial,sans-serif;
-                            font-size:13px;
-                            line-height:1.25;
-                        }
-
-                        .ticket{
-                            width:72mm;
-                            margin:0 auto;
-                            padding:8px 8px 10px;
-                        }
-
-                        .center{text-align:center;}
-                        .right{text-align:right;}
-                        .bold{font-weight:800;}
-                        .small{font-size:12px;}
-
-                        .muted{
-                            font-size:12px;
-                            color:#000;
-                            font-weight:600;
-                        }
-
-                        .hr{
-                            border:none;
-                            border-top:2px solid #000;
-                            margin:8px 0;
-                        }
-
-                        .block{ margin:6px 0; }
-
-                        .row{
-                            display:table;
-                            width:100%;
-                        }
-
-                        .row > div{
-                            display:table-cell;
-                            vertical-align:top;
-                        }
-
-                        .row .right{
-                            width:1%;
-                            white-space:nowrap;
-                        }
-
-                        .logo-empresa{
-                            max-width:60mm;
-                            max-height:18mm;
-                            object-fit:contain;
-                            margin:0 auto 4px;
-                            display:block;
-                        }
-
-                        .logo-fracc{
-                            max-width:55mm;
-                            max-height:18mm;
-                            object-fit:contain;
-                            margin:6px auto 2px;
-                            display:block;
-                        }
-
-                        table{
-                            width:100%;
-                            border-collapse:collapse;
-                            margin-top:6px;
-                        }
-
-                        th,td{
-                            padding:4px 0;
-                            vertical-align:top;
-                        }
-
-                        thead th{
-                            border-bottom:2px solid #000;
-                            padding-bottom:6px;
-                        }
-
-                        tfoot th{
-                            border-top:2px solid #000;
-                            padding-top:6px;
-                        }
-
-                        @page{
-                            size:80mm auto;
-                            margin:0;
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${ticketEl.innerHTML}
-                </body>
-                </html>
-            `;
+            const html = crearDocumentoImpresion(ticketEl);
 
             printStatus.textContent = 'Enviando a impresora local...';
 
-            const printResponse = await fetch(`${NODE_URL}/print-html`, {
+            const printResponse = await fetch(NODE_URL + '/print-html', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

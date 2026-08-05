@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\RecibosPrintController;
 use App\Http\Controllers\PrivateFileController;
 use App\Livewire\Admin\ClientesExcelentes\Contrato as ClientesExcelentesContrato;
 use App\Livewire\Admin\ClientesExcelentes\Index as ClientesExcelentesIndex;
+use App\Livewire\Admin\Comprobantes\Index as ComprobantesIndex;
 use App\Livewire\Admin\Contratos\Create as ContratosCreate;
 use App\Livewire\Admin\Contratos\Edit as ContratosEdit;
 use App\Livewire\Admin\Contratos\Index as ContratosIndex;
@@ -132,6 +133,10 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
             ->name('sistema.index')
             ->middleware('permission:sistema.ver');
 
+        Route::get('/sistema/openai/uso', App\Livewire\Admin\OpenAiUsos\Index::class)
+            ->name('sistema.openai-usos.index')
+            ->middleware(['permission:sistema.ver', 'permission:logs.ver']);
+
         /*
         | Catálogos
         */
@@ -243,6 +248,14 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
             ->name('cuotas')
             ->middleware('permission:cuotas.ver');
 
+        /*
+        | Comprobantes de pago llegados por WhatsApp.
+        | Validarlos genera un recibo, así que exige el mismo permiso que crearlos.
+        */
+        Route::get('/comprobantes', ComprobantesIndex::class)
+            ->name('comprobantes.index')
+            ->middleware('permission:recibos.crear');
+
         Route::get('/recibos', RecibosIndex::class)
             ->name('recibos.index')
             ->middleware('permission:recibos.crear');
@@ -321,4 +334,5 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
         Route::get('/logs', App\Livewire\Admin\Logs\Index::class)
             ->name('logs.index')
             ->middleware('permission:logs.ver');
+
     });
