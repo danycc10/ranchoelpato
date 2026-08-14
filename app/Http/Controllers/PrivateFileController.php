@@ -90,12 +90,12 @@ class PrivateFileController extends Controller
         abort_unless(auth()->check(), 403);
         abort_unless(auth()->user()?->can('sistema.ver'), 403);
 
-        $documento = ContratoWordService::documentType($tipo);
-        abort_unless($documento, 404);
-
         $contrato = Contrato::query()
             ->where('uuid', $uuid)
             ->firstOrFail();
+
+        $documento = ContratoWordService::documentTypeFor($tipo, $contrato);
+        abort_unless($documento, 404);
 
         $relativePath = $contrato->{$documento['scan_field']};
 
@@ -159,12 +159,12 @@ class PrivateFileController extends Controller
         abort_unless(auth()->check(), 403);
         abort_unless(auth()->user()?->can('sistema.ver'), 403);
 
-        $documento = ContratoWordService::documentType($tipo);
-        abort_unless($documento, 404);
-
         $contrato = Contrato::query()
             ->where('uuid', $uuid)
             ->firstOrFail();
+
+        $documento = ContratoWordService::documentTypeFor($tipo, $contrato);
+        abort_unless($documento, 404);
 
         $disk = $contrato->archivo_contrato_disk ?: 'private';
         $field = $documento['docx_field'];

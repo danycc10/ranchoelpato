@@ -6,6 +6,7 @@ use App\Models\Contrato;
 use App\Models\Cuota;
 use App\Models\Promocion;
 use App\Services\Contratos\ContratoPlanService;
+use App\Services\Contratos\ContratoWordService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -288,7 +289,7 @@ class Create extends Component
         return ($base->folio_contrato ?? 'CT')."-{$sigla}-".now()->format('YmdHis');
     }
 
-    public function guardar()
+    public function guardar(ContratoWordService $contratoWordService)
     {
         $this->step = 1;
         $this->validateStep();
@@ -366,6 +367,23 @@ class Create extends Component
                 ]);
             }
         });
+
+        // El contrato de financiamiento eléctrico se deja listo desde la creación;
+        // si la plantilla falla, el contrato ya quedó guardado y el Word se
+        // vuelve a intentar al descargarlo desde la pantalla del contrato.
+        if ($contrato && $this->servicio_tipo === 'electricidad') {
+            try {
+                $contrato->update([
+                    'archivo_contrato_financiamiento_electrico_docx' => $contratoWordService->generarDocx(
+                        $contrato,
+                        'contrato_financiamiento_electrico'
+                    ),
+                    'archivo_contrato_disk' => 'private',
+                ]);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
 
         $this->dispatch('toast', type: 'success', message: 'Contrato de servicio creado y cuotas generadas.');
 

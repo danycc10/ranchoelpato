@@ -60,6 +60,15 @@ class Show extends Component
         }
 
         $this->loadContrato($contrato);
+
+        $this->documentoTipoSeleccionado = $this->primerDocumentoDisponible();
+    }
+
+    private function primerDocumentoDisponible(): string
+    {
+        $documentos = ContratoWordService::documentTypesFor($this->contrato);
+
+        return (string) (array_key_first($documentos) ?? 'contrato');
     }
 
     private function loadContrato(Contrato $contrato): void
@@ -104,7 +113,7 @@ class Show extends Component
         $this->loadContrato($this->contrato);
 
         $this->documentoAccion = null;
-        $this->documentoTipoSeleccionado = 'contrato';
+        $this->documentoTipoSeleccionado = $this->primerDocumentoDisponible();
         $this->resetDocumentoUpload();
 
         $this->modalContratoOpen = true;
@@ -114,7 +123,7 @@ class Show extends Component
     {
         $this->modalContratoOpen = false;
         $this->documentoAccion = null;
-        $this->documentoTipoSeleccionado = 'contrato';
+        $this->documentoTipoSeleccionado = $this->primerDocumentoDisponible();
         $this->resetDocumentoUpload();
     }
 
@@ -134,7 +143,7 @@ class Show extends Component
     {
         abort_unless(auth()->user()?->can('sistema.ver'), 403);
 
-        if (! ContratoWordService::documentType($tipo)) {
+        if (! ContratoWordService::documentTypeFor($tipo, $this->contrato)) {
             return;
         }
 
@@ -232,7 +241,7 @@ class Show extends Component
 
     private function documentoSeleccionadoConfig(): array
     {
-        $documento = ContratoWordService::documentType($this->documentoTipoSeleccionado);
+        $documento = ContratoWordService::documentTypeFor($this->documentoTipoSeleccionado, $this->contrato);
 
         abort_unless($documento, 404);
 
@@ -769,7 +778,7 @@ class Show extends Component
 
         return view('livewire.admin.contratos-servicios.show', [
             'cuotas' => $cuotas,
-            'documentosContrato' => ContratoWordService::documentTypes(),
+            'documentosContrato' => ContratoWordService::documentTypesFor($this->contrato),
         ])->layout('layouts.app');
     }
 }

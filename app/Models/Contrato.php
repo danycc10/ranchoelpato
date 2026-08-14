@@ -52,6 +52,8 @@ class Contrato extends Model
         'archivo_convenio_pago_docx',
         'archivo_convenio_pago_reconocimiento_adeudo',
         'archivo_convenio_pago_reconocimiento_adeudo_docx',
+        'archivo_contrato_financiamiento_electrico',
+        'archivo_contrato_financiamiento_electrico_docx',
         'alerta_convenio',
 
         'comprador_ine_frente',

@@ -7,10 +7,8 @@ use App\Models\ComprobantePago;
 use App\Models\Cuota;
 use App\Models\User;
 use App\Services\Comprobantes\RegistrarPagoComprobanteService;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -21,8 +19,6 @@ class RegistrarPagoComprobanteMultipleTest extends TestCase
     #[Test]
     public function genera_recibos_separados_para_principal_y_recargo_de_cada_cuota(): void
     {
-        Schema::table('contratos', fn (Blueprint $table) => $table->softDeletes());
-
         $ahora = now();
         $usuario = User::factory()->create();
         $cliente = Cliente::create([

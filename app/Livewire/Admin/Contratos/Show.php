@@ -130,7 +130,7 @@ class Show extends Component
     {
         abort_unless(auth()->user()?->can('sistema.ver'), 403);
 
-        if (! ContratoWordService::documentType($tipo)) {
+        if (! ContratoWordService::documentTypeFor($tipo, $this->contrato)) {
             return;
         }
 
@@ -333,7 +333,7 @@ class Show extends Component
 
     private function documentoSeleccionadoConfig(): array
     {
-        $documento = ContratoWordService::documentType($this->documentoTipoSeleccionado);
+        $documento = ContratoWordService::documentTypeFor($this->documentoTipoSeleccionado, $this->contrato);
 
         abort_unless($documento, 404);
 
@@ -946,7 +946,7 @@ class Show extends Component
     public function render()
     {
         return view('livewire.admin.contratos.show', [
-            'documentosContrato' => ContratoWordService::documentTypes(),
+            'documentosContrato' => ContratoWordService::documentTypesFor($this->contrato),
         ])
             ->layout('layouts.app');
     }

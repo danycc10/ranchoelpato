@@ -3,6 +3,7 @@
 namespace App\Services\Contratos;
 
 use App\Models\Contrato;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PhpOffice\PhpWord\TemplateProcessor;
@@ -20,6 +21,8 @@ class ContratoWordService
             'filename_slug' => 'contrato',
             'scan_filename' => 'contrato.pdf',
             'uses_fraccionamiento_template' => true,
+            // Es el contrato de compraventa del lote: no aplica a contratos de servicio.
+            'tipos' => ['terreno'],
         ],
         'constancia_terminacion_pago' => [
             'label' => 'Constancia de terminación de pago',
@@ -52,6 +55,17 @@ class ContratoWordService
             'scan_filename' => 'convenio-pago-reconocimiento-adeudo.pdf',
             'uses_fraccionamiento_template' => false,
         ],
+        'contrato_financiamiento_electrico' => [
+            'label' => 'Contrato de financiamiento eléctrico',
+            'template' => 'plantillas/CONTRATO_FINANCIAMIENTO_INFRAESTRUCTURA_ELECTRICA.docx',
+            'docx_field' => 'archivo_contrato_financiamiento_electrico_docx',
+            'scan_field' => 'archivo_contrato_financiamiento_electrico',
+            'filename_slug' => 'contrato-financiamiento-electrico',
+            'scan_filename' => 'contrato-financiamiento-electrico.pdf',
+            'uses_fraccionamiento_template' => false,
+            // Solo aplica a contratos de servicio de luz.
+            'servicio_tipos' => ['electricidad'],
+        ],
     ];
 
     public static function documentTypes(): array
@@ -73,12 +87,70 @@ class ContratoWordService
         return array_keys(self::DOCUMENT_TYPES);
     }
 
+    /**
+     * Documentos disponibles para un contrato concreto.
+     *
+     * Algunos formatos solo aplican a cierto tipo de servicio (por ejemplo, el
+     * contrato de financiamiento eléctrico solo existe para contratos de luz).
+     */
+    public static function documentTypesFor(?Contrato $contrato): array
+    {
+        return array_filter(
+            self::documentTypes(),
+            fn (array $documento) => self::aplicaAContrato($documento, $contrato)
+        );
+    }
+
+    public static function documentTypeFor(string $key, ?Contrato $contrato): ?array
+    {
+        $documento = self::documentType($key);
+
+        if (! $documento || ! self::aplicaAContrato($documento, $contrato)) {
+            return null;
+        }
+
+        return $documento;
+    }
+
+    public static function aplicaAContrato(array $documento, ?Contrato $contrato): bool
+    {
+        $tipos = $documento['tipos'] ?? null;
+        $servicioTipos = $documento['servicio_tipos'] ?? null;
+
+        if (empty($tipos) && empty($servicioTipos)) {
+            return true;
+        }
+
+        if (! $contrato) {
+            return false;
+        }
+
+        $tipoContrato = (string) ($contrato->tipo ?: 'terreno');
+
+        if (! empty($tipos) && ! in_array($tipoContrato, $tipos, true)) {
+            return false;
+        }
+
+        if (empty($servicioTipos)) {
+            return true;
+        }
+
+        return $tipoContrato === 'servicio'
+            && in_array((string) $contrato->servicio_tipo, $servicioTipos, true);
+    }
+
     public function generarDocx(Contrato $contrato, string $tipo = 'contrato'): string
     {
         $documento = self::documentType($tipo);
 
         if (! $documento) {
             throw new RuntimeException('Tipo de documento no válido.');
+        }
+
+        if (! self::aplicaAContrato($documento, $contrato)) {
+            throw new RuntimeException(
+                'El documento '.($documento['label'] ?? $tipo).' no aplica para este contrato.'
+            );
         }
 
         $contrato->loadMissing([
@@ -91,6 +163,10 @@ class ContratoWordService
         );
 
         $this->setCommonValues($template, $contrato);
+
+        if ($tipo === 'contrato_financiamiento_electrico') {
+            $this->setFinanciamientoElectricoValues($template, $contrato);
+        }
 
         $this->setImageIfExists($template, 'vendedor_ine_frente', $contrato->vendedor_ine_frente);
         $this->setImageIfExists($template, 'vendedor_ine_reverso', $contrato->vendedor_ine_reverso);
@@ -150,7 +226,7 @@ class ContratoWordService
     {
         $paths = [];
 
-        foreach (self::documentTypes() as $key => $documento) {
+        foreach (self::documentTypesFor($contrato) as $key => $documento) {
             $paths[$documento['docx_field']] = $this->generarDocx($contrato, $key);
         }
 
@@ -227,6 +303,219 @@ class ContratoWordService
             'fecha_hoy',
             now()->day.' de '.now()->translatedFormat('F').' del '.now()->year
         );
+    }
+
+    /**
+     * Datos exclusivos del contrato de financiamiento de infraestructura eléctrica.
+     *
+     * Lo que no existe en el sistema (forma de pago, identificación oficial, etc.)
+     * se deja como línea en blanco para llenarse a mano.
+     */
+    protected function setFinanciamientoElectricoValues(TemplateProcessor $template, Contrato $contrato): void
+    {
+        $contrato->loadMissing([
+            'cliente',
+            'lote.fraccionamiento.propietario',
+            'contratoBase',
+        ]);
+
+        $propietario = $contrato->lote?->fraccionamiento?->propietario;
+        $cliente = $contrato->cliente;
+
+        $template->setValue('proveedor_nombre', $this->linea(
+            $propietario?->nombre_legal ?: ($propietario?->nombre ?: $contrato->vendedor_nombre_legal)
+        ));
+
+        $template->setValue('cliente_nombre', $this->linea(
+            $contrato->comprador_nombre_legal ?: ($cliente?->nombre_legal ?: $cliente?->nombre_completo)
+        ));
+
+        $template->setValue('lote_identificacion', $this->linea($this->descripcionLote($contrato)));
+
+        $template->setValue('cliente_curp', $this->linea($cliente?->curp ?: $contrato->comprador_curp));
+        $template->setValue('cliente_rfc', $this->linea($cliente?->rfc));
+        $template->setValue('cliente_domicilio', $this->linea($cliente?->direccion, 45));
+        $template->setValue('cliente_telefono', $this->linea($cliente?->telefono, 20));
+        $template->setValue('cliente_correo', $this->linea($cliente?->correo, 35));
+        $template->setValue('cliente_identificacion', $this->linea(
+            $contrato->comprador_ine_frente ? 'Credencial para votar (INE)' : null,
+            35
+        ));
+
+        $template->setValue('medidas', $this->linea($this->descripcionMedidas($contrato), 45));
+        $template->setValue('contrato_relacionado', $this->linea(
+            $contrato->contratoBase?->folio_contrato ?: $contrato->folio_contrato,
+            25
+        ));
+
+        $precioTotal = (float) $contrato->precio_total;
+
+        $template->setValue('precio_total_numero', $this->formatMoney($precioTotal));
+        $template->setValue('precio_total_letra', $this->montoEnLetra($precioTotal));
+        $template->setValue('enganche_numero', $this->formatMoney((float) $contrato->enganche));
+        $template->setValue('saldo_financiado_numero', $this->formatMoney((float) $contrato->saldo_inicial));
+        $template->setValue('monto_pago_numero', $this->formatMoney((float) $contrato->monto_pago));
+
+        [$numeroPagos, $primerPago, $ultimoPago] = $this->resumenCalendario($contrato);
+
+        $template->setValue('numero_pagos', $this->linea($numeroPagos > 0 ? (string) $numeroPagos : null, 8));
+        $template->setValue('fecha_primer_pago', $this->linea($this->fechaLarga($primerPago), 28));
+        $template->setValue('fecha_ultimo_pago', $this->linea($this->fechaLarga($ultimoPago), 28));
+
+        $template->setValue('periodicidad', $contrato->frecuencia === 'semanal' ? 'Semanal' : 'Mensual');
+        $template->setValue('dias_pago', $this->linea($this->diasPagoTexto($contrato), 30));
+        $template->setValue('forma_pago', $this->linea(null, 40));
+
+        $template->setValue('recargo_mora', $this->recargoMoraTexto($contrato));
+        $template->setValue('dias_incumplimiento', $this->linea(
+            ((int) $contrato->dias_gracia) > 0 ? (string) (int) $contrato->dias_gracia : null,
+            6
+        ));
+
+        $template->setValue('ciudad_firma', 'Piedras Negras');
+        $template->setValue('fecha_firma_larga', $this->fechaLarga(now()));
+    }
+
+    protected function descripcionLote(Contrato $contrato): string
+    {
+        $partes = [];
+
+        if ($contrato->lote?->lote) {
+            $partes[] = 'Lote '.$contrato->lote->lote;
+        }
+
+        if ($contrato->lote?->manzana) {
+            $partes[] = 'Manzana '.$contrato->lote->manzana;
+        }
+
+        if ($contrato->lote?->fraccionamiento?->nombre) {
+            $partes[] = $contrato->lote->fraccionamiento->nombre;
+        }
+
+        if ($partes === []) {
+            return $this->safe($contrato->lote?->clave);
+        }
+
+        return implode(', ', $partes);
+    }
+
+    protected function descripcionMedidas(Contrato $contrato): string
+    {
+        $medidas = [
+            'Norte' => $contrato->medida_norte_snapshot ?: $contrato->lote?->medida_norte,
+            'Sur' => $contrato->medida_sur_snapshot ?: $contrato->lote?->medida_sur,
+            'Este' => $contrato->medida_este_snapshot ?: $contrato->lote?->medida_este,
+            'Oeste' => $contrato->medida_oeste_snapshot ?: $contrato->lote?->medida_oeste,
+        ];
+
+        $partes = [];
+
+        foreach ($medidas as $lado => $valor) {
+            if ($valor === null || (float) $valor <= 0) {
+                continue;
+            }
+
+            $partes[] = $lado.' '.number_format((float) $valor, 2).' m';
+        }
+
+        $area = (float) ($contrato->area_m2_snapshot ?: $contrato->lote?->area_m2);
+
+        if ($area > 0) {
+            $partes[] = 'superficie '.number_format($area, 2).' m²';
+        }
+
+        return implode(', ', $partes);
+    }
+
+    /**
+     * Número de pagos y fechas de la primera y última parcialidad.
+     *
+     * @return array{0: int, 1: ?CarbonInterface, 2: ?CarbonInterface}
+     */
+    protected function resumenCalendario(Contrato $contrato): array
+    {
+        $cuotas = $contrato->cuotas()
+            ->orderBy('numero')
+            ->get(['fecha_vencimiento']);
+
+        if ($cuotas->isNotEmpty()) {
+            return [
+                $cuotas->count(),
+                $cuotas->first()?->fecha_vencimiento,
+                $cuotas->last()?->fecha_vencimiento,
+            ];
+        }
+
+        $montoPago = (float) $contrato->monto_pago;
+        $numeroPagos = $montoPago > 0
+            ? (int) ceil((float) $contrato->saldo_inicial / $montoPago)
+            : 0;
+
+        return [$numeroPagos, $contrato->fecha_inicio, null];
+    }
+
+    protected function diasPagoTexto(Contrato $contrato): string
+    {
+        if ($contrato->frecuencia === 'semanal') {
+            $dia = ContratoPlanService::diasSemana()[(int) $contrato->dia_semana] ?? null;
+
+            return $dia ? 'Cada '.mb_strtolower($dia, 'UTF-8') : '';
+        }
+
+        return $contrato->dia_mes
+            ? 'Día '.(int) $contrato->dia_mes.' de cada mes'
+            : '';
+    }
+
+    protected function recargoMoraTexto(Contrato $contrato): string
+    {
+        $valor = (float) $contrato->valor_recargo;
+
+        if ($valor <= 0) {
+            return $this->linea(null, 30);
+        }
+
+        if ($contrato->tipo_recargo === 'porcentaje') {
+            return number_format($valor, 2).'% sobre la parcialidad vencida';
+        }
+
+        return $this->formatMoney($valor).' M.N. por cada parcialidad vencida';
+    }
+
+    protected function fechaLarga($fecha): string
+    {
+        if (! $fecha) {
+            return '';
+        }
+
+        return $fecha->translatedFormat('d \d\e F \d\e Y');
+    }
+
+    protected function formatMoney($amount): string
+    {
+        return '$'.number_format((float) $amount, 2);
+    }
+
+    protected function montoEnLetra($amount): string
+    {
+        $amount = (float) $amount;
+
+        $entero = (int) floor($amount);
+        $centavos = (int) round(($amount - $entero) * 100);
+
+        $texto = mb_strtoupper($this->numeroATexto($entero), 'UTF-8');
+
+        return $texto.' PESOS '.str_pad((string) $centavos, 2, '0', STR_PAD_LEFT).'/100 MONEDA NACIONAL';
+    }
+
+    /**
+     * Valor listo para imprimir: el dato o una línea para llenarse a mano.
+     */
+    protected function linea($valor, int $largo = 30): string
+    {
+        $valor = $this->safe($valor);
+
+        return $valor !== '' ? $valor : str_repeat('_', $largo);
     }
 
     protected function buildRelativePath(Contrato $contrato, array $documento): string

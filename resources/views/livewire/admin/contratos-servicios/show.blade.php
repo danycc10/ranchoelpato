@@ -386,7 +386,7 @@
                                 wire:click="seleccionarAccionDocumento('descargar')"
                                 class="text-left rounded-2xl border p-4 hover:bg-gray-50">
                                 <div class="font-black text-gray-900">Descargar documentos</div>
-                                <div class="text-sm text-gray-500">Word de contrato, constancia y convenios.</div>
+                                <div class="text-sm text-gray-500">Word de los formatos disponibles para este contrato.</div>
                             </button>
 
                             <button

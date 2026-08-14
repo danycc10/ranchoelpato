@@ -6,9 +6,7 @@ use App\Livewire\Admin\Comprobantes\Index;
 use App\Models\Cliente;
 use App\Models\ComprobantePago;
 use App\Models\User;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -29,10 +27,6 @@ class ComprobanteClienteSelectionTest extends TestCase
     public function permite_vincular_manualmente_un_cliente_cuando_openwa_envia_un_lid_sin_telefono(): void
     {
         config()->set('services.whatsapp.comprobantes_admin_enabled', true);
-
-        // Contrato usa SoftDeletes en el modelo; la migración histórica de la
-        // base de pruebas no contiene aún esa columna que sí existe en operación.
-        Schema::table('contratos', fn (Blueprint $table) => $table->softDeletes());
 
         $usuario = User::factory()->create();
         $cliente = Cliente::create([

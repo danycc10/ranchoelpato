@@ -16,6 +16,7 @@ class ContratoWordServiceTest extends TestCase
                 'constancia_terminacion_pago',
                 'convenio_pago',
                 'convenio_pago_reconocimiento_adeudo',
+                'contrato_financiamiento_electrico',
             ],
             ContratoWordService::validDocumentTypeKeys()
         );
