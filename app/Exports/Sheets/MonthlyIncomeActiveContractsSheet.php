@@ -2,7 +2,9 @@
 
 namespace App\Exports\Sheets;
 
+use App\Services\Contratos\ContratoPlanService;
 use App\Services\Reports\MonthlyIncomeReportData;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -43,6 +45,8 @@ class MonthlyIncomeActiveContractsSheet implements FromCollection, WithColumnFor
             'LOTE',
             'FRACCIONAMIENTO',
             'CANTIDAD QUE PAGA',
+            'DÍA DE COBRO',
+            'SEMANAS DEL MES',
         ];
     }
 
@@ -75,7 +79,9 @@ class MonthlyIncomeActiveContractsSheet implements FromCollection, WithColumnFor
                 'clientes.apellidos',
                 'lotes.lote',
                 'fraccionamientos.nombre',
-                'contratos.monto_pago'
+                'contratos.monto_pago',
+                'contratos.frecuencia',
+                'contratos.dia_semana'
             )
 
             ->orderBy('fraccionamientos.nombre')
@@ -89,22 +95,58 @@ class MonthlyIncomeActiveContractsSheet implements FromCollection, WithColumnFor
                 DB::raw("COALESCE(lotes.lote, 'SIN LOTE') as lote"),
                 DB::raw("COALESCE(fraccionamientos.nombre, 'Sin finca') as fraccionamiento"),
                 DB::raw('COALESCE(contratos.monto_pago, 0) as cantidad_paga'),
+                DB::raw("COALESCE(contratos.frecuencia, '') as frecuencia"),
+                'contratos.dia_semana',
+                // Cuotas del contrato que vencen dentro del mes: en los contratos
+                // semanales es justo el número de semanas que cubre el mes.
+                DB::raw('COUNT(DISTINCT cuotas.id) as cuotas_del_mes'),
+                DB::raw('MIN(cuotas.fecha_vencimiento) as primer_vencimiento'),
             ])
             ->get()
             ->map(function ($r) {
+                $esSemanal = str_contains(mb_strtolower((string) ($r->frecuencia ?? '')), 'seman');
+
                 return [
                     (string) ($r->nombre ?? ''),
                     (string) ($r->lote ?? ''),
                     (string) ($r->fraccionamiento ?? ''),
                     (float) ($r->cantidad_paga ?? 0),
+                    $esSemanal ? $this->diaDeCobro($r) : '',
+                    $esSemanal ? (int) ($r->cuotas_del_mes ?? 0) : '',
                 ];
             });
+    }
+
+    /**
+     * Día de la semana en que cobra el contrato.
+     *
+     * Se toma el configurado en el contrato y, si viene vacío (contratos
+     * importados), se deduce del primer vencimiento del mes.
+     */
+    protected function diaDeCobro(object $fila): string
+    {
+        $dias = ContratoPlanService::diasSemana();
+
+        $dia = (int) ($fila->dia_semana ?? 0);
+
+        if (! isset($dias[$dia]) && ! empty($fila->primer_vencimiento)) {
+            try {
+                $dia = Carbon::parse($fila->primer_vencimiento)->isoWeekday();
+            } catch (\Throwable) {
+                return '';
+            }
+        }
+
+        return isset($dias[$dia])
+            ? mb_strtoupper($dias[$dia], 'UTF-8')
+            : '';
     }
 
     public function columnFormats(): array
     {
         return [
             'D' => '"$"#,##0.00',
+            'F' => '0',
         ];
     }
 
@@ -189,10 +231,16 @@ class MonthlyIncomeActiveContractsSheet implements FromCollection, WithColumnFor
                     ],
                 ]);
 
+                $sheet->getStyle("E2:F{$highestRow}")
+                    ->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
                 $sheet->getColumnDimension('A')->setWidth(30);
                 $sheet->getColumnDimension('B')->setWidth(10);
                 $sheet->getColumnDimension('C')->setWidth(26);
                 $sheet->getColumnDimension('D')->setWidth(16);
+                $sheet->getColumnDimension('E')->setWidth(14);
+                $sheet->getColumnDimension('F')->setWidth(16);
 
                 $sheet->setShowGridlines(false);
             },
