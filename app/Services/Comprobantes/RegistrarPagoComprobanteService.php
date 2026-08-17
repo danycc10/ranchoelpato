@@ -7,13 +7,13 @@ use App\Models\Contrato;
 use App\Models\Cuota;
 use App\Models\Notificacion;
 use App\Models\Pago;
-use App\Models\Periodo;
 use App\Models\Recibo;
 use App\Models\ReciboPago;
 use App\Models\TipoCobro;
 use App\Services\Contabilidad\PropietarioContableResolver;
 use App\Services\Notificaciones\ProcesarNotificacionService;
 use App\Services\Recibos\CuotaAntiguedadSelector;
+use App\Services\Recibos\PeriodoResolver;
 use App\Services\Recibos\ReciboFolioService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -505,17 +505,7 @@ class RegistrarPagoComprobanteService
 
     protected function periodoDe(Cuota $cuota): ?int
     {
-        if (! $cuota->fecha_vencimiento) {
-            return null;
-        }
-
-        $dt = Carbon::parse($cuota->fecha_vencimiento);
-
-        return Periodo::query()
-            ->where('tipo', 'mensual')
-            ->where('anio', (int) $dt->year)
-            ->where('mes', (int) $dt->month)
-            ->value('id');
+        return app(PeriodoResolver::class)->idParaFecha($cuota->fecha_vencimiento);
     }
 
     /**

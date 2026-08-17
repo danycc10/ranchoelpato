@@ -125,6 +125,27 @@ class RegistrarPagoComprobanteMultipleTest extends TestCase
 
         $this->assertCount(4, $recibos);
         $this->assertSame(500.0, round((float) $recibos->sum('monto'), 2));
+
+        // Cada recibo (principal y recargo) lleva el periodo de su propia cuota,
+        // aunque el mes no estuviera dado de alta en el catálogo.
+        foreach ([$cuotaJulio->id => 7, $cuotaAgosto->id => 8] as $cuotaId => $mes) {
+            $recibosCuota = $recibos->where('cuota_id', $cuotaId);
+
+            $this->assertCount(2, $recibosCuota);
+
+            foreach ($recibosCuota as $recibo) {
+                $this->assertNotNull(
+                    $recibo->periodo_id,
+                    "El recibo {$recibo->folio} se guardó sin periodo."
+                );
+                $this->assertDatabaseHas('periodos', [
+                    'id' => $recibo->periodo_id,
+                    'tipo' => 'mensual',
+                    'anio' => 2026,
+                    'mes' => $mes,
+                ]);
+            }
+        }
         $this->assertSame(2, $recibos->where('tipos_cobro_id', $tipoCobroId)->count());
         $this->assertSame(2, $recibos->where('tipos_cobro_id', $tipoRecargoId)->count());
         $this->assertDatabaseCount('comprobante_pago_recibos', 4);

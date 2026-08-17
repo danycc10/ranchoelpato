@@ -17,6 +17,7 @@ use App\Models\TipoCobro;
 use App\Services\Contabilidad\PropietarioContableResolver;
 use App\Services\ImageUploadService;
 use App\Services\Recibos\CuotaAntiguedadSelector;
+use App\Services\Recibos\PeriodoResolver;
 use App\Services\Recibos\RecargoCuotaCalculator;
 use App\Services\Recibos\ReciboFolioService;
 use App\Services\Recibos\ReciboPagoNormalizer;
@@ -1158,11 +1159,7 @@ class Crear extends Component
             return;
         }
 
-        $this->periodo_id = Periodo::query()
-            ->where('tipo', 'mensual')
-            ->where('anio', now()->year)
-            ->where('mes', now()->month)
-            ->value('id');
+        $this->periodo_id = $this->resolverPeriodoIdDesdeFecha(now());
     }
 
     protected function cargarCuotasPendientes(): void
@@ -1952,9 +1949,12 @@ class Crear extends Component
                 $recargoFinal = (float) ($estadoRecargo['recargo_monto'] ?? 0);
                 $recargoCondonado = (bool) ($estadoRecargo['recargo_condonado'] ?? false);
 
+                // El periodo se resuelve una vez por cuota: lo comparten el recibo
+                // principal y el de recargo, aunque solo se genere uno de los dos.
+                $periodoIdCuota = $this->resolverPeriodoIdDesdeFecha($cuota->fecha_vencimiento);
+
                 if (! $this->tipoCobroEsRecargo($this->tipos_cobro_id) && $pendientePrincipal > 0) {
                     $saldoAnterior = $obtenerSaldoContrato((int) $this->contrato_id);
-                    $periodoIdCuota = $this->resolverPeriodoIdDesdeFecha($cuota->fecha_vencimiento);
 
                     $propietarioContablePrincipalId = $this->resolverPropietarioContableId(
                         $this->tipos_cobro_id,
@@ -2566,23 +2566,9 @@ class Crear extends Component
         );
     }
 
-    protected function resolverPeriodoIdDesdeFecha(?string $fechaVencimiento): ?int
+    protected function resolverPeriodoIdDesdeFecha($fechaVencimiento): ?int
     {
-        if (! $fechaVencimiento) {
-            return null;
-        }
-
-        try {
-            $dt = Carbon::parse($fechaVencimiento)->locale('es');
-        } catch (\Throwable $e) {
-            return null;
-        }
-
-        return Periodo::query()
-            ->where('tipo', 'mensual')
-            ->where('anio', (int) $dt->year)
-            ->where('mes', (int) $dt->month)
-            ->value('id');
+        return app(PeriodoResolver::class)->idParaFecha($fechaVencimiento);
     }
 
     protected function openPrintBatchTab(array $reciboIds): void
