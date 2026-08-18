@@ -229,8 +229,31 @@ class Show extends Component
         $this->dispatch('toast', type: 'success', message: 'El PDF escaneado fue eliminado correctamente.');
     }
 
+    /**
+     * Los contratos históricos solo resguardan documentos: no tienen cuotas ni
+     * saldo que mover, así que las acciones de cobranza quedan fuera.
+     */
+    private function bloqueaSiEsHistorico(): bool
+    {
+        if (! $this->contrato->solo_documentos) {
+            return false;
+        }
+
+        $this->dispatch(
+            'toast',
+            type: 'error',
+            message: 'Este contrato es histórico: solo permite documentos.'
+        );
+
+        return true;
+    }
+
     public function abrirAbonoCapital(): void
     {
+        if ($this->bloqueaSiEsHistorico()) {
+            return;
+        }
+
         $this->abonoCapitalMonto = '';
         $this->abonoCapitalFecha = now()->toDateString();
         $this->abonoCapitalObservaciones = '';
@@ -241,6 +264,10 @@ class Show extends Component
     public function confirmarAbonoCapital(): void
     {
         abort_unless(auth()->user()?->can('contratos.editar'), 403);
+
+        if ($this->bloqueaSiEsHistorico()) {
+            return;
+        }
 
         $saldoActual = (float) ($this->contrato->saldo_actual ?? 0);
 
@@ -398,6 +425,10 @@ class Show extends Component
     {
         abort_unless(auth()->user()?->can('sistema.ver'), 403);
 
+        if ($this->bloqueaSiEsHistorico()) {
+            return;
+        }
+
         $this->showReprogramar = true;
 
         $first = $this->contrato->cuotas()
@@ -410,6 +441,10 @@ class Show extends Component
     public function guardarReprogramacion(): void
     {
         abort_unless(auth()->user()?->can('sistema.ver'), 403);
+
+        if ($this->bloqueaSiEsHistorico()) {
+            return;
+        }
 
         $this->validate([
             'nuevaFechaPrimerPago' => ['required', 'date'],

@@ -12,6 +12,7 @@ use App\Http\Controllers\PrivateFileController;
 use App\Livewire\Admin\ClientesExcelentes\Contrato as ClientesExcelentesContrato;
 use App\Livewire\Admin\ClientesExcelentes\Index as ClientesExcelentesIndex;
 use App\Livewire\Admin\Comprobantes\Index as ComprobantesIndex;
+use App\Livewire\Admin\Contratos\CrearHistorico as ContratosCrearHistorico;
 use App\Livewire\Admin\Contratos\Create as ContratosCreate;
 use App\Livewire\Admin\Contratos\Edit as ContratosEdit;
 use App\Livewire\Admin\Contratos\Index as ContratosIndex;
@@ -188,6 +189,10 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
 
         Route::get('/contratos/crear', ContratosCreate::class)
             ->name('contratos.create')
+            ->middleware('permission:contratos.editar');
+
+        Route::get('/contratos/crear-historico', ContratosCrearHistorico::class)
+            ->name('contratos.crear-historico')
             ->middleware('permission:contratos.editar');
 
         Route::get('/contratos/{uuid}', ContratosShow::class)

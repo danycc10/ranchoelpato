@@ -15,6 +15,11 @@
             Exportar Excel
         </button>
 
+        <a href="{{ route('admin.contratos.crear-historico') }}"
+            class="w-full sm:w-auto text-center px-4 py-2 rounded-xl border bg-white hover:bg-gray-50 font-semibold">
+            + Histórico
+        </a>
+
         <a href="{{ route('admin.contratos.create') }}"
             class="w-full sm:w-auto text-center px-4 py-2 rounded-xl bg-black text-white font-bold">
             + Nuevo
@@ -209,6 +214,13 @@ TABLA (md+)
 
                         </span>
 
+                        @if($it->solo_documentos)
+                        <span class="ml-1 inline-flex px-2 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800"
+                            title="Alta histórica: solo resguarda documentos, sin cuotas ni saldos.">
+                            Histórico
+                        </span>
+                        @endif
+
                     </td>
 
                     <td class="p-3 font-bold">
@@ -290,6 +302,12 @@ TABLA (md+)
                     <span class="inline-flex px-2 py-1 rounded-full text-xs font-bold {{ $estatusClase }}">
                         {{ $estatus }}
                     </span>
+
+                    @if($it->solo_documentos)
+                    <span class="mt-1 inline-flex px-2 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                        Histórico
+                    </span>
+                    @endif
                 </div>
             </div>
 

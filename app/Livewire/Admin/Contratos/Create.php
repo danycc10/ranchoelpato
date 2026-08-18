@@ -8,6 +8,7 @@ use App\Models\Cuota;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
 use App\Models\Promocion;
+use App\Services\Contratos\ContratoFolioService;
 use App\Services\Contratos\ContratoPlanService;
 use App\Services\Contratos\ContratoWordService;
 use Carbon\Carbon;
@@ -914,7 +915,7 @@ class Create extends Component
 
     protected function generarFolioSeguro(): string
     {
-        return 'CT-'.now()->format('YmdHis').'-'.strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+        return app(ContratoFolioService::class)->generar();
     }
 
     protected function buildContratoPrivateBase(Lote $lote, Contrato $contrato): string

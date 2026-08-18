@@ -1,5 +1,6 @@
 @php
     $contratoCancelado = strtolower((string) ($contrato->estatus ?? '')) === 'cancelado';
+    $contratoHistorico = (bool) ($contrato->solo_documentos ?? false);
     $documentosContrato = $documentosContrato ?? [];
     $documentosCollection = collect($documentosContrato);
     $documentosScanCargados = $documentosCollection
@@ -33,9 +34,17 @@
                         {{ ucfirst($contrato->estatus) }}
                     </span>
                 @endif
+
+                @if($contratoHistorico)
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        Histórico
+                    </span>
+                @endif
             </div>
 
-            <p class="text-gray-500 text-sm">Detalle del contrato y cuotas.</p>
+            <p class="text-gray-500 text-sm">
+                {{ $contratoHistorico ? 'Contrato terminado dado de alta solo para resguardar sus documentos.' : 'Detalle del contrato y cuotas.' }}
+            </p>
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
@@ -73,25 +82,27 @@
                 </a>
             @endif
 
-            @can('contratos.editar')
-                <button
-                    @unless($contratoCancelado) wire:click="abrirAbonoCapital" @endunless
-                    type="button"
-                    @disabled($contratoCancelado)
-                    class="px-4 py-2 rounded-xl border font-bold {{ $contratoCancelado ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60' : 'border-emerald-400 text-emerald-700 hover:bg-emerald-50' }}">
-                    Abono a capital
-                </button>
-            @endcan
+            @unless($contratoHistorico)
+                @can('contratos.editar')
+                    <button
+                        @unless($contratoCancelado) wire:click="abrirAbonoCapital" @endunless
+                        type="button"
+                        @disabled($contratoCancelado)
+                        class="px-4 py-2 rounded-xl border font-bold {{ $contratoCancelado ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60' : 'border-emerald-400 text-emerald-700 hover:bg-emerald-50' }}">
+                        Abono a capital
+                    </button>
+                @endcan
 
-            @can('sistema.ver')
-                <button
-                    @unless($contratoCancelado) wire:click="abrirReprogramar" @endunless
-                    type="button"
-                    @disabled($contratoCancelado)
-                    class="px-4 py-2 rounded-xl border font-bold {{ $contratoCancelado ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60' : '' }}">
-                    Reprogramar calendario
-                </button>
-            @endcan
+                @can('sistema.ver')
+                    <button
+                        @unless($contratoCancelado) wire:click="abrirReprogramar" @endunless
+                        type="button"
+                        @disabled($contratoCancelado)
+                        class="px-4 py-2 rounded-xl border font-bold {{ $contratoCancelado ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60' : '' }}">
+                        Reprogramar calendario
+                    </button>
+                @endcan
+            @endunless
 
             @can('contratos.editar')
                 <a href="{{ route('admin.contratos.edit', $contrato->uuid) }}"

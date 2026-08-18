@@ -84,6 +84,7 @@ class CustomerPaymentsReport extends Component
 
         return Contrato::query()
             ->where('cliente_id', $this->clienteId)
+            ->where('solo_documentos', false)
             ->with(['lote.fraccionamiento'])
             ->orderByDesc('id')
             ->get(['id', 'folio_contrato', 'estatus', 'precio_total', 'enganche', 'saldo_actual', 'lote_id'])
@@ -169,8 +170,11 @@ class CustomerPaymentsReport extends Component
             return collect();
         }
 
+        // Los contratos históricos (alta solo para documentos) no tienen pagos
+        // ni saldo, así que no forman parte del resumen de cobranza del cliente.
         $contratos = Contrato::query()
             ->where('cliente_id', $this->clienteId)
+            ->where('solo_documentos', false)
             ->with(['lote.fraccionamiento'])
             ->get();
 

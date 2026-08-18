@@ -8,11 +8,12 @@ use App\Models\Cuota;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\RegistraFuncionesSqlite;
 use Tests\TestCase;
 
 class MonthlyIncomeActiveContractsSheetTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, RegistraFuncionesSqlite;
 
     #[Test]
     public function la_hoja_expone_las_columnas_de_dia_de_cobro_y_semanas(): void
@@ -26,7 +27,7 @@ class MonthlyIncomeActiveContractsSheetTest extends TestCase
     #[Test]
     public function los_contratos_semanales_muestran_su_dia_de_cobro_y_las_semanas_del_mes(): void
     {
-        $this->registrarConcatWsEnSqlite();
+        $this->registrarFuncionesMysqlEnSqlite();
 
         // Agosto 2026 tiene 5 lunes: el semanal cubre 5 semanas y el mensual una sola cuota.
         $semanal = $this->contrato('SEMANAL', 'semanal', [
@@ -46,7 +47,7 @@ class MonthlyIncomeActiveContractsSheetTest extends TestCase
     #[Test]
     public function las_semanas_reflejan_las_cuotas_reales_del_mes(): void
     {
-        $this->registrarConcatWsEnSqlite();
+        $this->registrarFuncionesMysqlEnSqlite();
 
         // Un mes con solo tres vencimientos semanales (por ejemplo, tras reprogramar).
         $semanal = $this->contrato('PARCIAL', 'semanal', [
@@ -62,7 +63,7 @@ class MonthlyIncomeActiveContractsSheetTest extends TestCase
     #[Test]
     public function el_dia_de_cobro_se_deduce_del_vencimiento_cuando_el_contrato_no_lo_tiene(): void
     {
-        $this->registrarConcatWsEnSqlite();
+        $this->registrarFuncionesMysqlEnSqlite();
 
         // Contratos importados que llegaron sin dia_semana capturado.
         $semanal = $this->contrato('SIN-DIA', 'semanal', [
@@ -83,26 +84,6 @@ class MonthlyIncomeActiveContractsSheetTest extends TestCase
         return (new MonthlyIncomeActiveContractsSheet(anio: $anio, mes: $mes, propietarioId: null))
             ->collection()
             ->keyBy(fn (array $fila) => $fila[1]);
-    }
-
-    /**
-     * La hoja arma el nombre del cliente con CONCAT_WS, que SQLite no trae.
-     */
-    private function registrarConcatWsEnSqlite(): void
-    {
-        if (DB::connection()->getDriverName() !== 'sqlite') {
-            return;
-        }
-
-        DB::connection()->getPdo()->sqliteCreateFunction(
-            'CONCAT_WS',
-            function ($separador, ...$partes) {
-                return implode(
-                    (string) $separador,
-                    array_filter($partes, fn ($parte) => $parte !== null)
-                );
-            }
-        );
     }
 
     /**

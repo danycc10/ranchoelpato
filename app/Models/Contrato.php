@@ -43,6 +43,7 @@ class Contrato extends Model
         'servicio_tipo',
         'contrato_base_id',
         'es_financiamiento_instalacion',
+        'solo_documentos',
         'archivo_contrato_disk',
 
         'archivo_contrato_docx',
@@ -92,6 +93,7 @@ class Contrato extends Model
         'dia_semana' => 'integer',
         'dia_mes' => 'integer',
         'es_financiamiento_instalacion' => 'boolean',
+        'solo_documentos' => 'boolean',
         'alerta_convenio' => 'boolean',
 
         'area_m2_snapshot' => 'decimal:2',
