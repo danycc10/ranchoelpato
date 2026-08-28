@@ -114,7 +114,7 @@ class GenerarPlantillaContratoElectrico extends Command
         $run->addText('${cliente_nombre}', self::FONT_BOLD);
         $run->addText(', a quien en lo sucesivo se le denominará ', self::FONT);
         $run->addText('“EL CLIENTE”', self::FONT_BOLD);
-        $run->addText(', respecto del lote o terreno identificado como ', self::FONT);
+        $run->addText(', respecto del lote o lotes identificados como ', self::FONT);
         $run->addText('${lote_identificacion}', self::FONT_BOLD);
         $run->addText(', sujetándose a las siguientes declaraciones y cláusulas:', self::FONT);
     }
@@ -148,11 +148,11 @@ class GenerarPlantillaContratoElectrico extends Command
         $this->campo($section, 'Teléfono: ', '${cliente_telefono}');
         $this->campo($section, 'Identificación oficial: ', '${cliente_identificacion}', true);
 
-        $this->parrafo($section, 'b) Que tiene derechos respecto del lote o terreno identificado como:');
-        $this->campo($section, 'Desarrollo/Fraccionamiento: ', '${fraccionamiento}');
-        $this->campo($section, 'Número de lote: ', '${lote}');
-        $this->campo($section, 'Manzana: ', '${manzana}');
-        $this->campo($section, 'Medidas: ', '${medidas}');
+        $this->parrafo($section, 'b) Que tiene derechos respecto del lote o lotes identificados como:');
+        $this->campo($section, 'Desarrollo/Fraccionamiento: ', '${lotes_fraccionamiento}');
+        $this->campo($section, 'Número de lote: ', '${lotes_numero}');
+        $this->campo($section, 'Manzana: ', '${lotes_manzana}');
+        $this->campo($section, 'Medidas del lote principal: ', '${medidas}');
         $this->campo($section, 'Contrato relacionado No.: ', '${contrato_relacionado}', true);
 
         $this->parrafo(
@@ -438,8 +438,8 @@ class GenerarPlantillaContratoElectrico extends Command
         $run = $section->addTextRun(self::PAR);
         $run->addText('ANEXOS: ', self::FONT_BOLD);
         $run->addText(
-            'A) Tabla y calendario completo de pagos. B) Identificación oficial de EL CLIENTE. C) Documento que '
-            .'identifica el lote o contrato relacionado. D) Pagaré o pagarés que, en su caso, garanticen el '
+            'A) Tabla y calendario completo de pagos. B) Identificación oficial de EL CLIENTE. C) Documentos que '
+            .'identifican los lotes o contratos relacionados. D) Pagaré o pagarés que, en su caso, garanticen el '
             .'financiamiento. E) Descripción del alcance de la infraestructura eléctrica financiada.',
             ['name' => 'Arial', 'size' => 9]
         );

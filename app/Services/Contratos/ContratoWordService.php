@@ -330,7 +330,8 @@ class ContratoWordService
             $contrato->comprador_nombre_legal ?: ($cliente?->nombre_legal ?: $cliente?->nombre_completo)
         ));
 
-        $template->setValue('lote_identificacion', $this->linea($this->descripcionLote($contrato)));
+        // El contrato ampara todos los lotes del cliente, no solo el que se usó para darlo de alta.
+        $this->setLotesValues($template, $contrato);
 
         $template->setValue('cliente_curp', $this->linea($cliente?->curp ?: $contrato->comprador_curp));
         $template->setValue('cliente_rfc', $this->linea($cliente?->rfc));
@@ -340,12 +341,6 @@ class ContratoWordService
         $template->setValue('cliente_identificacion', $this->linea(
             $contrato->comprador_ine_frente ? 'Credencial para votar (INE)' : null,
             35
-        ));
-
-        $template->setValue('medidas', $this->linea($this->descripcionMedidas($contrato), 45));
-        $template->setValue('contrato_relacionado', $this->linea(
-            $contrato->contratoBase?->folio_contrato ?: $contrato->folio_contrato,
-            25
         ));
 
         $precioTotal = (float) $contrato->precio_total;
@@ -376,29 +371,41 @@ class ContratoWordService
         $template->setValue('fecha_firma_larga', $this->fechaLarga(now()));
     }
 
-    protected function descripcionLote(Contrato $contrato): string
+    /**
+     * Menciona en el contrato eléctrico todos los lotes del cliente.
+     *
+     * No se detallan uno por uno: los números van juntos («Lotes 19 y 20») igual
+     * que las manzanas, los desarrollos y los contratos de terreno relacionados.
+     */
+    protected function setLotesValues(TemplateProcessor $template, Contrato $contrato): void
     {
-        $partes = [];
+        $lotes = $this->lotesDelCliente($contrato);
 
-        if ($contrato->lote?->lote) {
-            $partes[] = 'Lote '.$contrato->lote->lote;
-        }
+        $numeros = $this->unirValores(array_column($lotes, 'lote'));
+        $manzanas = $this->unirValores(array_column($lotes, 'manzana'));
+        $fraccionamientos = $this->unirValores(array_column($lotes, 'fraccionamiento'));
+        $contratos = $this->unirValores(array_column($lotes, 'contrato'));
 
-        if ($contrato->lote?->manzana) {
-            $partes[] = 'Manzana '.$contrato->lote->manzana;
-        }
+        $identificacion = array_filter([
+            $numeros !== '' ? $this->etiquetaPlural('Lote', 'Lotes', $numeros).' '.$numeros : '',
+            $manzanas !== '' ? $this->etiquetaPlural('Manzana', 'Manzanas', $manzanas).' '.$manzanas : '',
+            $fraccionamientos,
+        ]);
 
-        if ($contrato->lote?->fraccionamiento?->nombre) {
-            $partes[] = $contrato->lote->fraccionamiento->nombre;
-        }
+        $template->setValue('lote_identificacion', $this->linea(implode(', ', $identificacion)));
 
-        if ($partes === []) {
-            return $this->safe($contrato->lote?->clave);
-        }
+        $template->setValue('lotes_numero', $this->linea($numeros, 20));
+        $template->setValue('lotes_manzana', $this->linea($manzanas, 20));
+        $template->setValue('lotes_fraccionamiento', $this->linea($fraccionamientos, 30));
+        $template->setValue('contrato_relacionado', $this->linea($contratos, 25));
 
-        return implode(', ', $partes);
+        // Las medidas son solo las del lote principal: el del propio contrato.
+        $template->setValue('medidas', $this->linea($this->descripcionMedidas($contrato), 45));
     }
 
+    /**
+     * Medidas y superficie del lote del contrato, como quedaron al firmarse.
+     */
     protected function descripcionMedidas(Contrato $contrato): string
     {
         $medidas = [
@@ -425,6 +432,98 @@ class ContratoWordService
         }
 
         return implode(', ', $partes);
+    }
+
+    /**
+     * «19», «19 y 20», «19, 20 y 21»: valores únicos, sin vacíos.
+     *
+     * @param  array<int, ?string>  $valores
+     */
+    protected function unirValores(array $valores): string
+    {
+        $valores = array_values(array_unique(array_filter(
+            array_map(fn ($valor) => $this->safe($valor), $valores),
+            fn (string $valor) => $valor !== ''
+        )));
+
+        if (count($valores) <= 1) {
+            return $valores[0] ?? '';
+        }
+
+        $ultimo = array_pop($valores);
+
+        return implode(', ', $valores).' y '.$ultimo;
+    }
+
+    /**
+     * Singular o plural según si la lista unida trae más de un valor.
+     */
+    protected function etiquetaPlural(string $singular, string $plural, string $valores): string
+    {
+        return str_contains($valores, ' y ') ? $plural : $singular;
+    }
+
+    /**
+     * Todos los lotes del cliente, no solo el del contrato con el que se dio de alta.
+     *
+     * Se toman de los contratos no cancelados del cliente y, para cada lote, se
+     * anota el folio de su contrato de terreno.
+     *
+     * @return list<array<string, string>>
+     */
+    protected function lotesDelCliente(Contrato $contrato): array
+    {
+        $porLote = [];
+
+        if ($contrato->cliente_id) {
+            $contratos = Contrato::query()
+                ->where('cliente_id', $contrato->cliente_id)
+                ->whereNotNull('lote_id')
+                ->where('estatus', '!=', 'cancelado')
+                ->with('lote.fraccionamiento')
+                ->orderByRaw("CASE WHEN COALESCE(tipo, 'terreno') = 'terreno' THEN 0 ELSE 1 END")
+                ->orderBy('id')
+                ->get();
+
+            foreach ($contratos as $otro) {
+                if (! $otro->lote) {
+                    continue;
+                }
+
+                $porLote[$otro->lote_id] ??= ['lote' => $otro->lote, 'folio' => null];
+
+                if (! $porLote[$otro->lote_id]['folio'] && ($otro->tipo ?: 'terreno') === 'terreno') {
+                    $porLote[$otro->lote_id]['folio'] = $otro->folio_contrato;
+                }
+            }
+        }
+
+        // El lote del propio contrato aparece siempre, aunque el contrato esté cancelado.
+        if ($contrato->lote) {
+            $porLote[$contrato->lote_id] ??= ['lote' => $contrato->lote, 'folio' => null];
+
+            $porLote[$contrato->lote_id]['folio'] = $porLote[$contrato->lote_id]['folio']
+                ?: ($contrato->contratoBase?->folio_contrato ?: $contrato->folio_contrato);
+        }
+
+        $filas = [];
+
+        foreach ($porLote as $datos) {
+            $lote = $datos['lote'];
+
+            $filas[] = [
+                'fraccionamiento' => $this->safe($lote->fraccionamiento?->nombre),
+                'lote' => $this->safe($lote->lote ?: $lote->clave),
+                'manzana' => $this->safe($lote->manzana),
+                'contrato' => $this->safe($datos['folio']),
+            ];
+        }
+
+        usort($filas, fn (array $a, array $b) => strnatcasecmp($a['fraccionamiento'], $b['fraccionamiento'])
+            ?: strnatcasecmp($a['manzana'], $b['manzana'])
+            ?: strnatcasecmp($a['lote'], $b['lote']));
+
+        return $filas;
     }
 
     /**

@@ -98,6 +98,39 @@ class ContratoFinanciamientoElectricoDocxTest extends TestCase
     }
 
     #[Test]
+    public function el_word_incluye_todos_los_lotes_del_cliente(): void
+    {
+        Storage::fake('private');
+
+        $this->artisan('contratos:plantilla-electrica')->assertSuccessful();
+
+        $terreno = $this->contratoTerreno();
+        $this->otroLoteDelCliente($terreno, '13', 'CT-002');
+        $this->otroLoteDelCliente($terreno, '14', 'CT-003', 'cancelado');
+
+        $luz = $this->contratoServicio($terreno, 'electricidad');
+
+        $path = (new ContratoWordService)->generarDocx($luz, 'contrato_financiamiento_electrico');
+
+        $texto = $this->textoDocx(Storage::disk('private')->path($path));
+
+        // Los dos lotes vigentes se mencionan juntos, con sus contratos de terreno.
+        $this->assertStringContainsString('Lotes 12 y 13, Manzana 5, Rancho El Pato', $texto);
+        $this->assertStringContainsString('12 y 13', $texto);
+        $this->assertStringContainsString('CT-001 y CT-002', $texto);
+
+        // Las medidas son solo las del lote principal (el del contrato).
+        $this->assertStringContainsString('Norte 10.00 m', $texto);
+        $this->assertStringNotContainsString('Norte 15.00 m', $texto);
+
+        // El lote de un contrato cancelado no se incluye.
+        $this->assertStringNotContainsString('12, 13 y 14', $texto);
+        $this->assertStringNotContainsString('CT-003', $texto);
+
+        $this->assertStringNotContainsString('${', $texto);
+    }
+
+    #[Test]
     public function no_genera_el_documento_para_un_contrato_que_no_es_de_luz(): void
     {
         Storage::fake('private');
@@ -170,6 +203,47 @@ class ContratoFinanciamientoElectricoDocxTest extends TestCase
             'medida_sur_snapshot' => 10,
             'medida_este_snapshot' => 20,
             'medida_oeste_snapshot' => 20,
+        ]);
+    }
+
+    /**
+     * Otro lote del mismo cliente, con su propio contrato de terreno.
+     */
+    private function otroLoteDelCliente(
+        Contrato $base,
+        string $numeroLote,
+        string $folio,
+        string $estatus = 'activo'
+    ): Contrato {
+        $lote = Lote::create([
+            'fraccionamiento_id' => $base->lote->fraccionamiento_id,
+            'manzana' => '5',
+            'lote' => $numeroLote,
+            'clave' => 'M5-L'.$numeroLote,
+            'area_m2' => 300,
+            'medida_norte' => 15,
+            'medida_sur' => 15,
+            'medida_este' => 20,
+            'medida_oeste' => 20,
+        ]);
+
+        return Contrato::create([
+            'cliente_id' => $base->cliente_id,
+            'lote_id' => $lote->id,
+            'folio_contrato' => $folio,
+            'fecha_inicio' => '2026-02-10',
+            'frecuencia' => 'mensual',
+            'dia_mes' => 10,
+            'precio_total' => 120000,
+            'enganche' => 12000,
+            'saldo_inicial' => 108000,
+            'saldo_actual' => 108000,
+            'monto_pago' => 3500,
+            'tipo_recargo' => 'fijo',
+            'valor_recargo' => 100,
+            'dias_gracia' => 3,
+            'estatus' => $estatus,
+            'tipo' => 'terreno',
         ]);
     }
 
