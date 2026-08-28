@@ -578,7 +578,7 @@ class ContratoWordService
             return number_format($valor, 2).'% sobre la parcialidad vencida';
         }
 
-        return $this->formatMoney($valor).' M.N. por cada parcialidad vencida';
+        return $this->formatMoney($valor).' M.N. por dia de cada parcialidad vencida';
     }
 
     protected function fechaLarga($fecha): string
