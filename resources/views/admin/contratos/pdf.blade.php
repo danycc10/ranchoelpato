@@ -130,6 +130,11 @@
         }
 
         $totalPagos = $contrato->cuotas?->count() ?? 0;
+
+        // En los contratos de luz se listan los números de todos los lotes del cliente.
+        $lotesCliente = $lotesCliente ?? null;
+        $lotesTexto = $lotesCliente['numeros'] ?? '';
+        $lotesEtiqueta = str_contains($lotesTexto, ' y ') ? 'Lotes:' : 'Lote:';
     @endphp
 
     <div class="header">
@@ -144,8 +149,8 @@
                 <td class="label">Fecha inicio:</td>
                 <td>{{ optional($contrato->fecha_inicio)->format('d/m/Y') }}</td>
 
-                <td class="label">Lote:</td>
-                <td>{{ $contrato->lote?->clave }}</td>
+                <td class="label">{{ $lotesEtiqueta }}</td>
+                <td>{{ $lotesTexto !== '' ? $lotesTexto : $contrato->lote?->clave }}</td>
             </tr>
 
             <tr>
