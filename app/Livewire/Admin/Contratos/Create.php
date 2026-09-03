@@ -8,6 +8,7 @@ use App\Models\Cuota;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
 use App\Models\Promocion;
+use App\Services\Contratos\CondicionesCesionService;
 use App\Services\Contratos\ContratoFolioService;
 use App\Services\Contratos\ContratoPlanService;
 use App\Services\Contratos\ContratoWordService;
@@ -77,6 +78,19 @@ class Create extends Component
 
     public bool $usar_configuracion_manual = false;
 
+    // ===========================
+    // Condiciones del contrato de cesión de derechos
+    // ===========================
+    public string $posesion_entrega = '';
+
+    public string $servicios_estado = '';
+
+    public string $servicios_a_cargo = '';
+
+    public int $parcialidades_rescision = 2;
+
+    public float $tolerancia_medidas = 5.0;
+
     public array $previewCuotas = [];
 
     public string $diaSemanaTexto = '';
@@ -135,6 +149,15 @@ class Create extends Component
     {
         $this->fecha_inicio = now()->toDateString();
         $this->actualizarDiaTextoYDefaults();
+
+        // Condiciones del contrato de cesión: arrancan con las de ajustes del sistema.
+        $condiciones = CondicionesCesionService::porDefecto();
+
+        $this->posesion_entrega = $condiciones['posesion_entrega'];
+        $this->servicios_estado = $condiciones['servicios_estado'];
+        $this->servicios_a_cargo = $condiciones['servicios_a_cargo'];
+        $this->parcialidades_rescision = (int) $condiciones['parcialidades_rescision'];
+        $this->tolerancia_medidas = (float) $condiciones['tolerancia_medidas'];
 
         $this->anualidad_fecha = $this->fecha_inicio;
         $this->anualidad_monto = 0;
@@ -859,6 +882,13 @@ class Create extends Component
                 'comprador_nombre_legal' => ['nullable', 'string', 'max:255'],
                 'comprador_curp' => ['nullable', 'string', 'max:30'],
 
+                // Condiciones del contrato de cesión de derechos.
+                'posesion_entrega' => ['nullable', 'string', 'max:120'],
+                'servicios_estado' => ['nullable', 'string', 'max:60'],
+                'servicios_a_cargo' => ['nullable', 'string', 'max:60'],
+                'parcialidades_rescision' => ['nullable', 'integer', 'min:1', 'max:99'],
+                'tolerancia_medidas' => ['nullable', 'numeric', 'min:0', 'max:100'],
+
                 /*    'area_m2' => ['required', 'numeric', 'min:0.01'],
                 'medida_norte' => ['required', 'string', 'max:255'],
                 'medida_sur' => ['required', 'string', 'max:255'],
@@ -1103,6 +1133,12 @@ class Create extends Component
                     'colindancia_sur_snapshot' => $this->colindancia_sur,
                     'colindancia_este_snapshot' => $this->colindancia_este,
                     'colindancia_oeste_snapshot' => $this->colindancia_oeste,
+
+                    'posesion_entrega' => $this->posesion_entrega ?: null,
+                    'servicios_estado' => $this->servicios_estado ?: null,
+                    'servicios_a_cargo' => $this->servicios_a_cargo ?: null,
+                    'parcialidades_rescision' => $this->parcialidades_rescision ?: null,
+                    'tolerancia_medidas' => $this->tolerancia_medidas,
                 ];
 
                 if (Schema::hasColumn('contratos', 'calendario_tipo')) {

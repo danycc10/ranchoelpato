@@ -229,6 +229,45 @@
                     @error('ubicacion') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
 
+                {{-- Datos para el contrato de cesión de derechos --}}
+                <div class="md:col-span-2 pt-2 border-t">
+                    <p class="text-sm font-bold text-gray-700">Contrato de cesión de derechos</p>
+                    <p class="text-xs text-gray-500">
+                        Se usan en las declaraciones del contrato de los lotes de este fraccionamiento.
+                    </p>
+                </div>
+
+                <div>
+                    <x-label value="Núcleo agrario / ejido" />
+                    <x-input type="text" class="w-full" wire:model.defer="ejido" />
+                    @error('ejido') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <x-label value="Municipio" />
+                    <x-input type="text" class="w-full" wire:model.defer="municipio" />
+                    @error('municipio') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <x-label value="Antecedente de los derechos" />
+                    <select wire:model.defer="antecedente_tipo" class="w-full rounded-xl border-gray-300">
+                        <option value="">—</option>
+                        @foreach(\App\Services\Contratos\DatosContratoCesionService::ANTECEDENTE_OPCIONES as $opcion)
+                        <option value="{{ $opcion }}">{{ $opcion }}</option>
+                        @endforeach
+                    </select>
+                    @error('antecedente_tipo') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="md:col-span-2">
+                    <x-label value="Datos del documento del antecedente" />
+                    <textarea class="w-full rounded-xl border-gray-300" rows="2"
+                        wire:model.defer="antecedente_datos"
+                        placeholder="Número, fecha y autoridad que lo emitió"></textarea>
+                    @error('antecedente_datos') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
                 {{-- Logo --}}
                 <div class="md:col-span-2">
                     <x-label value="Logo (opcional)" />

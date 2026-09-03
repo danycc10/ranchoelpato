@@ -55,7 +55,18 @@ class Contrato extends Model
         'archivo_convenio_pago_reconocimiento_adeudo_docx',
         'archivo_contrato_financiamiento_electrico',
         'archivo_contrato_financiamiento_electrico_docx',
+        'archivo_contrato_cesion',
+        'archivo_contrato_cesion_docx',
+        'archivo_caratula_expediente',
+        'archivo_caratula_expediente_docx',
         'alerta_convenio',
+
+        // Condiciones que el contrato de cesión deja a elección de las partes.
+        'posesion_entrega',
+        'servicios_estado',
+        'servicios_a_cargo',
+        'parcialidades_rescision',
+        'tolerancia_medidas',
 
         'comprador_ine_frente',
         'comprador_ine_reverso',
@@ -89,6 +100,8 @@ class Contrato extends Model
         'valor_recargo' => 'decimal:2',
         'dias_gracia' => 'integer',
         'frecuencia_recargo_dias' => 'integer',
+        'parcialidades_rescision' => 'integer',
+        'tolerancia_medidas' => 'decimal:2',
         'liquidado_at' => 'datetime',
         'dia_semana' => 'integer',
         'dia_mes' => 'integer',

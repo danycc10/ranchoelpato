@@ -85,6 +85,72 @@
         </div>
     </section>
 
+    {{-- Condiciones con las que nacen los contratos de cesión de derechos --}}
+    <section class="mb-6">
+        <div class="rounded-2xl border bg-white p-5 shadow-sm">
+            <h2 class="text-lg font-black">Contrato de cesión de derechos</h2>
+            <p class="mt-1 text-sm text-gray-600">
+                Valores con los que se propone cada contrato nuevo. Se pueden cambiar contrato por contrato.
+            </p>
+
+            <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Entrega de la posesión</label>
+                    <select wire:model.live="cesion.posesion_entrega" class="w-full rounded-xl border-gray-300">
+                        @foreach(\App\Services\Contratos\CondicionesCesionService::POSESION_OPCIONES as $opcion)
+                        <option value="{{ $opcion }}">{{ $opcion }}</option>
+                        @endforeach
+                    </select>
+                    @error('cesion.posesion_entrega') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Servicios e infraestructura</label>
+                    <select wire:model.live="cesion.servicios_estado" class="w-full rounded-xl border-gray-300">
+                        @foreach(\App\Services\Contratos\CondicionesCesionService::SERVICIOS_OPCIONES as $opcion)
+                        <option value="{{ $opcion }}">{{ $opcion }}</option>
+                        @endforeach
+                    </select>
+                    @error('cesion.servicios_estado') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Medidores y consumos a cargo de</label>
+                    <select wire:model.live="cesion.servicios_a_cargo" class="w-full rounded-xl border-gray-300">
+                        @foreach(\App\Services\Contratos\CondicionesCesionService::A_CARGO_OPCIONES as $opcion)
+                        <option value="{{ $opcion }}">{{ $opcion }}</option>
+                        @endforeach
+                    </select>
+                    @error('cesion.servicios_a_cargo') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Parcialidades para rescindir</label>
+                        <input type="number" min="1" max="99" wire:model.live="cesion.parcialidades_rescision"
+                            class="w-full rounded-xl border-gray-300">
+                        @error('cesion.parcialidades_rescision') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Tolerancia de medidas (%)</label>
+                        <input type="number" step="0.01" min="0" max="100" wire:model.live="cesion.tolerancia_medidas"
+                            class="w-full rounded-xl border-gray-300">
+                        @error('cesion.tolerancia_medidas') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 flex justify-end border-t pt-4">
+                <button type="button" wire:click="guardarCondicionesCesion" wire:loading.attr="disabled"
+                    class="rounded-xl bg-black px-4 py-2.5 text-sm font-black text-white transition hover:bg-gray-800 disabled:opacity-40">
+                    <span wire:loading.remove wire:target="guardarCondicionesCesion">Guardar condiciones</span>
+                    <span wire:loading wire:target="guardarCondicionesCesion">Guardando…</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
         {{-- Usuarios --}}

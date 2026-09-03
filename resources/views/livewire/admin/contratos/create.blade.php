@@ -429,6 +429,64 @@
                 </div>
             </div>
 
+            {{-- Condiciones del contrato de cesión de derechos --}}
+            <div class="rounded-2xl border bg-gray-50 p-4 sm:p-5 space-y-4">
+                <div>
+                    <h3 class="text-base sm:text-lg font-black">Condiciones del contrato</h3>
+                    <p class="text-xs sm:text-sm text-gray-600">
+                        Vienen de los ajustes del sistema; cámbialas si este contrato se pacta distinto.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Entrega de la posesión</label>
+                        <select wire:model.live="posesion_entrega" class="w-full rounded-xl border-gray-300">
+                            @foreach(\App\Services\Contratos\CondicionesCesionService::POSESION_OPCIONES as $opcion)
+                            <option value="{{ $opcion }}">{{ $opcion }}</option>
+                            @endforeach
+                        </select>
+                        @error('posesion_entrega') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Servicios e infraestructura</label>
+                        <select wire:model.live="servicios_estado" class="w-full rounded-xl border-gray-300">
+                            @foreach(\App\Services\Contratos\CondicionesCesionService::SERVICIOS_OPCIONES as $opcion)
+                            <option value="{{ $opcion }}">{{ $opcion }}</option>
+                            @endforeach
+                        </select>
+                        @error('servicios_estado') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Medidores y consumos a cargo de</label>
+                        <select wire:model.live="servicios_a_cargo" class="w-full rounded-xl border-gray-300">
+                            @foreach(\App\Services\Contratos\CondicionesCesionService::A_CARGO_OPCIONES as $opcion)
+                            <option value="{{ $opcion }}">{{ $opcion }}</option>
+                            @endforeach
+                        </select>
+                        @error('servicios_a_cargo') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Parcialidades para rescindir</label>
+                            <input type="number" min="1" max="99" wire:model.live="parcialidades_rescision"
+                                class="w-full rounded-xl border-gray-300">
+                            @error('parcialidades_rescision') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Tolerancia de medidas (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" wire:model.live="tolerancia_medidas"
+                                class="w-full rounded-xl border-gray-300">
+                            @error('tolerancia_medidas') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {{-- Credenciales --}}
             <div class="rounded-2xl border bg-gray-50 p-4 sm:p-5 space-y-4">
                 <div>

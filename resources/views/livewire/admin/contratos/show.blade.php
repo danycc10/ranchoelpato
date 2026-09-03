@@ -501,8 +501,8 @@
     {{-- MODAL DOCUMENTOS LEGALES --}}
     @if($modalContratoOpen)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white w-full max-w-4xl rounded-2xl shadow-xl overflow-hidden">
-                <div class="px-5 py-4 border-b flex items-center justify-between">
+            <div class="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-xl overflow-hidden flex flex-col">
+                <div class="px-5 py-4 border-b flex items-center justify-between shrink-0">
                     <div>
                         <h2 class="text-lg font-black">Documentos del contrato</h2>
                         <p class="text-sm text-gray-500">{{ $contrato->folio_contrato }}</p>
@@ -516,7 +516,7 @@
                     </button>
                 </div>
 
-                <div class="p-5 space-y-5">
+                <div class="p-5 space-y-5 overflow-y-auto">
                     @if(!$documentoAccion)
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <button type="button"
@@ -602,11 +602,112 @@
                             </button>
                         </div>
 
+                        @if($completandoDatosCesion)
+                            @php
+                                $grupos = collect($datosCesionFaltantes)->groupBy('grupo')->values();
+                                $totalPasos = $grupos->count();
+                                $paso = max(0, min($pasoDatosCesion, max(0, $totalPasos - 1)));
+                                $bloque = $grupos->get($paso);
+                            @endphp
+
+                            <div class="rounded-2xl border bg-white p-4 space-y-3">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div class="font-black text-gray-900">Datos que faltan</div>
+                                        <div class="text-xs text-gray-500">
+                                            Lo que dejes vacío sale como línea para llenarse a mano.
+                                        </div>
+                                    </div>
+
+                                    <button type="button" wire:click="cancelarDatosCesion"
+                                        class="px-3 py-1.5 rounded-lg border text-sm hover:bg-gray-50">
+                                        Cancelar
+                                    </button>
+                                </div>
+
+                                @if($totalPasos === 0)
+                                    <p class="text-sm text-gray-600">Ya no falta ningún dato.</p>
+                                @else
+                                    {{-- Un bloque por pantalla: fraccionamiento, partes y lote --}}
+                                    <div class="flex flex-wrap gap-1.5">
+                                        @foreach($grupos as $i => $campos)
+                                        <button type="button" wire:click="irAPasoDatosCesion({{ $i }})"
+                                            class="rounded-full px-2.5 py-1 text-[11px] font-bold border transition
+                                                {{ $i === $paso ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 hover:bg-gray-50' }}">
+                                            {{ \Illuminate\Support\Str::before($campos->first()['grupo'], ':') }}
+                                            <span class="opacity-70">({{ $campos->count() }})</span>
+                                        </button>
+                                        @endforeach
+                                    </div>
+
+                                    <div class="rounded-xl border bg-gray-50 p-3">
+                                        <div class="flex items-baseline justify-between gap-2 mb-2">
+                                            <div class="text-sm font-bold text-gray-800">{{ $bloque->first()['grupo'] }}</div>
+                                            <div class="text-[11px] text-gray-500">Paso {{ $paso + 1 }} de {{ $totalPasos }}</div>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[42vh] overflow-y-auto pr-1">
+                                            @foreach($bloque as $campo)
+                                                <div class="{{ $campo['tipo'] === 'parrafo' ? 'md:col-span-2' : '' }}">
+                                                    <label class="block text-xs font-semibold mb-1">{{ $campo['etiqueta'] }}</label>
+
+                                                    @if($campo['tipo'] === 'parrafo')
+                                                        <textarea rows="2" class="w-full rounded-lg border-gray-300 text-sm py-1.5"
+                                                            wire:model="datosCesion.{{ $campo['clave'] }}"></textarea>
+                                                    @elseif($campo['tipo'] === 'numero')
+                                                        <input type="number" step="0.01" min="0"
+                                                            class="w-full rounded-lg border-gray-300 text-sm py-1.5"
+                                                            wire:model="datosCesion.{{ $campo['clave'] }}">
+                                                    @elseif(\App\Services\Contratos\DatosContratoCesionService::opciones($campo['tipo']))
+                                                        <select class="w-full rounded-lg border-gray-300 text-sm py-1.5"
+                                                            wire:model="datosCesion.{{ $campo['clave'] }}">
+                                                            <option value="">—</option>
+                                                            @foreach(\App\Services\Contratos\DatosContratoCesionService::opciones($campo['tipo']) as $valor => $etiqueta)
+                                                            <option value="{{ $valor }}">{{ $etiqueta }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    @else
+                                                        <input type="text" class="w-full rounded-lg border-gray-300 text-sm py-1.5"
+                                                            wire:model="datosCesion.{{ $campo['clave'] }}">
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center justify-between gap-2 pt-1">
+                                        <button type="button" wire:click="irAPasoDatosCesion({{ $paso - 1 }})"
+                                            @disabled($paso === 0)
+                                            class="px-3 py-1.5 rounded-lg border text-sm hover:bg-gray-50 disabled:opacity-40">
+                                            Anterior
+                                        </button>
+
+                                        <div class="flex items-center gap-2">
+                                            @if($paso < $totalPasos - 1)
+                                            <button type="button" wire:click="irAPasoDatosCesion({{ $paso + 1 }})"
+                                                class="px-3 py-1.5 rounded-lg border text-sm hover:bg-gray-50">
+                                                Siguiente
+                                            </button>
+                                            @endif
+
+                                            <button type="button" wire:click="guardarDatosCesion" wire:loading.attr="disabled"
+                                                class="rounded-lg bg-black px-4 py-1.5 text-sm font-bold text-white hover:bg-gray-800 disabled:opacity-40">
+                                                <span wire:loading.remove wire:target="guardarDatosCesion">Guardar datos</span>
+                                                <span wire:loading wire:target="guardarDatosCesion">Guardando…</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        @else
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             @foreach($documentosContrato as $tipoDocumento => $documento)
                                 @php
                                     $docxGenerado = filled($contrato->{$documento['docx_field']} ?? null);
                                     $scanCargado = filled($contrato->{$documento['scan_field']} ?? null);
+                                    $faltantes = $tipoDocumento === 'contrato_cesion_derechos'
+                                        ? count($datosCesionFaltantes)
+                                        : 0;
                                 @endphp
 
                                 <div class="rounded-2xl border p-4 bg-white">
@@ -620,17 +721,31 @@
                                                 <span class="rounded-full px-2 py-0.5 text-[11px] font-bold {{ $scanCargado ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500' }}">
                                                     {{ $scanCargado ? 'Scan cargado' : 'Sin scan' }}
                                                 </span>
+
+                                                @if($faltantes > 0)
+                                                <span class="rounded-full px-2 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-800">
+                                                    Faltan {{ $faltantes }} dato(s)
+                                                </span>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
 
+                                    @if($faltantes > 0)
+                                    <button type="button" wire:click="completarDatosCesion"
+                                        class="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 font-bold text-amber-800 hover:bg-amber-100">
+                                        Completar datos
+                                    </button>
+                                    @endif
+
                                     <a href="{{ route('admin.private.contratos.documentos.docx.download', ['uuid' => $contrato->uuid, 'tipo' => $tipoDocumento]) }}"
-                                        class="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-blue-700 px-4 py-2 font-bold text-white hover:bg-blue-800">
+                                        class="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-blue-700 px-4 py-2 font-bold text-white hover:bg-blue-800">
                                         Descargar Word
                                     </a>
                                 </div>
                             @endforeach
                         </div>
+                        @endif
                     @elseif($documentoAccion === 'subir' && $documentoSeleccionado)
                         <div class="flex items-center justify-between gap-3">
                             <div>

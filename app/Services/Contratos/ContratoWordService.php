@@ -3,6 +3,8 @@
 namespace App\Services\Contratos;
 
 use App\Models\Contrato;
+use App\Models\CuentaBancaria;
+use App\Models\Propietario;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -54,6 +56,29 @@ class ContratoWordService
             'filename_slug' => 'convenio-pago-reconocimiento-adeudo',
             'scan_filename' => 'convenio-pago-reconocimiento-adeudo.pdf',
             'uses_fraccionamiento_template' => false,
+        ],
+        'contrato_cesion_derechos' => [
+            'label' => 'Contrato de cesión de derechos posesorios',
+            'template' => 'plantillas/CONTRATO_CESION_DERECHOS_POSESORIOS.docx',
+            'docx_field' => 'archivo_contrato_cesion_docx',
+            'scan_field' => 'archivo_contrato_cesion',
+            'filename_slug' => 'contrato-cesion-derechos',
+            'scan_filename' => 'contrato-cesion-derechos.pdf',
+            'uses_fraccionamiento_template' => false,
+            // Es la cesión del lote: no aplica a contratos de servicio.
+            'tipos' => ['terreno'],
+        ],
+        'caratula_expediente' => [
+            'label' => 'Carátula y control del expediente (uso interno)',
+            'template' => 'plantillas/CARATULA_CONTROL_EXPEDIENTE.docx',
+            'docx_field' => 'archivo_caratula_expediente_docx',
+            'scan_field' => 'archivo_caratula_expediente',
+            'filename_slug' => 'caratula-expediente',
+            'scan_filename' => 'caratula-expediente.pdf',
+            'uses_fraccionamiento_template' => false,
+            // Acompaña al contrato de cesión: no se firma, se archiva.
+            'tipos' => ['terreno'],
+            'uso_interno' => true,
         ],
         'contrato_financiamiento_electrico' => [
             'label' => 'Contrato de financiamiento eléctrico',
@@ -168,6 +193,14 @@ class ContratoWordService
             $this->setFinanciamientoElectricoValues($template, $contrato);
         }
 
+        if ($tipo === 'contrato_cesion_derechos') {
+            $this->setCesionValues($template, $contrato);
+        }
+
+        if ($tipo === 'caratula_expediente') {
+            $this->setCaratulaValues($template, $contrato);
+        }
+
         $this->setImageIfExists($template, 'vendedor_ine_frente', $contrato->vendedor_ine_frente);
         $this->setImageIfExists($template, 'vendedor_ine_reverso', $contrato->vendedor_ine_reverso);
         $this->setImageIfExists($template, 'comprador_ine_frente', $contrato->comprador_ine_frente);
@@ -222,15 +255,37 @@ class ContratoWordService
         }
     }
 
+    /**
+     * Genera todos los documentos que aplican al contrato.
+     *
+     * Un formato sin plantilla instalada se omite: dar de alta el contrato no
+     * debe fallar por eso, y el documento se puede generar después desde la
+     * pantalla del contrato.
+     */
     public function generarTodosDocx(Contrato $contrato): array
     {
         $paths = [];
 
         foreach (self::documentTypesFor($contrato) as $key => $documento) {
+            if (! $this->tienePlantilla($contrato, $documento)) {
+                continue;
+            }
+
             $paths[$documento['docx_field']] = $this->generarDocx($contrato, $key);
         }
 
         return $paths;
+    }
+
+    protected function tienePlantilla(Contrato $contrato, array $documento): bool
+    {
+        try {
+            $this->resolveTemplatePath($contrato, $documento);
+
+            return true;
+        } catch (RuntimeException) {
+            return false;
+        }
     }
 
     protected function setCommonValues(TemplateProcessor $template, Contrato $contrato): void
@@ -369,6 +424,313 @@ class ContratoWordService
 
         $template->setValue('ciudad_firma', 'Piedras Negras');
         $template->setValue('fecha_firma_larga', $this->fechaLarga(now()));
+    }
+
+    /**
+     * Carátula de la operación y control interno del expediente.
+     *
+     * Lo que el sistema puede saber del expediente se responde solo; lo que
+     * depende de la revisión física queda como línea para palomear a mano.
+     */
+    protected function setCaratulaValues(TemplateProcessor $template, Contrato $contrato): void
+    {
+        $contrato->loadMissing(['cliente', 'lote.fraccionamiento.propietario']);
+
+        $fraccionamiento = $contrato->lote?->fraccionamiento;
+        $propietario = $fraccionamiento?->propietario;
+        $cliente = $contrato->cliente;
+
+        $template->setValue('cedente_nombre', $this->linea(
+            $contrato->vendedor_nombre_legal ?: ($propietario?->nombre_legal ?: $propietario?->nombre)
+        ));
+
+        $template->setValue('adquirente_nombre', $this->linea(
+            $contrato->comprador_nombre_legal ?: ($cliente?->nombre_legal ?: $cliente?->nombre_completo)
+        ));
+
+        $template->setValue('ejido', $this->linea($fraccionamiento?->ejido, 30));
+        $template->setValue('municipio', $this->linea($fraccionamiento?->municipio, 25));
+
+        $area = (float) ($contrato->area_m2_snapshot ?: $contrato->lote?->area_m2);
+        $template->setValue('superficie', $this->linea($area > 0 ? number_format($area, 2).' m²' : null, 20));
+
+        $precioTotal = (float) $contrato->precio_total;
+
+        $template->setValue('precio_total_numero', $this->formatMoney($precioTotal));
+        $template->setValue('precio_total_letra', $this->montoEnLetra($precioTotal));
+        $template->setValue('enganche_numero', $this->formatMoney((float) $contrato->enganche));
+        $template->setValue('saldo_financiado_numero', $this->formatMoney((float) $contrato->saldo_inicial));
+        $template->setValue('monto_pago_numero', $this->formatMoney((float) $contrato->monto_pago));
+        $template->setValue('periodicidad', $contrato->frecuencia === 'semanal' ? 'Semanal' : 'Mensual');
+
+        [$numeroPagos] = $this->resumenCalendario($contrato);
+
+        $template->setValue('numero_pagos', $this->linea($numeroPagos > 0 ? (string) $numeroPagos : null, 6));
+        $template->setValue('fecha_firma_larga', $this->fechaLarga(now()));
+
+        // Control interno: lo que el sistema sí puede contestar.
+        $template->setValue('fecha_alta', $this->linea(
+            $contrato->created_at?->format('d/m/Y'),
+            18
+        ));
+        $template->setValue('expediente_completo', $this->siNo($this->expedienteCompleto($contrato)));
+        $template->setValue('identificaciones', $this->siNo(
+            filled($contrato->comprador_ine_frente) && filled($contrato->vendedor_ine_frente)
+        ));
+        $template->setValue('antecedente_agrario', $this->antecedenteAgrarioTexto($contrato));
+
+        // Lo que depende de revisar el expediente a mano.
+        $template->setValue('asesor', $this->linea(null, 30));
+        $template->setValue('plano_firmado', 'SÍ / NO');
+        $template->setValue('observaciones', $this->linea(null, 60));
+    }
+
+    /**
+     * Todos los documentos que aplican al contrato tienen su PDF escaneado.
+     */
+    protected function expedienteCompleto(Contrato $contrato): bool
+    {
+        $documentos = array_filter(
+            self::documentTypesFor($contrato),
+            fn (array $documento) => empty($documento['uso_interno'])
+        );
+
+        if ($documentos === []) {
+            return false;
+        }
+
+        foreach ($documentos as $documento) {
+            if (blank($contrato->{$documento['scan_field']})) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected function antecedenteAgrarioTexto(Contrato $contrato): string
+    {
+        $fraccionamiento = $contrato->lote?->fraccionamiento;
+
+        if (blank($fraccionamiento?->ejido)) {
+            return 'NO APLICA';
+        }
+
+        return $this->siNo(filled($fraccionamiento?->antecedente_tipo));
+    }
+
+    protected function siNo(bool $valor): string
+    {
+        return $valor ? 'SÍ' : 'NO';
+    }
+
+    /**
+     * Contrato de cesión onerosa de derechos posesorios sobre el lote.
+     *
+     * Lo que el sistema no tiene capturado se deja como línea en blanco para
+     * llenarse a mano, igual que en el contrato de luz.
+     */
+    protected function setCesionValues(TemplateProcessor $template, Contrato $contrato): void
+    {
+        $contrato->loadMissing([
+            'cliente',
+            'lote.fraccionamiento.propietario.cuentasBancarias',
+        ]);
+
+        $fraccionamiento = $contrato->lote?->fraccionamiento;
+        $propietario = $fraccionamiento?->propietario;
+        $cliente = $contrato->cliente;
+
+        // Partes: el propietario cede, el cliente adquiere.
+        $this->setParteValues($template, 'cedente', [
+            'nombre' => $contrato->vendedor_nombre_legal
+                ?: ($propietario?->nombre_legal ?: $propietario?->nombre),
+            'curp' => $contrato->vendedor_curp ?: $propietario?->curp,
+            'rfc' => $propietario?->rfc,
+            'domicilio' => $propietario?->direccion,
+            'telefono' => $propietario?->telefono,
+            'correo' => $propietario?->correo,
+            'persona' => $propietario,
+            'ine' => $contrato->vendedor_ine_frente,
+        ]);
+
+        $this->setParteValues($template, 'adquirente', [
+            'nombre' => $contrato->comprador_nombre_legal
+                ?: ($cliente?->nombre_legal ?: $cliente?->nombre_completo),
+            'curp' => $contrato->comprador_curp ?: $cliente?->curp,
+            'rfc' => $cliente?->rfc,
+            'domicilio' => $cliente?->direccion,
+            'telefono' => $cliente?->telefono,
+            'correo' => $cliente?->correo,
+            'persona' => $cliente,
+            'ine' => $contrato->comprador_ine_frente,
+        ]);
+
+        // Predio: de dónde vienen los derechos y dónde está.
+        $template->setValue('antecedente_tipo', $this->linea($fraccionamiento?->antecedente_tipo, 35));
+        $template->setValue('antecedente_datos', $this->linea($fraccionamiento?->antecedente_datos, 35));
+        $template->setValue('proyecto_ubicacion', $this->linea($fraccionamiento?->ubicacion, 35));
+        $template->setValue('ejido', $this->linea($fraccionamiento?->ejido, 30));
+        $template->setValue('municipio', $this->linea($fraccionamiento?->municipio, 25));
+
+        $template->setValue('lote_identificacion', $this->linea($this->descripcionLoteCesion($contrato)));
+
+        $area = (float) ($contrato->area_m2_snapshot ?: $contrato->lote?->area_m2);
+        $template->setValue('superficie', $this->linea($area > 0 ? number_format($area, 2).' m²' : null, 20));
+
+        foreach (['norte', 'sur', 'este', 'oeste'] as $lado) {
+            $template->setValue('lote_'.$lado, $this->linea($this->ladoLote($contrato, $lado), 40));
+        }
+
+        // Precio y calendario.
+        $precioTotal = (float) $contrato->precio_total;
+
+        $template->setValue('precio_total_numero', $this->formatMoney($precioTotal));
+        $template->setValue('precio_total_letra', $this->montoEnLetra($precioTotal));
+        $template->setValue('enganche_numero', $this->formatMoney((float) $contrato->enganche));
+        $template->setValue('saldo_financiado_numero', $this->formatMoney((float) $contrato->saldo_inicial));
+        $template->setValue('monto_pago_numero', $this->formatMoney((float) $contrato->monto_pago));
+
+        [$numeroPagos, $primerPago] = $this->resumenCalendario($contrato);
+
+        $template->setValue('numero_pagos', $this->linea($numeroPagos > 0 ? (string) $numeroPagos : null, 8));
+        $template->setValue('fecha_primer_pago', $this->linea($this->fechaLarga($primerPago), 28));
+        $template->setValue(
+            'periodicidad_texto',
+            $contrato->frecuencia === 'semanal' ? 'semanales' : 'mensuales'
+        );
+        $template->setValue('dias_pago', $this->linea($this->diasPagoFrase($contrato), 30));
+        $template->setValue('datos_pago', $this->linea($this->datosPago($propietario), 40));
+
+        $template->setValue('recargo_mora', $this->recargoMoraTexto($contrato));
+        $template->setValue('dias_gracia', $this->linea(
+            ((int) $contrato->dias_gracia) > 0 ? (string) (int) $contrato->dias_gracia : null,
+            6
+        ));
+
+        // Condiciones elegidas para este contrato (o las de ajustes del sistema).
+        $condiciones = CondicionesCesionService::paraContrato($contrato);
+
+        $template->setValue('posesion_entrega', $this->safe($condiciones['posesion_entrega']));
+        $template->setValue('servicios_estado', $this->safe($condiciones['servicios_estado']));
+        $template->setValue('servicios_a_cargo', $this->safe($condiciones['servicios_a_cargo']));
+        $template->setValue('parcialidades_rescision', $this->safe($condiciones['parcialidades_rescision']));
+        $template->setValue('tolerancia_medidas', $this->safe($condiciones['tolerancia_medidas']));
+
+        $template->setValue('fecha_firma_larga', $this->fechaLarga(now()));
+    }
+
+    /**
+     * Datos con los que se identifica una de las partes en su declaración a).
+     *
+     * @param  array<string, mixed>  $datos
+     */
+    protected function setParteValues(TemplateProcessor $template, string $parte, array $datos): void
+    {
+        $persona = $datos['persona'] ?? null;
+
+        $template->setValue($parte.'_nombre', $this->linea($datos['nombre']));
+        $template->setValue($parte.'_persona_tipo', $this->linea(
+            $this->personaTipoTexto($persona?->persona_tipo),
+            16
+        ));
+        $template->setValue($parte.'_nacionalidad', $this->linea($persona?->nacionalidad, 14));
+        $template->setValue($parte.'_estado_civil', $this->linea($persona?->estado_civil, 14));
+        $template->setValue($parte.'_ocupacion', $this->linea($persona?->ocupacion, 14));
+        $template->setValue($parte.'_domicilio', $this->linea($datos['domicilio'] ?? null, 40));
+        $template->setValue($parte.'_curp', $this->linea($datos['curp'] ?? null, 20));
+        $template->setValue($parte.'_rfc', $this->linea($datos['rfc'] ?? null, 16));
+        $template->setValue($parte.'_telefono', $this->linea($datos['telefono'] ?? null, 14));
+        $template->setValue($parte.'_correo', $this->linea($datos['correo'] ?? null, 24));
+
+        // Si no se capturó el tipo, se toma INE cuando hay credencial en el expediente.
+        $identificacion = $persona?->identificacion_tipo
+            ?: (($datos['ine'] ?? null) ? 'INE' : null);
+
+        $template->setValue($parte.'_identificacion', $this->linea($identificacion, 14));
+        $template->setValue($parte.'_identificacion_numero', $this->linea($persona?->identificacion_numero, 18));
+    }
+
+    protected function personaTipoTexto(?string $tipo): ?string
+    {
+        return match (mb_strtolower(trim((string) $tipo))) {
+            'fisica' => 'persona física',
+            'moral' => 'persona moral',
+            default => null,
+        };
+    }
+
+    /**
+     * «Lote 12, Manzana 5, Rancho El Pato»: el lote de este contrato.
+     */
+    protected function descripcionLoteCesion(Contrato $contrato): string
+    {
+        $partes = array_filter([
+            $contrato->lote?->lote ? 'Lote '.$contrato->lote->lote : '',
+            $contrato->lote?->manzana ? 'Manzana '.$contrato->lote->manzana : '',
+            $this->safe($contrato->lote?->fraccionamiento?->nombre),
+        ]);
+
+        return $partes === []
+            ? $this->safe($contrato->lote?->clave)
+            : implode(', ', $partes);
+    }
+
+    /**
+     * Medida y colindancia de un lado del lote, como quedaron en el contrato.
+     */
+    protected function ladoLote(Contrato $contrato, string $lado): string
+    {
+        $medida = $contrato->{'medida_'.$lado.'_snapshot'} ?: $contrato->lote?->{'medida_'.$lado};
+        $colindancia = $contrato->{'colindancia_'.$lado.'_snapshot'} ?: $contrato->lote?->{'colindancia_'.$lado};
+
+        $partes = [];
+
+        if ($medida !== null && (float) $medida > 0) {
+            $partes[] = number_format((float) $medida, 2).' m';
+        }
+
+        if ($this->safe($colindancia) !== '') {
+            $partes[] = 'colinda con '.$this->safe($colindancia);
+        }
+
+        return implode(', ', $partes);
+    }
+
+    /**
+     * Cómo continúan los pagos después del primero.
+     */
+    protected function diasPagoFrase(Contrato $contrato): string
+    {
+        if ($contrato->frecuencia === 'semanal') {
+            $dia = ContratoPlanService::diasSemana()[(int) $contrato->dia_semana] ?? null;
+
+            return $dia ? 'cada '.mb_strtolower($dia, 'UTF-8') : '';
+        }
+
+        return $contrato->dia_mes
+            ? 'los días '.(int) $contrato->dia_mes.' de cada mes'
+            : '';
+    }
+
+    /**
+     * Cuentas donde el propietario recibe los pagos.
+     */
+    protected function datosPago(?Propietario $propietario): string
+    {
+        if (! $propietario) {
+            return '';
+        }
+
+        return $propietario->cuentasBancarias
+            ->where('activa', true)
+            ->map(fn (CuentaBancaria $cuenta) => trim(implode(' ', array_filter([
+                $this->safe($cuenta->banco),
+                $this->safe($cuenta->tipo),
+                $this->safe($cuenta->numero),
+            ]))))
+            ->filter()
+            ->implode('; ');
     }
 
     /**

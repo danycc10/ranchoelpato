@@ -10,6 +10,7 @@ use App\Services\Contratos\ContratoCuotasReprogramarService;
 use App\Services\Contratos\ContratoPlanService;
 use App\Services\Contratos\ContratoWordService;
 use App\Services\Contratos\CuotaPagoRollbackService;
+use App\Services\Contratos\DatosContratoCesionService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -17,6 +18,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use RuntimeException;
 
 class Show extends Component
 {
@@ -32,6 +34,14 @@ class Show extends Component
     public ?string $documentoAccion = null;
 
     public string $documentoTipoSeleccionado = 'contrato';
+
+    // Captura de los datos que le faltan al contrato de cesión
+    public bool $completandoDatosCesion = false;
+
+    /** @var array<string, mixed> */
+    public array $datosCesion = [];
+
+    public int $pasoDatosCesion = 0;
 
     // ✅ Reprogramar
     public bool $showReprogramar = false;
@@ -141,7 +151,96 @@ class Show extends Component
     public function volverAccionesDocumento(): void
     {
         $this->documentoAccion = null;
+        $this->completandoDatosCesion = false;
         $this->resetDocumentoUpload();
+    }
+
+    /**
+     * Abre la captura de los datos que el contrato de cesión todavía no tiene.
+     */
+    public function completarDatosCesion(): void
+    {
+        abort_unless(auth()->user()?->can('sistema.ver'), 403);
+
+        if (! ContratoWordService::documentTypeFor('contrato_cesion_derechos', $this->contrato)) {
+            return;
+        }
+
+        $this->datosCesion = [];
+
+        foreach (DatosContratoCesionService::faltantes($this->contrato) as $campo) {
+            $this->datosCesion[$campo['origen']][$campo['campo']] = '';
+        }
+
+        $this->pasoDatosCesion = 0;
+        $this->completandoDatosCesion = true;
+    }
+
+    /**
+     * Los datos que faltan se capturan por bloques: uno por pantalla.
+     */
+    public function irAPasoDatosCesion(int $paso): void
+    {
+        $this->pasoDatosCesion = max(0, $paso);
+    }
+
+    /**
+     * Regenera el Word del contrato de cesión con los datos ya capturados.
+     *
+     * Si la plantilla no está instalada se deja para cuando se descargue.
+     */
+    private function regenerarContratoCesion(): void
+    {
+        try {
+            $servicio = new ContratoWordService;
+
+            $this->contrato->update([
+                'archivo_contrato_cesion_docx' => $servicio->generarDocx(
+                    $this->contrato,
+                    'contrato_cesion_derechos'
+                ),
+                'archivo_contrato_disk' => $this->contrato->archivo_contrato_disk ?: 'private',
+            ]);
+        } catch (RuntimeException) {
+            $this->contrato->update(['archivo_contrato_cesion_docx' => null]);
+        }
+
+        $this->contrato->refresh();
+    }
+
+    public function cancelarDatosCesion(): void
+    {
+        $this->completandoDatosCesion = false;
+        $this->datosCesion = [];
+        $this->pasoDatosCesion = 0;
+    }
+
+    public function guardarDatosCesion(): void
+    {
+        abort_unless(auth()->user()?->can('sistema.ver'), 403);
+
+        $guardados = DatosContratoCesionService::guardar($this->contrato, $this->datosCesion);
+
+        $this->contrato->refresh();
+
+        // El Word guardado quedó viejo: se vuelve a generar con los datos nuevos.
+        if ($guardados > 0) {
+            $this->regenerarContratoCesion();
+        }
+
+        $this->loadContrato($this->contrato);
+
+        $this->completandoDatosCesion = false;
+        $this->datosCesion = [];
+        $this->pasoDatosCesion = 0;
+
+        $this->dispatch(
+            'toast',
+            type: $guardados > 0 ? 'success' : 'error',
+            message: $guardados > 0
+                ? 'Se guardaron '.$guardados.' dato(s) para el contrato.'
+                : 'No se capturó ningún dato.'
+        );
     }
 
     public function subirArchivoContrato(): void
@@ -282,11 +381,11 @@ class Show extends Component
             'abonoCapitalObservaciones' => ['nullable', 'string', 'max:500'],
         ], [
             'abonoCapitalMonto.required' => 'El monto es requerido.',
-            'abonoCapitalMonto.numeric'  => 'El monto debe ser numérico.',
-            'abonoCapitalMonto.min'      => 'El monto debe ser mayor a cero.',
-            'abonoCapitalMonto.max'      => "El monto no puede exceder el saldo actual (\${$saldoActual}).",
+            'abonoCapitalMonto.numeric' => 'El monto debe ser numérico.',
+            'abonoCapitalMonto.min' => 'El monto debe ser mayor a cero.',
+            'abonoCapitalMonto.max' => "El monto no puede exceder el saldo actual (\${$saldoActual}).",
             'abonoCapitalFecha.required' => 'La fecha es requerida.',
-            'abonoCapitalFecha.date'     => 'La fecha no es válida.',
+            'abonoCapitalFecha.date' => 'La fecha no es válida.',
         ]);
 
         DB::transaction(function () {
@@ -294,9 +393,9 @@ class Show extends Component
                 ->lockForUpdate()
                 ->findOrFail($this->contrato->id);
 
-            $monto         = round((float) $this->abonoCapitalMonto, 2);
+            $monto = round((float) $this->abonoCapitalMonto, 2);
             $saldoAnterior = round((float) ($contrato->saldo_actual ?? 0), 2);
-            $saldoNuevo    = round(max(0, $saldoAnterior - $monto), 2);
+            $saldoNuevo = round(max(0, $saldoAnterior - $monto), 2);
 
             $contrato->update(['saldo_actual' => $saldoNuevo]);
 
@@ -310,11 +409,13 @@ class Show extends Component
                 ->lockForUpdate()
                 ->get();
 
-            $abonoRestante    = $monto;
+            $abonoRestante = $monto;
             $cuotasEliminadas = 0;
 
             foreach ($cuotasPendientes as $cuota) {
-                if ($abonoRestante <= 0) break;
+                if ($abonoRestante <= 0) {
+                    break;
+                }
 
                 $pendiente = round((float) $cuota->monto - (float) ($cuota->pagado_total ?? 0), 2);
 
@@ -334,13 +435,13 @@ class Show extends Component
 
             ContratoHistorial::create([
                 'contrato_id' => $contrato->id,
-                'user_id'     => auth()->id(),
-                'tipo'        => 'abono_capital',
-                'antes'       => ['saldo_actual' => $saldoAnterior],
-                'despues'     => ['saldo_actual' => $saldoNuevo, 'monto_abono' => $monto, 'cuotas_eliminadas' => $cuotasEliminadas],
+                'user_id' => auth()->id(),
+                'tipo' => 'abono_capital',
+                'antes' => ['saldo_actual' => $saldoAnterior],
+                'despues' => ['saldo_actual' => $saldoNuevo, 'monto_abono' => $monto, 'cuotas_eliminadas' => $cuotasEliminadas],
                 'saldo_anterior' => $saldoAnterior,
-                'saldo_nuevo'    => $saldoNuevo,
-                'nota'        => $this->abonoCapitalObservaciones ?: null,
+                'saldo_nuevo' => $saldoNuevo,
+                'nota' => $this->abonoCapitalObservaciones ?: null,
             ]);
         });
 
@@ -980,8 +1081,13 @@ class Show extends Component
 
     public function render()
     {
+        $aplicaCesion = (bool) ContratoWordService::documentTypeFor('contrato_cesion_derechos', $this->contrato);
+
         return view('livewire.admin.contratos.show', [
             'documentosContrato' => ContratoWordService::documentTypesFor($this->contrato),
+            'datosCesionFaltantes' => $aplicaCesion && $this->modalContratoOpen
+                ? DatosContratoCesionService::faltantes($this->contrato)
+                : [],
         ])
             ->layout('layouts.app');
     }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Sistema;
 
+use App\Services\Contratos\CondicionesCesionService;
 use App\Services\Whatsapp\WhatsappProviderSelector;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\Rule;
@@ -14,11 +15,41 @@ class Index extends Component
 
     public string $whatsappProveedor = WhatsappProviderSelector::OPENWA;
 
+    /**
+     * Condiciones con las que nacen los contratos de cesión de derechos.
+     *
+     * @var array<string, string>
+     */
+    public array $cesion = CondicionesCesionService::DEFAULTS;
+
     public function mount(WhatsappProviderSelector $selector): void
     {
         // Permiso para ver el módulo Sistema
         $this->authorize('sistema.ver');
         $this->whatsappProveedor = $selector->activo();
+        $this->cesion = CondicionesCesionService::porDefecto();
+    }
+
+    public function guardarCondicionesCesion(): void
+    {
+        $this->authorize('sistema.ver');
+
+        $this->validate([
+            'cesion.posesion_entrega' => ['required', 'string', 'max:120'],
+            'cesion.servicios_estado' => ['required', 'string', 'max:60'],
+            'cesion.servicios_a_cargo' => ['required', 'string', 'max:60'],
+            'cesion.parcialidades_rescision' => ['required', 'integer', 'min:1', 'max:99'],
+            'cesion.tolerancia_medidas' => ['required', 'numeric', 'min:0', 'max:100'],
+        ]);
+
+        CondicionesCesionService::guardarPorDefecto($this->cesion);
+
+        activity()
+            ->causedBy(auth()->user())
+            ->withProperties($this->cesion)
+            ->log('Condiciones del contrato de cesión actualizadas');
+
+        $this->dispatch('toast', type: 'success', message: 'Condiciones del contrato actualizadas.');
     }
 
     public function goUsuarios(): void

@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Clientes;
 
 use App\Models\Cliente;
+use App\Services\Contratos\DatosIdentidadService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -89,6 +90,14 @@ class Index extends Component
             'rfc' => '',
             'curp' => '',
             'notas' => '',
+
+            // Datos que declara el cliente en el contrato de cesión.
+            'persona_tipo' => 'fisica',
+            'nacionalidad' => DatosIdentidadService::NACIONALIDAD_DEFAULT,
+            'estado_civil' => '',
+            'ocupacion' => '',
+            'identificacion_tipo' => 'INE',
+            'identificacion_numero' => '',
         ];
 
         $this->ineFrenteFile = null;
@@ -116,6 +125,13 @@ class Index extends Component
             'rfc' => (string) ($c->rfc ?? ''),
             'curp' => (string) ($c->curp ?? ''),
             'notas' => (string) ($c->notas ?? ''),
+
+            'persona_tipo' => (string) ($c->persona_tipo ?? 'fisica'),
+            'nacionalidad' => (string) ($c->nacionalidad ?? DatosIdentidadService::NACIONALIDAD_DEFAULT),
+            'estado_civil' => (string) ($c->estado_civil ?? ''),
+            'ocupacion' => (string) ($c->ocupacion ?? ''),
+            'identificacion_tipo' => (string) ($c->identificacion_tipo ?? 'INE'),
+            'identificacion_numero' => (string) ($c->identificacion_numero ?? ''),
         ];
 
         $this->ine_frente = $c->ine_frente;
@@ -181,7 +197,7 @@ class Index extends Component
 
             'ineFrenteFile' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:10240'],
             'ineReversoFile' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:10240'],
-        ];
+        ] + DatosIdentidadService::reglas('form.');
     }
 
     public function guardar(): void
@@ -202,6 +218,10 @@ class Index extends Component
             'notas' => $this->stringOrNull($this->form['notas'] ?? null),
             'documentos_disk' => 'private',
         ];
+
+        foreach (DatosIdentidadService::CAMPOS as $campo) {
+            $payload[$campo] = $this->stringOrNull($this->form[$campo] ?? null);
+        }
 
         if ($this->editId) {
             $cliente = Cliente::query()->findOrFail($this->editId);

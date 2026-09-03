@@ -260,6 +260,63 @@
                     @error('form.curp') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
 
+                {{-- Datos que declara el cliente en el contrato de cesión de derechos --}}
+                <div class="md:col-span-2 pt-2 border-t">
+                    <p class="text-sm font-bold text-gray-700">Datos para el contrato</p>
+                    <p class="text-xs text-gray-500">Se imprimen en la declaración del contrato de cesión de derechos.</p>
+                </div>
+
+                <div>
+                    <label class="text-sm font-semibold">Tipo de persona</label>
+                    <select wire:model.live="form.persona_tipo" class="w-full mt-1 rounded-xl border-gray-300">
+                        <option value="">—</option>
+                        @foreach(\App\Services\Contratos\DatosIdentidadService::PERSONA_TIPOS as $valor => $etiqueta)
+                        <option value="{{ $valor }}">{{ $etiqueta }}</option>
+                        @endforeach
+                    </select>
+                    @error('form.persona_tipo') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="text-sm font-semibold">Nacionalidad</label>
+                    <input type="text" wire:model.live="form.nacionalidad" class="w-full mt-1 rounded-xl border-gray-300">
+                    @error('form.nacionalidad') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="text-sm font-semibold">Estado civil</label>
+                    <select wire:model.live="form.estado_civil" class="w-full mt-1 rounded-xl border-gray-300">
+                        <option value="">—</option>
+                        @foreach(\App\Services\Contratos\DatosIdentidadService::ESTADOS_CIVILES as $opcion)
+                        <option value="{{ $opcion }}">{{ $opcion }}</option>
+                        @endforeach
+                    </select>
+                    @error('form.estado_civil') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="text-sm font-semibold">Ocupación</label>
+                    <input type="text" wire:model.live="form.ocupacion" class="w-full mt-1 rounded-xl border-gray-300">
+                    @error('form.ocupacion') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="text-sm font-semibold">Identificación oficial</label>
+                    <select wire:model.live="form.identificacion_tipo" class="w-full mt-1 rounded-xl border-gray-300">
+                        <option value="">—</option>
+                        @foreach(\App\Services\Contratos\DatosIdentidadService::IDENTIFICACIONES as $opcion)
+                        <option value="{{ $opcion }}">{{ $opcion }}</option>
+                        @endforeach
+                    </select>
+                    @error('form.identificacion_tipo') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="text-sm font-semibold">Número de identificación</label>
+                    <input type="text" wire:model.live="form.identificacion_numero" class="w-full mt-1 rounded-xl border-gray-300">
+                    @error('form.identificacion_numero') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
                 <div>
                     <label class="text-sm font-semibold">INE frente</label>
                     <input type="file"

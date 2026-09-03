@@ -4,8 +4,10 @@ namespace App\Livewire\Admin\Fraccionamientos;
 
 use App\Models\Fraccionamiento;
 use App\Models\Propietario;
+use App\Services\Contratos\DatosContratoCesionService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
 use Livewire\Component;
@@ -35,6 +37,15 @@ class Index extends Component
     public string $nombre = '';
 
     public ?string $ubicacion = null;
+
+    // Datos que declara el contrato de cesión de derechos
+    public ?string $ejido = null;
+
+    public ?string $municipio = null;
+
+    public ?string $antecedente_tipo = null;
+
+    public ?string $antecedente_datos = null;
 
     // Logo
     public $logo = null;
@@ -91,6 +102,11 @@ class Index extends Component
         $this->nombre = (string) $it->nombre;
         $this->ubicacion = $it->ubicacion;
 
+        $this->ejido = $it->ejido;
+        $this->municipio = $it->municipio;
+        $this->antecedente_tipo = $it->antecedente_tipo;
+        $this->antecedente_datos = $it->antecedente_datos;
+
         $this->logo = null;
         $this->removeLogo = false;
 
@@ -108,6 +124,12 @@ class Index extends Component
             'nombre' => ['required', 'string', 'max:255'],
             'ubicacion' => ['nullable', 'string', 'max:255'],
 
+            // Contrato de cesión
+            'ejido' => ['nullable', 'string', 'max:255'],
+            'municipio' => ['nullable', 'string', 'max:255'],
+            'antecedente_tipo' => ['nullable', 'string', Rule::in(DatosContratoCesionService::ANTECEDENTE_OPCIONES)],
+            'antecedente_datos' => ['nullable', 'string', 'max:1000'],
+
             // Logo
             'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'removeLogo' => ['boolean'],
@@ -118,9 +140,12 @@ class Index extends Component
         ]);
 
         $data['nombre'] = trim($data['nombre']);
-        $data['ubicacion'] = is_string($data['ubicacion'] ?? null)
-            ? (trim($data['ubicacion']) !== '' ? trim($data['ubicacion']) : null)
-            : null;
+
+        foreach (['ubicacion', 'ejido', 'municipio', 'antecedente_tipo', 'antecedente_datos'] as $campo) {
+            $data[$campo] = is_string($data[$campo] ?? null)
+                ? (trim($data[$campo]) !== '' ? trim($data[$campo]) : null)
+                : null;
+        }
 
         unset(
             $data['logo'],
@@ -222,6 +247,11 @@ class Index extends Component
         $this->propietario_id = null;
         $this->nombre = '';
         $this->ubicacion = null;
+
+        $this->ejido = null;
+        $this->municipio = null;
+        $this->antecedente_tipo = null;
+        $this->antecedente_datos = null;
 
         $this->logo = null;
         $this->removeLogo = false;

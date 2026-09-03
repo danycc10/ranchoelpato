@@ -16,6 +16,8 @@ class ContratoWordServiceTest extends TestCase
                 'constancia_terminacion_pago',
                 'convenio_pago',
                 'convenio_pago_reconocimiento_adeudo',
+                'contrato_cesion_derechos',
+                'caratula_expediente',
                 'contrato_financiamiento_electrico',
             ],
             ContratoWordService::validDocumentTypeKeys()

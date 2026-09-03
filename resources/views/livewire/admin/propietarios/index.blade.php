@@ -232,9 +232,80 @@
                 </div>
 
                 <div>
+                    <x-label value="RFC" />
+                    <x-input type="text" class="w-full uppercase" wire:model.defer="rfc" />
+                    @error('rfc') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
                     <x-label value="Teléfono" />
                     <x-input type="text" class="w-full" wire:model.defer="telefono" />
                     @error('telefono') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="md:col-span-2">
+                    <x-label value="Domicilio" />
+                    <x-input type="text" class="w-full" wire:model.defer="direccion" />
+                    @error('direccion') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                {{-- Datos que declara el propietario en el contrato de cesión de derechos --}}
+                <div class="md:col-span-2 pt-2 border-t">
+                    <p class="text-sm font-bold text-gray-700">Datos para el contrato</p>
+                    <p class="text-xs text-gray-500">
+                        Se imprimen en la declaración de la parte cedente del contrato de cesión de derechos.
+                    </p>
+                </div>
+
+                <div>
+                    <x-label value="Tipo de persona" />
+                    <select wire:model.defer="persona_tipo" class="w-full rounded-xl border-gray-300">
+                        <option value="">—</option>
+                        @foreach(\App\Services\Contratos\DatosIdentidadService::PERSONA_TIPOS as $valor => $etiqueta)
+                        <option value="{{ $valor }}">{{ $etiqueta }}</option>
+                        @endforeach
+                    </select>
+                    @error('persona_tipo') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <x-label value="Nacionalidad" />
+                    <x-input type="text" class="w-full" wire:model.defer="nacionalidad" />
+                    @error('nacionalidad') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <x-label value="Estado civil" />
+                    <select wire:model.defer="estado_civil" class="w-full rounded-xl border-gray-300">
+                        <option value="">—</option>
+                        @foreach(\App\Services\Contratos\DatosIdentidadService::ESTADOS_CIVILES as $opcion)
+                        <option value="{{ $opcion }}">{{ $opcion }}</option>
+                        @endforeach
+                    </select>
+                    @error('estado_civil') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <x-label value="Ocupación" />
+                    <x-input type="text" class="w-full" wire:model.defer="ocupacion" />
+                    @error('ocupacion') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <x-label value="Identificación oficial" />
+                    <select wire:model.defer="identificacion_tipo" class="w-full rounded-xl border-gray-300">
+                        <option value="">—</option>
+                        @foreach(\App\Services\Contratos\DatosIdentidadService::IDENTIFICACIONES as $opcion)
+                        <option value="{{ $opcion }}">{{ $opcion }}</option>
+                        @endforeach
+                    </select>
+                    @error('identificacion_tipo') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <x-label value="Número de identificación" />
+                    <x-input type="text" class="w-full" wire:model.defer="identificacion_numero" />
+                    @error('identificacion_numero') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
 
                 <div class="md:col-span-2">

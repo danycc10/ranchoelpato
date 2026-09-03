@@ -23,6 +23,14 @@ class Cliente extends Model
         'ine_frente',
         'ine_reverso',
         'documentos_disk',
+
+        // Datos que declaran las partes en el contrato de cesión.
+        'persona_tipo',
+        'nacionalidad',
+        'estado_civil',
+        'ocupacion',
+        'identificacion_tipo',
+        'identificacion_numero',
     ];
 
     protected $attributes = [

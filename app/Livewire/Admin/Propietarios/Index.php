@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Propietarios;
 
 use App\Models\Propietario;
+use App\Services\Contratos\DatosIdentidadService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -34,11 +35,28 @@ class Index extends Component
 
     public ?string $curp = null;
 
+    public ?string $rfc = null;
+
+    public ?string $direccion = null;
+
     public ?string $telefono = null;
 
     public ?string $correo = null;
 
     public ?string $notas = null;
+
+    // Datos que declara el propietario en el contrato de cesión
+    public ?string $persona_tipo = 'fisica';
+
+    public ?string $nacionalidad = DatosIdentidadService::NACIONALIDAD_DEFAULT;
+
+    public ?string $estado_civil = null;
+
+    public ?string $ocupacion = null;
+
+    public ?string $identificacion_tipo = 'INE';
+
+    public ?string $identificacion_numero = null;
 
     // Archivos guardados
     public ?string $ine_frente = null;
@@ -97,9 +115,18 @@ class Index extends Component
         $this->nombre = (string) $it->nombre;
         $this->nombre_legal = $it->nombre_legal;
         $this->curp = $it->curp;
+        $this->rfc = $it->rfc;
+        $this->direccion = $it->direccion;
         $this->telefono = $it->telefono;
         $this->correo = $it->correo;
         $this->notas = $it->notas;
+
+        $this->persona_tipo = $it->persona_tipo ?: 'fisica';
+        $this->nacionalidad = $it->nacionalidad ?: DatosIdentidadService::NACIONALIDAD_DEFAULT;
+        $this->estado_civil = $it->estado_civil;
+        $this->ocupacion = $it->ocupacion;
+        $this->identificacion_tipo = $it->identificacion_tipo ?: 'INE';
+        $this->identificacion_numero = $it->identificacion_numero;
 
         $this->ine_frente = $it->ine_frente;
         $this->ine_reverso = $it->ine_reverso;
@@ -118,25 +145,34 @@ class Index extends Component
             'nombre' => ['required', 'string', 'max:255'],
             'nombre_legal' => ['nullable', 'string', 'max:255'],
             'curp' => ['nullable', 'string', 'max:30'],
+            'rfc' => ['nullable', 'string', 'max:20'],
+            'direccion' => ['nullable', 'string', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:50'],
             'correo' => ['nullable', 'email', 'max:255'],
             'notas' => ['nullable', 'string'],
 
             'ineFrenteFile' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:10240'],
             'ineReversoFile' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:10240'],
-        ]);
+        ] + DatosIdentidadService::reglas());
 
         // Normaliza strings
         $data['nombre'] = trim($data['nombre']);
 
-        foreach (['nombre_legal', 'curp', 'telefono', 'correo'] as $k) {
+        $normalizables = array_merge(
+            ['nombre_legal', 'curp', 'rfc', 'direccion', 'telefono', 'correo'],
+            DatosIdentidadService::CAMPOS
+        );
+
+        foreach ($normalizables as $k) {
             $data[$k] = is_string($data[$k] ?? null)
                 ? (trim($data[$k]) !== '' ? trim($data[$k]) : null)
                 : null;
         }
 
-        if ($data['curp']) {
-            $data['curp'] = Str::upper($data['curp']);
+        foreach (['curp', 'rfc'] as $k) {
+            if ($data[$k]) {
+                $data[$k] = Str::upper($data[$k]);
+            }
         }
 
         $data['notas'] = is_string($data['notas'] ?? null)
@@ -362,9 +398,18 @@ class Index extends Component
         $this->nombre = '';
         $this->nombre_legal = null;
         $this->curp = null;
+        $this->rfc = null;
+        $this->direccion = null;
         $this->telefono = null;
         $this->correo = null;
         $this->notas = null;
+
+        $this->persona_tipo = 'fisica';
+        $this->nacionalidad = DatosIdentidadService::NACIONALIDAD_DEFAULT;
+        $this->estado_civil = null;
+        $this->ocupacion = null;
+        $this->identificacion_tipo = 'INE';
+        $this->identificacion_numero = null;
 
         $this->ine_frente = null;
         $this->ine_reverso = null;
