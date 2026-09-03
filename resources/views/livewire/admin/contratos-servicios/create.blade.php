@@ -76,7 +76,15 @@
                                         <button type="button"
                                             wire:click="selectContratoBase({{ $s['id'] }})"
                                             class="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0">
-                                            <div class="font-semibold text-gray-900">{{ $s['label'] }}</div>
+                                            <div class="font-semibold text-gray-900">
+                                                {{ $s['label'] }}
+
+                                                @if(!empty($s['estatus']))
+                                                <span class="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                                                    {{ $s['estatus'] }}
+                                                </span>
+                                                @endif
+                                            </div>
                                         </button>
                                     @endforeach
                                 </div>
@@ -89,6 +97,7 @@
 
                         <p class="text-xs text-gray-500 mt-2">
                             Tip: escribe el folio del contrato o el nombre del cliente.
+                            También aparecen los contratos ya liquidados.
                         </p>
                     </div>
 

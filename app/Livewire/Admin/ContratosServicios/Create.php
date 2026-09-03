@@ -14,6 +14,14 @@ use Livewire\Component;
 
 class Create extends Component
 {
+    /**
+     * Contratos de terreno a los que se les puede colgar un servicio.
+     *
+     * El terreno ya liquidado sigue siendo del cliente: puede contratar luz o
+     * agua igual que uno que sigue pagando.
+     */
+    private const ESTATUS_BASE = ['activo', 'liquidado'];
+
     public int $step = 1;
 
     public string $contrato_q = '';
@@ -92,7 +100,8 @@ class Create extends Component
 
         $this->contratos_suggest = Contrato::query()
             ->with(['cliente', 'lote'])
-            ->where('estatus', 'activo')
+            // Un lote ya pagado también puede contratar el servicio.
+            ->whereIn('estatus', self::ESTATUS_BASE)
             ->where('tipo', 'terreno')
             ->where(function ($qq) use ($q) {
                 $qq->where('folio_contrato', 'like', "%{$q}%")
@@ -109,6 +118,8 @@ class Create extends Component
                 'label' => ($c->folio_contrato ?? 'SIN-FOLIO')
                     .' · '.($c->cliente->nombre_completo ?? 'Sin cliente')
                     .' · '.($c->lote->clave ?? 'Sin lote'),
+                // Se marca el que ya está pagado para no confundirlo al elegir.
+                'estatus' => $c->estatus === 'activo' ? null : mb_strtoupper((string) $c->estatus),
             ])
             ->toArray();
     }
