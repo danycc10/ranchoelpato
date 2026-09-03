@@ -4,118 +4,11 @@
     <meta charset="utf-8">
     <title>Recibos agrupados</title>
 
+    <style id="ticket-css">
+@include('admin.recibos.partials.ticket-css')
+    </style>
+
     <style>
-        :root{
-            --ticket-width: 72mm;
-            --font: 13px;
-            --small: 12px;
-        }
-
-        * { box-sizing: border-box; }
-
-        body{
-            margin:0;
-            padding:0;
-            font-family: Arial, sans-serif;
-            font-size: var(--font);
-            line-height: 1.25;
-            color:#000;
-            background:#fff;
-        }
-
-        .ticket-page{
-            width: 80mm;
-            min-height: 210mm;
-            margin: 0 auto;
-            page-break-after: always;
-            break-after: page;
-            overflow: hidden;
-        }
-
-        .ticket-page:last-child{
-            page-break-after: auto;
-            break-after: auto;
-        }
-
-        .ticket{
-            width: var(--ticket-width);
-            margin: 0 auto;
-            padding: 8px 8px 10px;
-        }
-
-        .center{ text-align:center; }
-        .right{ text-align:right; }
-        .bold{ font-weight: 800; }
-        .small{ font-size: var(--small); }
-
-        .muted{
-            font-size: var(--small);
-            color:#000;
-            font-weight: 600;
-        }
-
-        .hr{
-            border: none;
-            border-top: 2px solid #000;
-            margin: 8px 0;
-        }
-
-        .block{ margin: 6px 0; }
-
-        .row{
-            display: table;
-            width: 100%;
-        }
-
-        .row > div{
-            display: table-cell;
-            vertical-align: top;
-        }
-
-        .row .right{
-            width: 1%;
-            white-space: nowrap;
-        }
-
-        .logo-empresa{
-            max-width: 60mm;
-            max-height: 18mm;
-            object-fit: contain;
-            margin: 0 auto 4px;
-            display:block;
-            image-rendering: crisp-edges;
-        }
-
-        .logo-fracc{
-            max-width: 55mm;
-            max-height: 18mm;
-            object-fit: contain;
-            margin: 6px auto 2px;
-            display:block;
-            image-rendering: crisp-edges;
-        }
-
-        table{
-            width:100%;
-            border-collapse: collapse;
-            margin-top: 6px;
-        }
-
-        th, td{
-            padding: 4px 0;
-            vertical-align: top;
-        }
-
-        thead th{
-            border-bottom: 2px solid #000;
-            padding-bottom: 6px;
-        }
-
-        tfoot th{
-            border-top: 2px solid #000;
-            padding-top: 6px;
-        }
-
         .no-print{
             padding: 12px;
             text-align:center;
@@ -131,45 +24,115 @@
             cursor:pointer;
             text-decoration:none;
             display:inline-block;
+            margin: 4px;
         }
 
-        @page{
-            size: 80mm 210mm;
-            margin: 0;
+        .btn-secondary{
+            background: #fff;
+            color: #000;
         }
 
-        @media print{
-            .no-print{ display:none !important; }
-            body{ margin:0; }
-            *{
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
+        .status{
+            margin-top: 8px;
+            font-size: 13px;
+            font-weight: 700;
         }
+
+        .status.ok{ color: green; }
+        .status.error{ color: red; }
     </style>
 </head>
 <body>
 
 @if(($modo ?? 'web') === 'web')
     <div class="no-print">
-        <button onclick="window.print()" class="btn">Imprimir</button>
+        <button onclick="window.print()" class="btn">Imprimir navegador</button>
 
-        <a href="{{ route('admin.recibos.pdf-lote', ['token' => $token]) }}"
-           class="btn"
-           style="margin-left:8px;">
+        <button id="btnPrintLocal" class="btn">
+            Impresora local ({{ $recibos->count() }})
+        </button>
+
+        <a href="{{ route('admin.recibos.pdf-lote', ['token' => $token]) }}" class="btn btn-secondary">
             PDF
         </a>
+
+        <div id="printStatus" class="status"></div>
     </div>
 @endif
 
 @foreach($recibos as $recibo)
-    <div class="ticket-page">
+    <div class="ticket-page" id="ticket-{{ $recibo->uuid }}">
         @include('admin.recibos.partials.recibo-ticket', [
             'recibo' => $recibo,
             'modo' => $modo ?? 'web',
         ])
     </div>
 @endforeach
+
+@if(($modo ?? 'web') === 'web')
+@php
+    $recibosParaImprimir = $recibos->map(fn ($recibo) => [
+        'folio' => $recibo->folio,
+        'id' => 'ticket-'.$recibo->uuid,
+        'tokenUrl' => route('admin.recibos.print-token', $recibo),
+        'dataUrl' => route('admin.recibos.print-data', $recibo),
+    ])->values();
+@endphp
+
+@include('admin.recibos.partials.ticket-print-js')
+
+<script>
+    // Se manda un ticket a la vez, con el token de su propio recibo: es la
+    // misma llamada que la impresión individual, repetida.
+    const RECIBOS = @json($recibosParaImprimir);
+
+    const btnPrintLocal = document.getElementById('btnPrintLocal');
+    const printStatus = document.getElementById('printStatus');
+
+    async function printLocal()
+    {
+        btnPrintLocal.disabled = true;
+
+        const fallidos = [];
+        let enviados = 0;
+
+        for (const recibo of RECIBOS) {
+
+            printStatus.className = 'status';
+            printStatus.textContent = `Enviando ${enviados + fallidos.length + 1} de ${RECIBOS.length}: ${recibo.folio}...`;
+
+            try {
+
+                await enviarTicketAImpresoraLocal({
+                    tokenUrl: recibo.tokenUrl,
+                    dataUrl: recibo.dataUrl,
+                    elemento: document.getElementById(recibo.id)
+                });
+
+                enviados++;
+
+            } catch (error) {
+
+                console.error(recibo.folio, error);
+                fallidos.push(`${recibo.folio} (${error.message})`);
+
+            }
+        }
+
+        if (fallidos.length === 0) {
+            printStatus.className = 'status ok';
+            printStatus.textContent = `${enviados} ticket(s) enviados correctamente.`;
+        } else {
+            printStatus.className = 'status error';
+            printStatus.textContent = `${enviados} enviados. Fallaron: ${fallidos.join(' · ')}`;
+        }
+
+        btnPrintLocal.disabled = false;
+    }
+
+    btnPrintLocal?.addEventListener('click', printLocal);
+</script>
+@endif
 
 </body>
 </html>

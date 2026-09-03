@@ -8,6 +8,9 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class RecibosPrintController extends Controller
 {
+    /** Hoja del ticket: 80 mm de ancho por 247 mm, la misma para uno o varios recibos. */
+    private const HOJA_TICKET = [0, 0, 226.77, 700];
+
     public function show(Recibo $recibo)
     {
         $recibo->load($this->relations());
@@ -61,7 +64,7 @@ class RecibosPrintController extends Controller
         $modo = 'pdf';
 
         $pdf = Pdf::loadView('admin.recibos.imprimir', compact('recibo', 'modo'));
-        $pdf->setPaper([0, 0, 226.77, 700], 'portrait');
+        $pdf->setPaper(self::HOJA_TICKET, 'portrait');
 
         return $pdf->download('recibo_'.$recibo->folio.'.pdf');
     }
@@ -79,8 +82,9 @@ class RecibosPrintController extends Controller
         $recibos = $this->obtenerRecibosDesdeToken($token);
         $modo = 'pdf';
 
+        // Misma hoja que el recibo individual: un recibo por página, igual de largo.
         $pdf = Pdf::loadView('admin.recibos.imprimir-lote', compact('recibos', 'modo', 'token'));
-        $pdf->setPaper([0, 0, 226.77, 3000], 'portrait');
+        $pdf->setPaper(self::HOJA_TICKET, 'portrait');
 
         return $pdf->download('recibos_lote_'.now()->format('Ymd_His').'.pdf');
     }

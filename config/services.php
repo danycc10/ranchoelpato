@@ -37,6 +37,7 @@ return [
 
     'print_bridge' => [
         'secret' => env('PRINT_BRIDGE_SECRET'),
+        'url' => env('PRINT_BRIDGE_URL', 'http://192.168.100.16:3001'),
     ],
 
     'whatsapp' => [
