@@ -73,7 +73,15 @@ class RecibosExport implements FromCollection, WithColumnFormatting, WithEvents,
             $q->whereNull('recibos.deleted_at');
         }
 
-        $q->when($this->propietarioId, fn ($q) => $q->where('fraccionamientos.propietario_id', $this->propietarioId))
+        // Mismo criterio que la consulta: el propietario contable del recibo y,
+        // si el recibo no lo trae, el dueño de su fraccionamiento.
+        $q->when($this->propietarioId, fn ($q) => $q->where(function ($r) {
+            $r->where('recibos.propietario_contable_id', $this->propietarioId)
+                ->orWhere(function ($sin) {
+                    $sin->whereNull('recibos.propietario_contable_id')
+                        ->where('fraccionamientos.propietario_id', $this->propietarioId);
+                });
+        }))
             ->when($this->tipoCobroid, fn ($q) => $q->where('recibos.tipos_cobro_id', $this->tipoCobroid))
             ->when($this->formaPagoId, fn ($q) => $q->where('recibos_pagos.forma_pago_id', $this->formaPagoId))
             ->when($this->cuentaId, fn ($q) => $q->where('recibos_pagos.cuenta_bancaria_id', $this->cuentaId))

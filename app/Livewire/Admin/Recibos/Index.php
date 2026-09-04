@@ -632,9 +632,17 @@ class Index extends Component
                 'pagosDetalle.formaPago',
                 'pagosDetalle.cuentaBancaria',
             ])
+            // El propietario del recibo es el contable: a quién le entra ese
+            // dinero, que no siempre es el dueño del fraccionamiento.
             ->when($this->propietario_id, function ($q) {
-                $q->whereHas('lote.fraccionamiento', function ($f) {
-                    $f->where('propietario_id', $this->propietario_id);
+                $q->where(function ($r) {
+                    $r->where('propietario_contable_id', $this->propietario_id)
+                        // Los recibos viejos, sin contable, siguen contando por
+                        // su fraccionamiento, igual que los resuelve el sistema.
+                        ->orWhere(function ($sin) {
+                            $sin->whereNull('propietario_contable_id')
+                                ->whereHas('lote.fraccionamiento', fn ($f) => $f->where('propietario_id', $this->propietario_id));
+                        });
                 });
             })
             ->when(
