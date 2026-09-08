@@ -340,10 +340,11 @@
                             <span class="px-2 py-1 rounded-lg bg-red-100 text-red-700 text-xs font-bold">PDF</span>
                         </a>
                         @else
-                        <a href="{{ $this->ineFrentePreview }}" target="_blank" class="block">
+                        <a href="{{ $this->ineFrentePreview }}" target="_blank" rel="noopener"
+                            class="group block cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
                             <img src="{{ $this->ineFrentePreview }}"
                                 alt="Vista previa INE frente"
-                                class="w-full h-48 rounded-xl border object-contain bg-white">
+                                class="relative z-0 w-full h-48 rounded-xl border object-contain bg-white transform-gpu transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none group-hover:z-10 group-hover:scale-[1.12] group-focus:scale-[1.12]">
                         </a>
                         @endif
                     </div>
@@ -388,10 +389,11 @@
                             <span class="px-2 py-1 rounded-lg bg-red-100 text-red-700 text-xs font-bold">PDF</span>
                         </a>
                         @else
-                        <a href="{{ $this->ineReversoPreview }}" target="_blank" class="block">
+                        <a href="{{ $this->ineReversoPreview }}" target="_blank" rel="noopener"
+                            class="group block cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
                             <img src="{{ $this->ineReversoPreview }}"
                                 alt="Vista previa INE reverso"
-                                class="w-full h-48 rounded-xl border object-contain bg-white">
+                                class="relative z-0 w-full h-48 rounded-xl border object-contain bg-white transform-gpu transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none group-hover:z-10 group-hover:scale-[1.12] group-focus:scale-[1.12]">
                         </a>
                         @endif
                     </div>

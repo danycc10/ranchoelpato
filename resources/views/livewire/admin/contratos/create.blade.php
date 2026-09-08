@@ -511,10 +511,13 @@
                         </div>
 
                         @if($this->compradorIneFrentePreview)
-                        <div class="rounded-xl overflow-hidden border bg-gray-100">
-                            <img src="{{ $this->compradorIneFrentePreview }}"
-                                alt="Preview INE comprador frente"
-                                class="w-full h-52 object-contain bg-white">
+                        <div class="rounded-xl border bg-gray-100 overflow-visible">
+                            <a href="{{ $this->compradorIneFrentePreview }}" target="_blank" rel="noopener"
+                                class="group block cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
+                                <img src="{{ $this->compradorIneFrentePreview }}"
+                                    alt="Preview INE comprador frente"
+                                    class="relative z-0 w-full h-52 object-contain bg-white transform-gpu transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none group-hover:z-10 group-hover:scale-[1.12] group-focus:scale-[1.12]">
+                            </a>
                         </div>
                         @endif
 
@@ -539,10 +542,13 @@
                         </div>
 
                         @if($this->compradorIneReversoPreview)
-                        <div class="rounded-xl overflow-hidden border bg-gray-100">
-                            <img src="{{ $this->compradorIneReversoPreview }}"
-                                alt="Preview INE comprador reverso"
-                                class="w-full h-52 object-contain bg-white">
+                        <div class="rounded-xl border bg-gray-100 overflow-visible">
+                            <a href="{{ $this->compradorIneReversoPreview }}" target="_blank" rel="noopener"
+                                class="group block cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
+                                <img src="{{ $this->compradorIneReversoPreview }}"
+                                    alt="Preview INE comprador reverso"
+                                    class="relative z-0 w-full h-52 object-contain bg-white transform-gpu transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none group-hover:z-10 group-hover:scale-[1.12] group-focus:scale-[1.12]">
+                            </a>
                         </div>
                         @endif
 
@@ -567,10 +573,13 @@
                         </div>
 
                         @if($this->vendedorIneFrentePreview)
-                        <div class="rounded-xl overflow-hidden border bg-gray-100">
-                            <img src="{{ $this->vendedorIneFrentePreview }}"
-                                alt="Preview INE vendedor frente"
-                                class="w-full h-52 object-contain bg-white">
+                        <div class="rounded-xl border bg-gray-100 overflow-visible">
+                            <a href="{{ $this->vendedorIneFrentePreview }}" target="_blank" rel="noopener"
+                                class="group block cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
+                                <img src="{{ $this->vendedorIneFrentePreview }}"
+                                    alt="Preview INE vendedor frente"
+                                    class="relative z-0 w-full h-52 object-contain bg-white transform-gpu transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none group-hover:z-10 group-hover:scale-[1.12] group-focus:scale-[1.12]">
+                            </a>
                         </div>
                         @endif
 
@@ -595,10 +604,13 @@
                         </div>
 
                         @if($this->vendedorIneReversoPreview)
-                        <div class="rounded-xl overflow-hidden border bg-gray-100">
-                            <img src="{{ $this->vendedorIneReversoPreview }}"
-                                alt="Preview INE vendedor reverso"
-                                class="w-full h-52 object-contain bg-white">
+                        <div class="rounded-xl border bg-gray-100 overflow-visible">
+                            <a href="{{ $this->vendedorIneReversoPreview }}" target="_blank" rel="noopener"
+                                class="group block cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
+                                <img src="{{ $this->vendedorIneReversoPreview }}"
+                                    alt="Preview INE vendedor reverso"
+                                    class="relative z-0 w-full h-52 object-contain bg-white transform-gpu transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none group-hover:z-10 group-focus:scale-[1.12] group-hover:scale-[1.12]">
+                            </a>
                         </div>
                         @endif
 

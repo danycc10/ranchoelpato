@@ -64,11 +64,12 @@
                     <div class="text-xs font-bold text-gray-600 mb-2">Lo que envió el cliente</div>
 
                     @if($this->imagenUrl)
-                        <a href="{{ $this->imagenUrl }}" target="_blank" rel="noopener">
-                            <img src="{{ $this->imagenUrl }}" alt="Comprobante"
-                                class="w-full rounded-xl border bg-white object-contain max-h-[560px]">
+                        <a href="{{ $this->imagenUrl }}" target="_blank" rel="noopener"
+                            class="group block cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
+                            <img src="{{ $this->imagenUrl }}" alt="Comprobante enviado por el cliente"
+                                class="relative z-0 w-full rounded-xl border bg-white object-contain max-h-[560px] transform-gpu transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none group-hover:z-10 group-hover:scale-[1.06] group-focus:scale-[1.06]">
                         </a>
-                        <p class="text-xs text-gray-500 mt-2">Clic en la imagen para verla en grande.</p>
+                        <p class="text-xs text-gray-500 mt-2">Pasa el cursor para ampliar rápidamente o haz clic para verla completa.</p>
                     @else
                         <div class="rounded-xl border-2 border-dashed border-red-300 bg-red-50 p-6 text-center">
                             <p class="font-bold text-red-800">No hay imagen disponible</p>

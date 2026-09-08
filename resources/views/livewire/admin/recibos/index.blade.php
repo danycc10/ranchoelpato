@@ -520,7 +520,7 @@
                     <div>
                         <div class="text-sm font-bold mb-2">Actual</div>
 
-                        <div class="rounded-2xl border bg-gray-50 min-h-[200px] flex items-center justify-center overflow-hidden">
+                        <div class="relative rounded-2xl border bg-gray-50 min-h-[200px] flex items-center justify-center overflow-visible">
                             @if($reciboEvidenciaPath)
                             @php
                             $evidenciaUrl = route('admin.recibo-pagos.evidencia.show', $reciboPagoEvidenciaId) . '?v=' . urlencode($reciboEvidenciaPath);
@@ -540,13 +540,17 @@
                                 </a>
                             </div>
                             @else
-                            <a href="{{ $evidenciaUrl }}" target="_blank">
+                            <a href="{{ $evidenciaUrl }}" target="_blank" rel="noopener"
+                                class="group block cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
                                 <img
                                     wire:key="evidencia-modal-{{ md5((string) $reciboEvidenciaPath) }}"
                                     src="{{ $evidenciaUrl }}"
-                                    alt="Evidencia actual"
-                                    class="max-h-[280px] w-auto object-contain">
+                                    alt="Evidencia actual del pago"
+                                    class="relative z-0 max-h-[280px] w-auto object-contain transform-gpu transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none group-hover:z-10 group-hover:scale-[1.3] group-focus:scale-[1.3]">
                             </a>
+                            <p class="absolute bottom-2 left-0 right-0 text-center text-[11px] text-gray-500 pointer-events-none">
+                                Pasa el cursor para ampliar · clic para abrir completa
+                            </p>
                             @endif
                             @else
                             <div class="text-sm text-gray-400">Este pago no tiene evidencia</div>
@@ -572,12 +576,12 @@
                             Procesando archivo...
                         </div>
 
-                        <div class="mt-3 rounded-2xl border bg-gray-50 min-h-[160px] flex items-center justify-center overflow-hidden">
+                        <div class="group relative mt-3 rounded-2xl border bg-gray-50 min-h-[160px] flex items-center justify-center overflow-visible">
                             @if($nuevaEvidenciaPreviewUrl)
                             <img
                                 src="{{ $nuevaEvidenciaPreviewUrl }}"
                                 alt="Vista previa nueva"
-                                class="max-h-[200px] w-auto object-contain">
+                                class="relative z-0 max-h-[200px] w-auto object-contain transform-gpu transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none group-hover:z-10 group-hover:scale-[1.3]">
                             @elseif($nuevaEvidencia && strtolower($nuevaEvidencia->getClientOriginalExtension()) === 'pdf')
                             <div class="text-sm text-gray-500 px-4 text-center">
                                 PDF cargado correctamente.

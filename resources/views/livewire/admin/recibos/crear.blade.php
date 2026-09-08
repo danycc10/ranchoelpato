@@ -762,12 +762,15 @@
                 <div>
                     <label class="text-xs text-gray-600">Vista previa</label>
 
-                    <div class="rounded-2xl border bg-white min-h-[220px] flex items-center justify-center overflow-hidden">
+                    <div class="group relative rounded-2xl border bg-white min-h-[220px] flex items-center justify-center overflow-visible">
                         @if($recargoEvidenciaPreviewUrl)
-                        <img
-                            src="{{ $recargoEvidenciaPreviewUrl }}"
-                            alt="Vista previa evidencia recargo"
-                            class="max-h-72 w-auto object-contain">
+                        <a href="{{ $recargoEvidenciaPreviewUrl }}" target="_blank" rel="noopener"
+                            class="group block cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
+                            <img
+                                src="{{ $recargoEvidenciaPreviewUrl }}"
+                                alt="Vista previa evidencia recargo"
+                                class="relative z-0 max-h-72 w-auto object-contain transform-gpu transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none group-hover:z-10 group-hover:scale-[1.3] group-focus-within:scale-[1.3]">
+                        </a>
                         @elseif($recargo_evidencia && strtolower($recargo_evidencia->getClientOriginalExtension()) === 'pdf')
                         <div class="text-sm text-gray-500 text-center px-4">
                             PDF cargado correctamente.
@@ -922,12 +925,15 @@
                 <div>
                     <label class="text-xs text-gray-600">Vista previa</label>
 
-                    <div class="rounded-2xl border bg-white min-h-[260px] flex items-center justify-center overflow-hidden mt-1.5">
+                    <div class="group relative rounded-2xl border bg-white min-h-[260px] flex items-center justify-center overflow-visible mt-1.5">
                         @if($pagoEvidenciaPreviewUrl)
-                        <img
-                            src="{{ $pagoEvidenciaPreviewUrl }}"
-                            alt="Vista previa evidencia"
-                            class="max-h-80 w-auto object-contain">
+                        <a href="{{ $pagoEvidenciaPreviewUrl }}" target="_blank" rel="noopener"
+                            class="group block cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
+                            <img
+                                src="{{ $pagoEvidenciaPreviewUrl }}"
+                                alt="Vista previa evidencia"
+                                class="relative z-0 max-h-80 w-auto object-contain transform-gpu transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none group-hover:z-10 group-hover:scale-[1.3] group-focus-within:scale-[1.3]">
+                        </a>
                         @elseif($this->pagoTieneEvidencia($pagoEvidenciaIndex) && $this->pagoNombreEvidencia($pagoEvidenciaIndex) && str_ends_with(strtolower($this->pagoNombreEvidencia($pagoEvidenciaIndex)), '.pdf'))
                         <div class="text-sm text-gray-500 text-center px-4">
                             PDF cargado correctamente.

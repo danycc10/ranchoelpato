@@ -552,7 +552,7 @@
                         || strtolower(pathinfo((string)($selectedReciboData['evidencia_path'] ?? ''), PATHINFO_EXTENSION)) === 'pdf';
                         @endphp
 
-                        <div class="rounded-2xl border bg-white min-h-[240px] sm:min-h-[380px] flex items-center justify-center overflow-hidden">
+                        <div class="relative rounded-2xl border bg-white min-h-[240px] sm:min-h-[380px] flex items-center justify-center overflow-visible">
                             @if($evidenciaUrl)
                             @if($esPdf)
                             <div class="text-center px-4 py-8">
@@ -576,12 +576,13 @@
                                 </a>
                             </div>
                             @else
-                            <a href="{{ $evidenciaUrl }}" target="_blank" class="block w-full">
+                            <a href="{{ $evidenciaUrl }}" target="_blank" rel="noopener"
+                                class="group block w-full cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2">
                                 <img
                                     wire:key="detalle-evidencia-{{ md5((string)($selectedReciboData['evidencia_path'] ?? 'sin-evidencia')) }}"
                                     src="{{ $evidenciaUrl }}"
-                                    alt="Evidencia"
-                                    class="max-h-[60vh] sm:max-h-[520px] w-full object-contain">
+                                    alt="Evidencia del pago"
+                                    class="relative z-0 max-h-[60vh] sm:max-h-[520px] w-full object-contain transform-gpu transition-transform duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none group-hover:z-10 group-hover:scale-[1.06] group-focus:scale-[1.06]">
                             </a>
                             @endif
                             @else
