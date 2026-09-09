@@ -507,36 +507,11 @@ class Crear extends Component
             $this->showAvisoOrdenCuotasModal = false;
         }
 
-        $seleccionMultiple = count($this->cuotaIds) > 1;
-
         // Si por cualquier motivo no hay pagos, siempre deja uno
         if (empty($this->pagos) || ! is_array($this->pagos) || count($this->pagos) === 0) {
             $this->pagos = [$this->nuevoPagoRow()];
         }
 
-        // Si hay múltiples cuotas, solo se permite un método de pago
-        if ($seleccionMultiple) {
-            $primerPago = $this->pagos[0] ?? $this->nuevoPagoRow();
-            $this->pagos = [$primerPago];
-
-            // Si no tiene índice 0 válido, lo reconstruimos limpio
-            if (! isset($this->pagos[0]) || ! is_array($this->pagos[0])) {
-                $this->pagos = [$this->nuevoPagoRow()];
-            }
-
-            // Reindexar por seguridad
-            $this->pagos = array_values($this->pagos);
-
-            if ($this->showPagoEvidenciaModal && ($this->pagoEvidenciaIndex ?? 0) > 0) {
-                $this->cerrarModalEvidenciaPago();
-            }
-
-            $this->dispatch(
-                'toast',
-                type: 'warning',
-                message: 'Al seleccionar varias cuotas, solo se permite una forma de pago.'
-            );
-        }
         $this->sincronizarPeriodoDesdeCuotasSeleccionadas();
         $this->sincronizarCamposPrincipalesDesdePagos();
         $this->actualizarRequiereCuentaBancaria();
@@ -1338,20 +1313,6 @@ class Crear extends Component
         }
     }
 
-    protected function puedeUsarMultiplesFormasPago(): bool
-    {
-        if (! $this->asociarACuota) {
-            return true;
-        }
-
-        $ids = collect($this->cuotaIds)
-            ->filter()
-            ->unique()
-            ->values();
-
-        return $ids->count() <= 1;
-    }
-
     protected function nuevoPagoRow(): array
     {
         return [
@@ -1366,12 +1327,6 @@ class Crear extends Component
 
     public function agregarPago(): void
     {
-        if (! $this->puedeUsarMultiplesFormasPago()) {
-            $this->dispatch('toast', type: 'warning', message: 'Para usar múltiples formas de pago, debes seleccionar solo una cuota.');
-
-            return;
-        }
-
         $this->pagos[] = $this->nuevoPagoRow();
         $this->sincronizarCamposPrincipalesDesdePagos();
     }
@@ -1761,18 +1716,6 @@ class Crear extends Component
 
         $pagosPrincipales = $this->normalizarPagosPrincipales($montoEsperadoPagos);
 
-        $cuotaIdsSeleccionadas = collect($this->cuotaIds)
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-
-        if ($this->asociarACuota && $cuotaIdsSeleccionadas->count() > 1 && count($pagosPrincipales) > 1) {
-            throw ValidationException::withMessages([
-                'pagos' => 'Cuando seleccionas más de una cuota, solo puedes usar una forma de pago. Para usar múltiples formas de pago, debes generar el recibo para una sola cuota.',
-            ]);
-        }
-
         if ($this->tipoCobroEsRecargo($this->tipos_cobro_id) && empty($this->cuotaIds)) {
             throw ValidationException::withMessages([
                 'cuotaIds' => 'Debes seleccionar al menos una cuota para generar recargos.',
@@ -1943,199 +1886,234 @@ class Crear extends Component
                 ]);
             }
 
+            // Un solo recibo agrupa todas las cuotas seleccionadas: el desglose
+            // por cuota vive en la tabla `pagos` (un renglón por cuota) y el
+            // ticket lo reconstruye desde ahí.
+            $datosCuotas = [];
+            $totalPrincipal = 0.0;
+            $totalRecargo = 0.0;
+
+            $esCobroDeRecargo = $this->tipoCobroEsRecargo($this->tipos_cobro_id);
+
             foreach ($cuotas as $cuota) {
                 $estadoRecargo = $this->calcularEstadoRecargoCuota($cuota);
                 $pendientePrincipal = max(0, (float) $cuota->monto - (float) ($cuota->pagado_total ?? 0));
                 $recargoFinal = (float) ($estadoRecargo['recargo_monto'] ?? 0);
                 $recargoCondonado = (bool) ($estadoRecargo['recargo_condonado'] ?? false);
 
-                // El periodo se resuelve una vez por cuota: lo comparten el recibo
-                // principal y el de recargo, aunque solo se genere uno de los dos.
-                $periodoIdCuota = $this->resolverPeriodoIdDesdeFecha($cuota->fecha_vencimiento);
+                $aplicaRecargo = ! $recargoCondonado
+                    && $recargoFinal > 0
+                    && ($esCobroDeRecargo || $this->tipoCobroEsMensualidad($this->tipos_cobro_id));
 
-                if (! $this->tipoCobroEsRecargo($this->tipos_cobro_id) && $pendientePrincipal > 0) {
-                    $saldoAnterior = $obtenerSaldoContrato((int) $this->contrato_id);
+                $principal = $esCobroDeRecargo ? 0.0 : $pendientePrincipal;
 
-                    $propietarioContablePrincipalId = $this->resolverPropietarioContableId(
-                        $this->tipos_cobro_id,
-                        $this->getFormaPagoPrincipal($pagosPrincipales)
-                    );
+                $datosCuotas[] = [
+                    'cuota' => $cuota,
+                    'principal' => $principal,
+                    'recargo' => $aplicaRecargo ? $recargoFinal : 0.0,
+                    // El periodo se resuelve una vez por cuota: lo comparten el
+                    // recibo principal y el de recargo.
+                    'periodo_id' => $this->resolverPeriodoIdDesdeFecha($cuota->fecha_vencimiento),
+                ];
 
-                    $recibo = $this->crearReciboConFolioSeguro([
-                        'fecha' => $fecha->toDateString(),
-                        'anio' => (int) $fecha->format('Y'),
+                $totalPrincipal += $principal;
+                $totalRecargo += $aplicaRecargo ? $recargoFinal : 0.0;
+            }
 
-                        'semana_pago' => (int) ($cuota->numero ?? 0),
-                        'semana_del_anio' => (int) $fecha->format('W'),
-                        'mes_del_anio' => (int) $fecha->format('m'),
+            $totalPrincipal = round($totalPrincipal, 2);
+            $totalRecargo = round($totalRecargo, 2);
 
-                        'cliente_id' => $this->cliente_id,
-                        'contrato_id' => $this->contrato_id,
-                        'lote_id' => $this->lote_id,
-                        'cuota_id' => $cuota->id,
+            $cuotasConPrincipal = collect($datosCuotas)->filter(fn ($d) => $d['principal'] > 0)->values();
+            $cuotasConRecargo = collect($datosCuotas)->filter(fn ($d) => $d['recargo'] > 0)->values();
 
-                        'tipos_cobro_id' => $this->tipos_cobro_id,
-                        'forma_pago_id' => $pagosPrincipales[0]['forma_pago_id'] ?? $this->forma_pago_id,
-                        'cuentas_bancarias_id' => $pagosPrincipales[0]['cuentas_bancarias_id'] ?? $this->cuentas_bancarias_id,
-                        'periodo_id' => $periodoIdCuota,
-                        'propietario_contable_id' => $propietarioContablePrincipalId,
+            if ($totalPrincipal > 0) {
+                // Las cuotas vienen ordenadas por vencimiento: la primera es el ancla.
+                $ancla = $cuotasConPrincipal->first();
+                $anclaCuota = $ancla['cuota'];
 
-                        'monto' => $pendientePrincipal,
-                        'saldo_anterior' => round((float) $saldoAnterior, 2),
-                        'saldo_posterior' => null,
+                $saldoAnterior = $obtenerSaldoContrato((int) $this->contrato_id);
 
-                        'observaciones' => $this->observaciones,
-                        'capturado_por_user_id' => auth()->id(),
+                $propietarioContablePrincipalId = $this->resolverPropietarioContableId(
+                    $this->tipos_cobro_id,
+                    $this->getFormaPagoPrincipal($pagosPrincipales)
+                );
 
-                        'evidencia_path' => null,
-                        'evidencia_disk' => null,
-                        'evidencia_mime' => null,
-                        'evidencia_size' => null,
-                    ]);
+                $recibo = $this->crearReciboConFolioSeguro([
+                    'fecha' => $fecha->toDateString(),
+                    'anio' => (int) $fecha->format('Y'),
 
-                    if ($cuotaIds->count() > 1) {
-                        $pagoBase = $pagosPrincipales[0];
+                    'semana_pago' => (int) ($anclaCuota->numero ?? 0),
+                    'semana_del_anio' => (int) $fecha->format('W'),
+                    'mes_del_anio' => (int) $fecha->format('m'),
 
-                        $pagosDelRecibo = [[
-                            'forma_pago_id' => $pagoBase['forma_pago_id'] ?? null,
-                            'cuentas_bancarias_id' => $pagoBase['cuentas_bancarias_id'] ?? null,
-                            'monto' => round((float) $pendientePrincipal, 2),
-                            'referencia' => $pagoBase['referencia'] ?? null,
-                            'evidencia' => $pagoBase['evidencia'] ?? null,
-                            'sin_evidencia' => $pagoBase['sin_evidencia'] ?? false,
-                            'orden' => 1,
-                        ]];
-                    } else {
-                        $pagosDelRecibo = $pagosPrincipales;
-                    }
+                    'cliente_id' => $this->cliente_id,
+                    'contrato_id' => $this->contrato_id,
+                    'lote_id' => $this->lote_id,
+                    'cuota_id' => $anclaCuota->id,
 
-                    $this->crearDetallesPagoRecibo($recibo, $pagosDelRecibo, $imageUploadService);
+                    'tipos_cobro_id' => $this->tipos_cobro_id,
+                    'forma_pago_id' => $pagosPrincipales[0]['forma_pago_id'] ?? $this->forma_pago_id,
+                    'cuentas_bancarias_id' => $pagosPrincipales[0]['cuentas_bancarias_id'] ?? $this->cuentas_bancarias_id,
+                    'periodo_id' => $ancla['periodo_id'],
+                    'propietario_contable_id' => $propietarioContablePrincipalId,
 
-                    $recibosParaEnviar[] = $recibo->id;
-                    $recibosParaImprimir[] = $recibo->id;
+                    'monto' => $totalPrincipal,
+                    'saldo_anterior' => round((float) $saldoAnterior, 2),
+                    'saldo_posterior' => null,
+
+                    'observaciones' => $this->observaciones,
+                    'capturado_por_user_id' => auth()->id(),
+
+                    'evidencia_path' => null,
+                    'evidencia_disk' => null,
+                    'evidencia_mime' => null,
+                    'evidencia_size' => null,
+                ]);
+
+                $this->crearDetallesPagoRecibo($recibo, $pagosPrincipales, $imageUploadService);
+
+                $recibosParaEnviar[] = $recibo->id;
+                $recibosParaImprimir[] = $recibo->id;
+
+                foreach ($cuotasConPrincipal as $item) {
+                    $cuotaItem = $item['cuota'];
 
                     Pago::create([
-                        'contrato_id' => $cuota->contrato_id,
-                        'cuota_id' => $cuota->id,
+                        'contrato_id' => $cuotaItem->contrato_id,
+                        'cuota_id' => $cuotaItem->id,
                         'recibo_id' => $recibo->id,
-                        'monto' => $pendientePrincipal,
+                        'monto' => $item['principal'],
                         'metodo' => $this->metodo,
                         'referencia' => $this->referencia,
                         'estatus' => 'confirmado',
                         'fecha_pago' => now(),
                     ]);
 
-                    $cuota->pagado_total = (float) ($cuota->pagado_total ?? 0) + $pendientePrincipal;
-                    $cuota->estatus = $cuota->pagado_total >= (float) $cuota->monto ? 'pagada' : 'pendiente';
-                    $cuota->save();
-
-                    $this->restarSaldoContrato((float) $pendientePrincipal);
-                    $actualizarSaldoPosteriorRecibo($recibo, (int) $this->contrato_id);
-
-                    activity()
-                        ->causedBy(auth()->user())
-                        ->performedOn($recibo)
-                        ->withProperties([
-                            'folio' => $recibo->folio,
-                            'monto' => $recibo->monto,
-                            'cliente_id' => $recibo->cliente_id,
-                            'contrato_id' => $recibo->contrato_id,
-                            'cuota_id' => $cuota->id,
-                            'saldo_anterior' => $recibo->saldo_anterior,
-                            'saldo_posterior' => $recibo->saldo_posterior,
-                        ])
-                        ->log('Recibo creado');
+                    $cuotaItem->pagado_total = (float) ($cuotaItem->pagado_total ?? 0) + $item['principal'];
+                    $cuotaItem->estatus = $cuotaItem->pagado_total >= (float) $cuotaItem->monto ? 'pagada' : 'pendiente';
+                    $cuotaItem->save();
                 }
 
-                $debeCrearRecargo = false;
+                $this->restarSaldoContrato($totalPrincipal);
+                $actualizarSaldoPosteriorRecibo($recibo, (int) $this->contrato_id);
 
-                if ($this->tipoCobroEsRecargo($this->tipos_cobro_id)) {
-                    $debeCrearRecargo = ! $recargoCondonado && $recargoFinal > 0;
-                } elseif ($this->tipoCobroEsMensualidad($this->tipos_cobro_id)) {
-                    $debeCrearRecargo = ! $recargoCondonado && $recargoFinal > 0;
-                }
+                activity()
+                    ->causedBy(auth()->user())
+                    ->performedOn($recibo)
+                    ->withProperties([
+                        'folio' => $recibo->folio,
+                        'monto' => $recibo->monto,
+                        'cliente_id' => $recibo->cliente_id,
+                        'contrato_id' => $recibo->contrato_id,
+                        'cuota_id' => $anclaCuota->id,
+                        'cuota_ids' => $cuotasConPrincipal->map(fn ($d) => (int) $d['cuota']->id)->all(),
+                        'saldo_anterior' => $recibo->saldo_anterior,
+                        'saldo_posterior' => $recibo->saldo_posterior,
+                    ])
+                    ->log('Recibo creado');
+            }
 
-                if ($debeCrearRecargo) {
-                    $cuota->recargo_aplicado = max((float) ($cuota->recargo_aplicado ?? 0), (float) $recargoFinal);
-                    $cuota->save();
+            if ($totalRecargo > 0) {
+                // El recargo conserva su propio folio porque puede resolver a otro
+                // propietario contable que la mensualidad; se imprime junto con el
+                // recibo principal en el mismo ticket.
+                $anclaRecargo = $cuotasConRecargo->first();
 
-                    $tipoRecargoId = $this->obtenerTipoCobroRecargoId();
-                    $tipoCobroReciboRecargoId = $tipoRecargoId ?: $this->tipos_cobro_id;
-                    $formaPagoRecargo = $this->recargo_forma_pago_id
-                        ?: $this->getFormaPagoPrincipal($pagosPrincipales);
-
-                    $propietarioContableRecargoId = $this->resolverPropietarioContableId(
-                        $tipoCobroReciboRecargoId,
-                        $formaPagoRecargo
+                foreach ($cuotasConRecargo as $item) {
+                    $cuotaItem = $item['cuota'];
+                    $cuotaItem->recargo_aplicado = max(
+                        (float) ($cuotaItem->recargo_aplicado ?? 0),
+                        (float) $item['recargo']
                     );
+                    $cuotaItem->save();
+                }
 
-                    $reciboRecargo = $this->crearReciboConFolioSeguro([
-                        'fecha' => $fecha->toDateString(),
-                        'anio' => (int) $fecha->format('Y'),
+                $tipoRecargoId = $this->obtenerTipoCobroRecargoId();
+                $tipoCobroReciboRecargoId = $tipoRecargoId ?: $this->tipos_cobro_id;
+                $formaPagoRecargo = $this->recargo_forma_pago_id
+                    ?: $this->getFormaPagoPrincipal($pagosPrincipales);
 
-                        'semana_pago' => (int) ($cuota->numero ?? 0),
-                        'semana_del_anio' => (int) $fecha->format('W'),
-                        'mes_del_anio' => (int) $fecha->format('m'),
+                $propietarioContableRecargoId = $this->resolverPropietarioContableId(
+                    $tipoCobroReciboRecargoId,
+                    $formaPagoRecargo
+                );
 
-                        'cliente_id' => $this->cliente_id,
-                        'contrato_id' => $this->contrato_id,
-                        'lote_id' => $this->lote_id,
-                        'cuota_id' => $cuota->id,
+                $etiquetaCuotasRecargo = $cuotasConRecargo
+                    ->map(fn ($d) => '#'.$d['cuota']->numero)
+                    ->implode(', ');
 
-                        'tipos_cobro_id' => $tipoRecargoId ?: $this->tipos_cobro_id,
-                        'forma_pago_id' => $this->recargo_forma_pago_id ?: $this->forma_pago_id,
-                        'cuentas_bancarias_id' => $this->formaPagoEsEfectivo($this->recargo_forma_pago_id ?: $this->forma_pago_id)
-                            ? null
-                            : ($this->recargo_cuentas_bancarias_id ?? $this->cuentas_bancarias_id),
-                        'periodo_id' => $periodoIdCuota,
+                $reciboRecargo = $this->crearReciboConFolioSeguro([
+                    'fecha' => $fecha->toDateString(),
+                    'anio' => (int) $fecha->format('Y'),
 
-                        'propietario_contable_id' => $propietarioContableRecargoId,
+                    'semana_pago' => (int) ($anclaRecargo['cuota']->numero ?? 0),
+                    'semana_del_anio' => (int) $fecha->format('W'),
+                    'mes_del_anio' => (int) $fecha->format('m'),
 
-                        'monto' => (float) $recargoFinal,
-                        'saldo_anterior' => null,
-                        'saldo_posterior' => null,
+                    'cliente_id' => $this->cliente_id,
+                    'contrato_id' => $this->contrato_id,
+                    'lote_id' => $this->lote_id,
+                    'cuota_id' => $anclaRecargo['cuota']->id,
 
-                        'observaciones' => trim('RECARGO de cuota #'.$cuota->numero.' — '.($this->observaciones ?? '')),
-                        'capturado_por_user_id' => auth()->id(),
+                    'tipos_cobro_id' => $tipoCobroReciboRecargoId,
+                    'forma_pago_id' => $this->recargo_forma_pago_id ?: $this->forma_pago_id,
+                    'cuentas_bancarias_id' => $this->formaPagoEsEfectivo($this->recargo_forma_pago_id ?: $this->forma_pago_id)
+                        ? null
+                        : ($this->recargo_cuentas_bancarias_id ?? $this->cuentas_bancarias_id),
+                    'periodo_id' => $anclaRecargo['periodo_id'],
 
-                        'evidencia_path' => null,
-                        'evidencia_disk' => null,
-                        'evidencia_mime' => null,
-                        'evidencia_size' => null,
-                    ]);
+                    'propietario_contable_id' => $propietarioContableRecargoId,
 
+                    'monto' => $totalRecargo,
+                    'saldo_anterior' => null,
+                    'saldo_posterior' => null,
+
+                    'observaciones' => rtrim(trim(
+                        'RECARGO de cuota(s) '.$etiquetaCuotasRecargo.' — '.($this->observaciones ?? '')
+                    ), ' —'),
+                    'capturado_por_user_id' => auth()->id(),
+
+                    'evidencia_path' => null,
+                    'evidencia_disk' => null,
+                    'evidencia_mime' => null,
+                    'evidencia_size' => null,
+                ]);
+
+                $pagosRecargo = [[
+                    'forma_pago_id' => (int) ($this->recargo_forma_pago_id ?: $this->forma_pago_id),
+                    'cuentas_bancarias_id' => $this->formaPagoEsEfectivo($this->recargo_forma_pago_id ?: $this->forma_pago_id)
+                        ? null
+                        : ($this->recargo_cuentas_bancarias_id ?? $this->cuentas_bancarias_id),
+                    'monto' => $totalRecargo,
+                    'referencia' => $this->recargo_referencia,
+                    'evidencia' => $this->mostrarCampoEvidenciaRecargo ? $this->recargo_evidencia : null,
+                    'orden' => 1,
+                ]];
+
+                if (! $this->debeCapturarPagoRecargoSeparado()) {
                     $pagosRecargo = [[
-                        'forma_pago_id' => (int) ($this->recargo_forma_pago_id ?: $this->forma_pago_id),
-                        'cuentas_bancarias_id' => $this->formaPagoEsEfectivo($this->recargo_forma_pago_id ?: $this->forma_pago_id)
-                            ? null
-                            : ($this->recargo_cuentas_bancarias_id ?? $this->cuentas_bancarias_id),
-                        'monto' => round((float) $recargoFinal, 2),
-                        'referencia' => $this->recargo_referencia,
-                        'evidencia' => $this->mostrarCampoEvidenciaRecargo ? $this->recargo_evidencia : null,
+                        'forma_pago_id' => $pagosPrincipales[0]['forma_pago_id'] ?? null,
+                        'cuentas_bancarias_id' => $pagosPrincipales[0]['cuentas_bancarias_id'] ?? null,
+                        'monto' => $totalRecargo,
+                        'referencia' => $pagosPrincipales[0]['referencia'] ?? null,
+                        'evidencia' => $pagosPrincipales[0]['evidencia'] ?? null,
                         'orden' => 1,
                     ]];
+                }
 
-                    if (! $this->debeCapturarPagoRecargoSeparado()) {
-                        $pagosRecargo = [[
-                            'forma_pago_id' => $pagosPrincipales[0]['forma_pago_id'] ?? null,
-                            'cuentas_bancarias_id' => $pagosPrincipales[0]['cuentas_bancarias_id'] ?? null,
-                            'monto' => round((float) $recargoFinal, 2),
-                            'referencia' => $pagosPrincipales[0]['referencia'] ?? null,
-                            'evidencia' => $pagosPrincipales[0]['evidencia'] ?? null,
-                            'orden' => 1,
-                        ]];
-                    }
+                $this->crearDetallesPagoRecibo($reciboRecargo, $pagosRecargo, $imageUploadService);
 
-                    $this->crearDetallesPagoRecibo($reciboRecargo, $pagosRecargo, $imageUploadService);
+                $recibosParaEnviar[] = $reciboRecargo->id;
+                $recibosParaImprimir[] = $reciboRecargo->id;
 
-                    $recibosParaEnviar[] = $reciboRecargo->id;
-                    $recibosParaImprimir[] = $reciboRecargo->id;
+                foreach ($cuotasConRecargo as $item) {
+                    $cuotaItem = $item['cuota'];
 
                     Pago::create([
-                        'contrato_id' => $cuota->contrato_id,
-                        'cuota_id' => $cuota->id,
+                        'contrato_id' => $cuotaItem->contrato_id,
+                        'cuota_id' => $cuotaItem->id,
                         'recibo_id' => $reciboRecargo->id,
-                        'monto' => (float) $recargoFinal,
+                        'monto' => $item['recargo'],
                         'metodo' => $this->recargo_metodo ?: $this->metodo,
                         'referencia' => $this->recargo_referencia,
                         'estatus' => 'confirmado',
@@ -2144,26 +2122,31 @@ class Crear extends Component
 
                     activity()
                         ->causedBy(auth()->user())
-                        ->performedOn($cuota)
+                        ->performedOn($cuotaItem)
                         ->withProperties([
-                            'cuota_id' => $cuota->id,
-                            'recargo_monto' => $recargoFinal,
+                            'cuota_id' => $cuotaItem->id,
+                            'recibo_id' => $reciboRecargo->id,
+                            'recargo_monto' => $item['recargo'],
                             'recargo_forma_pago_id' => $this->recargo_forma_pago_id,
                             'recargo_metodo' => $this->recargo_metodo,
                         ])
                         ->log('Pago de recargo registrado');
                 }
-
-                if ($cuota->estatus === 'pagada') {
-                    $this->actualizarEstatusContratoSiEstaLiquidado((int) $cuota->contrato_id);
-                }
             }
+
+            $this->actualizarEstatusContratoSiEstaLiquidado((int) $this->contrato_id);
 
             $this->cuotaId = null;
             $this->cuotaIds = [];
             $this->cargarCuotasPendientes();
 
-            $this->dispatch('toast', type: 'success', message: 'Recibos generados correctamente.');
+            $this->dispatch(
+                'toast',
+                type: 'success',
+                message: count($recibosParaImprimir) > 1
+                    ? 'Recibo y recargo generados correctamente.'
+                    : 'Recibo generado correctamente.'
+            );
 
             $this->limpiarFormularioDespuesDeGuardar();
         });
@@ -2183,7 +2166,7 @@ class Crear extends Component
             if (count($recibosParaImprimir) === 1) {
                 $this->openPrintTab($recibosParaImprimir[0]);
             } else {
-                $this->openPrintBatchTab($recibosParaImprimir);
+                $this->openPrintBatchTab($recibosParaImprimir, agrupar: true);
             }
         }
     }
@@ -2571,7 +2554,7 @@ class Crear extends Component
         return app(PeriodoResolver::class)->idParaFecha($fechaVencimiento);
     }
 
-    protected function openPrintBatchTab(array $reciboIds): void
+    protected function openPrintBatchTab(array $reciboIds, bool $agrupar = false): void
     {
         $token = Str::uuid()->toString();
 
@@ -2580,6 +2563,8 @@ class Crear extends Component
             [
                 'user_id' => auth()->id(),
                 'recibo_ids' => array_values($reciboIds),
+                // El recargo se imprime dentro del ticket del recibo principal.
+                'agrupar' => $agrupar,
             ],
             now()->addMinutes(15)
         );

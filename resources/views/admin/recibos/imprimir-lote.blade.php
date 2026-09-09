@@ -49,7 +49,7 @@
         <button onclick="window.print()" class="btn">Imprimir navegador</button>
 
         <button id="btnPrintLocal" class="btn">
-            Impresora local ({{ $recibos->count() }})
+            Impresora local ({{ $tickets->count() }})
         </button>
 
         <a href="{{ route('admin.recibos.pdf-lote', ['token' => $token]) }}" class="btn btn-secondary">
@@ -60,10 +60,11 @@
     </div>
 @endif
 
-@foreach($recibos as $recibo)
-    <div class="ticket-page" id="ticket-{{ $recibo->uuid }}">
+@foreach($tickets as $ticket)
+    <div class="ticket-page" id="ticket-{{ $ticket['recibo']->uuid }}">
         @include('admin.recibos.partials.recibo-ticket', [
-            'recibo' => $recibo,
+            'recibo' => $ticket['recibo'],
+            'recibosAdjuntos' => $ticket['adjuntos'],
             'modo' => $modo ?? 'web',
         ])
     </div>
@@ -71,11 +72,11 @@
 
 @if(($modo ?? 'web') === 'web')
 @php
-    $recibosParaImprimir = $recibos->map(fn ($recibo) => [
-        'folio' => $recibo->folio,
-        'id' => 'ticket-'.$recibo->uuid,
-        'tokenUrl' => route('admin.recibos.print-token', $recibo),
-        'dataUrl' => route('admin.recibos.print-data', $recibo),
+    $recibosParaImprimir = $tickets->map(fn ($ticket) => [
+        'folio' => $ticket['recibo']->folio,
+        'id' => 'ticket-'.$ticket['recibo']->uuid,
+        'tokenUrl' => route('admin.recibos.print-token', $ticket['recibo']),
+        'dataUrl' => route('admin.recibos.print-data', $ticket['recibo']),
     ])->values();
 @endphp
 

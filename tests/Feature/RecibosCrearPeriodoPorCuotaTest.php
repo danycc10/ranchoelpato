@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Livewire\Admin\Recibos\Crear;
 use App\Models\Cliente;
 use App\Models\Cuota;
+use App\Models\Pago;
 use App\Models\Periodo;
 use App\Models\Recibo;
 use App\Models\User;
@@ -19,7 +20,7 @@ class RecibosCrearPeriodoPorCuotaTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function cada_recibo_de_un_pago_de_varias_cuotas_lleva_el_periodo_de_su_cuota(): void
+    public function un_pago_de_varias_cuotas_genera_un_solo_recibo_con_su_desglose(): void
     {
         $datos = $this->contratoConCuotas();
 
@@ -54,36 +55,49 @@ class RecibosCrearPeriodoPorCuotaTest extends TestCase
             ->call('guardar')
             ->assertHasNoErrors();
 
-        $recibos = Recibo::query()
-            ->whereIn('cuota_id', $datos['cuota_ids'])
+        // Las tres cuotas salen en un solo recibo: un folio, un ticket.
+        $recibos = Recibo::query()->get();
+
+        $this->assertCount(1, $recibos);
+
+        $recibo = $recibos->first();
+
+        $this->assertSame($datos['cuota_ids'][0], (int) $recibo->cuota_id);
+        $this->assertSame(600.0, (float) $recibo->monto);
+
+        // El desglose por cuota vive en `pagos`: un renglón por cuota.
+        $pagos = Pago::query()
+            ->where('recibo_id', $recibo->id)
             ->get()
             ->keyBy('cuota_id');
 
-        $this->assertCount(3, $recibos);
+        $this->assertCount(3, $pagos);
 
-        $mesesEsperados = [
-            $datos['cuota_ids'][0] => [2026, 11],
-            $datos['cuota_ids'][1] => [2026, 12],
-            $datos['cuota_ids'][2] => [2027, 1],
-        ];
-
-        foreach ($mesesEsperados as $cuotaId => [$anio, $mes]) {
-            $recibo = $recibos[$cuotaId];
-
-            $this->assertNotNull(
-                $recibo->periodo_id,
-                "El recibo {$recibo->folio} se guardó sin periodo."
-            );
-            $this->assertDatabaseHas('periodos', [
-                'id' => $recibo->periodo_id,
-                'tipo' => 'mensual',
-                'anio' => $anio,
-                'mes' => $mes,
-            ]);
+        foreach ($datos['cuota_ids'] as $cuotaId) {
+            $this->assertArrayHasKey($cuotaId, $pagos->all());
+            $this->assertSame(200.0, (float) $pagos[$cuotaId]->monto);
         }
 
-        // Tres cuotas de meses distintos, tres periodos distintos.
-        $this->assertSame(3, $recibos->pluck('periodo_id')->unique()->count());
+        // El periodo del recibo es el de la cuota más antigua que cubre.
+        $this->assertNotNull(
+            $recibo->periodo_id,
+            "El recibo {$recibo->folio} se guardó sin periodo."
+        );
+        $this->assertDatabaseHas('periodos', [
+            'id' => $recibo->periodo_id,
+            'tipo' => 'mensual',
+            'anio' => 2026,
+            'mes' => 11,
+        ]);
+
+        // Las tres cuotas quedan pagadas y el contrato liquidado.
+        $this->assertSame(
+            0,
+            Cuota::query()
+                ->whereIn('id', $datos['cuota_ids'])
+                ->where('estatus', '!=', 'pagada')
+                ->count()
+        );
     }
 
     private function contratoConCuotas(): array

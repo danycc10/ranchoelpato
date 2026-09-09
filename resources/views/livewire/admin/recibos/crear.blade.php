@@ -77,22 +77,13 @@
                         </p>
                     </div>
 
-                    @if($this->puedeUsarMultiplesFormasPago())
                     <button
                         type="button"
                         wire:click="agregarPago"
                         class="px-3 py-2 rounded-xl bg-black text-white text-xs font-semibold">
                         + Agregar forma
                     </button>
-                    @endif
                 </div>
-
-                @if($asociarACuota && count(array_filter($cuotaIds ?? [])) > 1)
-                <div class="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                    Cuando seleccionas más de una cuota, solo se permite una forma de pago.
-                    Para usar múltiples formas de pago, debes generar el recibo para una sola cuota.
-                </div>
-                @endif
 
                 @foreach($pagos as $index => $pago)
                 <div wire:key="pago-row-{{ $index }}" class="rounded-2xl border bg-white p-4">

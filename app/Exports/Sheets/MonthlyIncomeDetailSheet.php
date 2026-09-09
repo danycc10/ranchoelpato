@@ -2,6 +2,7 @@
 
 namespace App\Exports\Sheets;
 
+use App\Exports\Support\ReciboCuotaSplit;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
@@ -75,7 +76,7 @@ class MonthlyIncomeDetailSheet implements FromCollection, WithColumnFormatting, 
             ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos_pagos.forma_pago_id')
             ->leftJoin('cuentas_bancarias', 'cuentas_bancarias.id', '=', 'recibos_pagos.cuenta_bancaria_id')
             ->leftJoin('periodos', 'periodos.id', '=', 'recibos.periodo_id')
-            ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
+            ->tap(fn ($query) => ReciboCuotaSplit::aplicar($query))
 
             ->whereNull('recibos_pagos.deleted_at')
             ->whereNull('recibos.deleted_at')
@@ -147,7 +148,9 @@ class MonthlyIncomeDetailSheet implements FromCollection, WithColumnFormatting, 
                 'recibos_pagos.fecha_efectiva as fecha_pago',
                 'recibos_pagos.fecha_efectiva as fecha_hora_pago',
                 'recibos.fecha as fecha_recibo',
-                'recibos.semana_pago',
+                // Con recibos que agrupan varias cuotas, cada renglón lleva el
+                // número de su propia cuota.
+                DB::raw('COALESCE(cuotas.numero, recibos.semana_pago) as semana_pago'),
 
                 DB::raw('COALESCE(fraccionamientos.nombre, "Sin finca") as fraccionamiento'),
 
@@ -175,7 +178,7 @@ class MonthlyIncomeDetailSheet implements FromCollection, WithColumnFormatting, 
 
                 DB::raw('COALESCE(periodos.nombre, "SIN PERIODO") as periodo'),
 
-                'recibos_pagos.monto',
+                DB::raw(ReciboCuotaSplit::monto('recibos_pagos.monto').' as monto'),
             ]);
 
         return $q->get()->map(function ($r) {

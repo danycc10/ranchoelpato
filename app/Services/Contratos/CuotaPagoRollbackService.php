@@ -31,13 +31,11 @@ class CuotaPagoRollbackService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $pagos = Pago::query()
+            $reciboIdsPagos = Pago::query()
                 ->where('contrato_id', $contrato->id)
                 ->where('cuota_id', $cuota->id)
                 ->lockForUpdate()
-                ->get();
-
-            $reciboIdsPagos = $pagos->pluck('recibo_id')
+                ->pluck('recibo_id')
                 ->filter()
                 ->unique()
                 ->values()
@@ -55,6 +53,28 @@ class CuotaPagoRollbackService
             $reciboIds = collect($reciboIdsPagos)
                 ->merge($reciboIdsHistoricos)
                 ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            // Un recibo puede cubrir varias cuotas, así que la anulación es
+            // todo o nada: se arrastran todas las cuotas de esos recibos para
+            // no dejar cuotas pagadas colgando de un recibo anulado.
+            $pagos = Pago::query()
+                ->where('contrato_id', $contrato->id)
+                ->where(function ($query) use ($cuota, $reciboIds) {
+                    $query->where('cuota_id', $cuota->id);
+
+                    if (! empty($reciboIds)) {
+                        $query->orWhereIn('recibo_id', $reciboIds);
+                    }
+                })
+                ->lockForUpdate()
+                ->get();
+
+            $cuotaIdsAfectadas = $pagos->pluck('cuota_id')
+                ->filter()
+                ->merge([$cuota->id])
                 ->unique()
                 ->values()
                 ->all();
@@ -88,13 +108,21 @@ class CuotaPagoRollbackService
                 }
             }
 
-            // ✅ Reset cuota
-            $cuota->pagado_total = 0;
-            $cuota->recargo_aplicado = 0;
-            $cuota->estatus = 'pendiente';
-            $cuota->origen_pago = null;
-            $cuota->observaciones_pago = null;
-            $cuota->save();
+            // ✅ Reset de todas las cuotas que cubrían esos recibos
+            $cuotasAfectadas = Cuota::query()
+                ->where('contrato_id', $contrato->id)
+                ->whereIn('id', $cuotaIdsAfectadas)
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($cuotasAfectadas as $c) {
+                $c->pagado_total = 0;
+                $c->recargo_aplicado = 0;
+                $c->estatus = 'pendiente';
+                $c->origen_pago = null;
+                $c->observaciones_pago = null;
+                $c->save();
+            }
 
             // ✅ Recalcular saldo REAL desde cuotas
             $saldo = (float) Cuota::query()

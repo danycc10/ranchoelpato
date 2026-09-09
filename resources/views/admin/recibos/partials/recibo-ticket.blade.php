@@ -95,9 +95,72 @@ $conceptoPeriodo .= " · {$mesPagadoTexto}";
 $conceptoPeriodo = $esRecargo ? 'Recargo' : 'Pago registrado';
 }
 
-$pagosDetalle = collect($recibo->pagosDetalle ?? [])
-->filter(fn ($p) => is_null($p->deleted_at ?? null))
+// Recibos que se imprimen dentro de este mismo ticket (el recargo conserva su
+// propio folio porque puede ir a otro propietario contable).
+$recibosAdjuntos = collect($recibosAdjuntos ?? [])->filter()->values();
+
+// Un recibo puede cubrir varias cuotas: el desglose por cuota vive en `pagos`.
+$etiquetaCuota = function ($cuotaPago, bool $paraRecargo) use ($contratoEsSemanal, $labelPeriodo) {
+if (!$cuotaPago) {
+return $paraRecargo ? 'Recargo' : 'Pago registrado';
+}
+
+$texto = ($paraRecargo ? 'Recargo ' : '') . $labelPeriodo . ' #' . $cuotaPago->numero;
+
+if ($cuotaPago->fecha_vencimiento) {
+$texto .= ' · ' . \Carbon\Carbon::parse($cuotaPago->fecha_vencimiento)->format('d/m/Y');
+}
+
+return $texto;
+};
+
+$conceptosDe = function ($rec, ?string $fallback = null) use ($etiquetaCuota) {
+$paraRecargo = str_contains(mb_strtoupper((string)($rec->tipoCobro?->nombre ?? '')), 'RECARGO');
+
+$pagosCuota = collect($rec->pagos ?? [])
+->filter(fn ($p) => is_null($p->deleted_at ?? null)
+&& is_null($p->anulado_at ?? null)
+&& $p->cuota)
+->sortBy(fn ($p) => $p->cuota?->fecha_vencimiento)
 ->values();
+
+if ($pagosCuota->isEmpty()) {
+return collect([[
+'label' => $fallback ?? $etiquetaCuota($rec->cuota ?? null, $paraRecargo),
+'monto' => (float) $rec->monto,
+]]);
+}
+
+return $pagosCuota->map(fn ($p) => [
+'label' => $etiquetaCuota($p->cuota, $paraRecargo),
+'monto' => (float) $p->monto,
+]);
+};
+
+$conceptos = $conceptosDe($recibo, $conceptoPeriodo);
+
+foreach ($recibosAdjuntos as $adjunto) {
+$conceptos = $conceptos->concat($conceptosDe($adjunto));
+}
+
+$conceptos = $conceptos->values();
+
+$totalTicket = (float) $recibo->monto + (float) $recibosAdjuntos->sum(fn ($r) => (float) $r->monto);
+
+// Con varias cuotas las fechas ya van en cada renglón, así que el encabezado
+// deja de mostrar un solo periodo.
+$mostrarPeriodoEncabezado = $conceptos->count() === 1;
+
+$formasDe = fn ($rec) => collect($rec->pagosDetalle ?? [])
+->filter(fn ($p) => is_null($p->deleted_at ?? null));
+
+$pagosDetalle = $formasDe($recibo);
+
+foreach ($recibosAdjuntos as $adjunto) {
+$pagosDetalle = $pagosDetalle->concat($formasDe($adjunto));
+}
+
+$pagosDetalle = $pagosDetalle->values();
 
 if ($pagosDetalle->isEmpty()) {
 $pagosDetalle = collect([
@@ -132,6 +195,12 @@ $totalPagosDetalle = (float) $pagosDetalle->sum(fn ($p) => (float) ($p->monto ??
         <div class="small">
             Folio: <span class="bold">{{ $recibo->folio }}</span>
         </div>
+
+        @foreach($recibosAdjuntos as $adjunto)
+        <div class="small">
+            Folio recargo: <span class="bold">{{ $adjunto->folio }}</span>
+        </div>
+        @endforeach
 
         <div class="small">
             Fecha:
@@ -172,17 +241,24 @@ $totalPagosDetalle = (float) $pagosDetalle->sum(fn ($p) => (float) ($p->monto ??
             <div class="right bold">{{ $tipoCobroMostrar }}</div>
         </div>
 
-        @if($numeroPeriodo)
+        @if($mostrarPeriodoEncabezado && $numeroPeriodo)
         <div class="row">
             <div class="muted">{{ $labelPeriodo }}:</div>
             <div class="right bold">#{{ $numeroPeriodo }}</div>
         </div>
         @endif
 
-        @if(!$contratoEsSemanal && $mesPagadoTexto)
+        @if($mostrarPeriodoEncabezado && !$contratoEsSemanal && $mesPagadoTexto)
         <div class="row">
             <div class="muted">Mes:</div>
             <div class="right bold">{{ $mesPagadoTexto }}</div>
+        </div>
+        @endif
+
+        @if(!$mostrarPeriodoEncabezado)
+        <div class="row">
+            <div class="muted">{{ $labelPeriodo }}s pagadas:</div>
+            <div class="right bold">{{ $conceptos->count() }}</div>
         </div>
         @endif
 
@@ -232,15 +308,17 @@ $totalPagosDetalle = (float) $pagosDetalle->sum(fn ($p) => (float) ($p->monto ??
             </tr>
         </thead>
         <tbody>
+            @foreach($conceptos as $concepto)
             <tr>
-                <td class="bold">{{ $conceptoPeriodo }}</td>
-                <td class="right bold">${{ number_format((float)$recibo->monto, 2) }}</td>
+                <td class="bold">{{ $concepto['label'] }}</td>
+                <td class="right bold">${{ number_format((float) $concepto['monto'], 2) }}</td>
             </tr>
+            @endforeach
         </tbody>
         <tfoot>
             <tr>
                 <th class="right bold">TOTAL</th>
-                <th class="right bold">${{ number_format((float)$recibo->monto, 2) }}</th>
+                <th class="right bold">${{ number_format($totalTicket, 2) }}</th>
             </tr>
         </tfoot>
     </table>

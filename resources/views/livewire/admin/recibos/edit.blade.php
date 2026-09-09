@@ -303,6 +303,40 @@
 
                 </div>
 
+                {{-- CUOTAS QUE REGRESAN A PENDIENTE --}}
+                @if(count($anularPreview['cuotas'] ?? []) > 0)
+                <div class="border rounded-2xl overflow-hidden">
+
+                    <div class="px-4 py-3 bg-gray-100 font-black text-sm">
+                        Cuotas que regresarán a pendiente
+                        ({{ count($anularPreview['cuotas']) }})
+                    </div>
+
+                    <div class="divide-y">
+                        @foreach($anularPreview['cuotas'] as $cuotaPreview)
+                        <div class="p-3 flex items-center justify-between gap-3 text-sm">
+                            <span class="font-semibold">
+                                Cuota #{{ $cuotaPreview['numero'] }}
+                            </span>
+
+                            @if(!empty($cuotaPreview['fecha_vencimiento']))
+                            <span class="text-gray-500 text-xs">
+                                Vence: {{ \Carbon\Carbon::parse($cuotaPreview['fecha_vencimiento'])->format('d/m/Y') }}
+                            </span>
+                            @endif
+                        </div>
+                        @endforeach
+                    </div>
+
+                    @if(count($anularPreview['cuotas']) > 1)
+                    <div class="px-4 py-3 bg-amber-50 text-xs font-semibold text-amber-800">
+                        Este recibo cubre varias cuotas: la anulación es de todas o de ninguna.
+                    </div>
+                    @endif
+
+                </div>
+                @endif
+
                 {{-- PAGOS --}}
                 <div class="border rounded-2xl overflow-hidden">
 

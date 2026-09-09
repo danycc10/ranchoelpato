@@ -2,6 +2,7 @@
 
 namespace App\Exports\Sheets;
 
+use App\Exports\Support\ReciboCuotaSplit;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
@@ -58,7 +59,7 @@ class MonthlyIncomeLateDetailSheet implements FromCollection, WithColumnFormatti
             ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos_pagos.forma_pago_id')
             ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
             ->leftJoin('contratos', 'contratos.id', '=', 'recibos.contrato_id')
-            ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
+            ->tap(fn ($query) => ReciboCuotaSplit::aplicar($query))
             ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
 
@@ -99,7 +100,7 @@ class MonthlyIncomeLateDetailSheet implements FromCollection, WithColumnFormatti
                 'lotes.lote',
                 'contratos.folio_contrato',
                 DB::raw('COALESCE(formas_pago.nombre, "SIN FORMA") as forma_pago'),
-                'recibos_pagos.monto as monto_atrasado',
+                DB::raw(ReciboCuotaSplit::monto('recibos_pagos.monto').' as monto_atrasado'),
             ]);
 
         return $q->get()->map(function ($r) {

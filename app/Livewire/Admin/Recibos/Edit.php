@@ -7,6 +7,7 @@ use App\Models\ContratoHistorial;
 use App\Models\CuentaBancaria;
 use App\Models\Cuota;
 use App\Models\FormaPago;
+use App\Models\Pago;
 use App\Models\Recibo;
 use App\Models\TipoCobro;
 use App\Services\Contratos\CuotaPagoRollbackService;
@@ -322,12 +323,34 @@ class Edit extends Component
 
         $pagos = collect($this->recibo->pagosDetalle ?? []);
 
+        // Un recibo puede cubrir varias cuotas y la anulación es todo o nada,
+        // así que el modal tiene que enseñarlas todas.
+        $cuotasCubiertas = Pago::query()
+            ->where('recibo_id', $this->recibo->id)
+            ->whereNull('anulado_at')
+            ->with('cuota')
+            ->get()
+            ->pluck('cuota')
+            ->filter()
+            ->unique('id')
+            ->sortBy('fecha_vencimiento')
+            ->values();
+
+        if ($cuotasCubiertas->isEmpty() && $this->recibo->cuota) {
+            $cuotasCubiertas = collect([$this->recibo->cuota]);
+        }
+
         $this->anularPreview = [
             'recibo_id' => (int) $this->recibo->id,
             'folio' => (string) $this->recibo->folio,
             'cliente' => (string) ($this->recibo->cliente?->nombre_completo ?? '—'),
             'cuota_id' => (int) $this->recibo->cuota_id,
             'cuota_numero' => (int) ($this->recibo->cuota?->numero ?? 0),
+            'cuotas' => $cuotasCubiertas->map(fn ($c) => [
+                'id' => (int) $c->id,
+                'numero' => (int) ($c->numero ?? 0),
+                'fecha_vencimiento' => (string) ($c->fecha_vencimiento ?? ''),
+            ])->all(),
             'concepto' => (string) ($this->recibo->tipoCobro?->nombre ?? '—'),
             'monto_recibo' => (float) ($this->recibo->monto ?? 0),
             'pagos_count' => (int) $pagos->count(),
