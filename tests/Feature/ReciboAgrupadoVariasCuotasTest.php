@@ -117,7 +117,7 @@ class ReciboAgrupadoVariasCuotasTest extends TestCase
         Cache::put('print_batch:'.$token, [
             'user_id' => auth()->id(),
             'recibo_ids' => [$principal->id, $recargo->id],
-            'agrupar' => true,
+            'adjunto_ids' => [$recargo->id],
         ], now()->addMinutes(15));
 
         $html = $this->get(route('admin.recibos.print-lote', ['token' => $token]))

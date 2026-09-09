@@ -19,10 +19,12 @@ use App\Services\ImageUploadService;
 use App\Services\Recibos\CuotaAntiguedadSelector;
 use App\Services\Recibos\PeriodoResolver;
 use App\Services\Recibos\RecargoCuotaCalculator;
+use App\Services\Recibos\RecargoSeleccionAjustador;
 use App\Services\Recibos\ReciboFolioService;
 use App\Services\Recibos\ReciboPagoNormalizer;
 use App\Services\Recibos\TipoCobroClassifier;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -143,6 +145,9 @@ class Crear extends Component
     public float $montoTotalSeleccionado = 0.0;
 
     public float $recargoTotalSeleccionado = 0.0;
+
+    /** Recargo que se cobraría automáticamente, antes del ajuste del cajero. */
+    public float $recargoTotalAutomatico = 0.0;
 
     public ?TemporaryUploadedFile $evidencia = null;
 
@@ -421,7 +426,7 @@ class Crear extends Component
 
             $this->sincronizarPeriodoDesdeCuotasSeleccionadas();
 
-            if (! $this->tipoCobroEsMensualidad($this->tipos_cobro_id)) {
+            if (! $this->tipoCobroAplicaRecargoPorAtraso($this->tipos_cobro_id)) {
                 $this->recargoModo = 'auto';
                 $this->recargoMontoManual = null;
             }
@@ -454,7 +459,8 @@ class Crear extends Component
 
         if ($property === 'recargoModo') {
             if ($this->recargoModo === 'manual' && ($this->recargoMontoManual === null || $this->recargoMontoManual === '')) {
-                $this->recargoMontoManual = (float) $this->recargoMonto;
+                // Arranca en el total automático de toda la selección.
+                $this->recargoMontoManual = $this->recargoAutomaticoTotal();
             }
 
             $this->recalcularResumenCuotasSeleccionadas();
@@ -794,6 +800,19 @@ class Crear extends Component
         return app(TipoCobroClassifier::class)->esServicio($tipoCobroId);
     }
 
+    protected function tipoCobroAplicaRecargoPorAtraso(?int $tipoCobroId): bool
+    {
+        return app(TipoCobroClassifier::class)->aplicaRecargoPorAtraso($tipoCobroId);
+    }
+
+    /** El cajero puede condonar o editar el recargo de la selección completa. */
+    public function puedeAjustarRecargo(): bool
+    {
+        return $this->asociarACuota
+            && ! empty($this->cuotaIds)
+            && $this->tipoCobroAplicaRecargoPorAtraso($this->tipos_cobro_id);
+    }
+
     protected function tipoCobroRequiereAsociarCuota(?int $tipoCobroId): bool
     {
         return app(TipoCobroClassifier::class)->requiereAsociarCuota($tipoCobroId);
@@ -893,44 +912,93 @@ class Crear extends Component
         return str_contains($nombre, 'EFECTIVO');
     }
 
-    protected function getRecargoFinal(): float
+    /**
+     * Suma del recargo automático de todas las cuotas seleccionadas, sin el
+     * ajuste del cajero. Es el punto de partida cuando elige editarlo a mano.
+     */
+    protected function recargoAutomaticoTotal(): float
     {
-        if ($this->recargoModo === 'condonar') {
+        $ids = collect($this->cuotaIds)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->all();
+
+        if ($ids === [] || ! $this->contrato_id) {
             return 0.0;
         }
 
-        if ($this->recargoModo === 'manual') {
-            $m = (float) ($this->recargoMontoManual ?? 0);
+        $cuotas = Cuota::with('contrato')
+            ->whereIn('id', $ids)
+            ->where('contrato_id', $this->contrato_id)
+            ->get();
 
-            return round(max(0, $m), 2);
-        }
-
-        return round(max(0, (float) ($this->recargoMonto ?? 0)), 2);
-    }
-
-    protected function syncDefaultsRecargoUI(): void
-    {
-        if ((float) $this->recargoMonto <= 0) {
-            $this->recargoModo = 'auto';
-            $this->recargoMontoManual = null;
-
-            return;
-        }
-
-        if ($this->recargoModo === 'manual' && ($this->recargoMontoManual === null || $this->recargoMontoManual === '')) {
-            $this->recargoMontoManual = (float) $this->recargoMonto;
-        }
+        return round((float) $cuotas->sum(
+            fn (Cuota $cuota) => (float) ($this->calcularEstadoRecargoCuota($cuota)['recargo_monto'] ?? 0)
+        ), 2);
     }
 
     protected function calcularEstadoRecargoCuota(Cuota $cuota): array
     {
+        // El modo elegido por el cajero se aplica sobre la selección completa
+        // (ver recargosFinalesPorCuota), no cuota por cuota: si se aplicara
+        // aquí, un monto manual se cobraría repetido en cada cuota.
         return app(RecargoCuotaCalculator::class)->estado(
             cuota: $cuota,
             formaPagoId: $this->recargo_forma_pago_id ?: $this->forma_pago_id,
-            permiteAjusteUsuario: count($this->cuotaIds) <= 1 && $this->tipoCobroEsMensualidad($this->tipos_cobro_id),
-            recargoModo: $this->recargoModo,
-            recargoMontoManual: $this->recargoMontoManual,
+            permiteAjusteUsuario: false,
         );
+    }
+
+    /**
+     * Recargo final de cada cuota seleccionada, ya con el modo del cajero
+     * aplicado y repartido entre ellas.
+     *
+     * @param  Collection<int, Cuota>  $cuotas
+     * @return array<int, array{estado: array, recargo: float, condonado: bool}>
+     */
+    protected function recargosFinalesPorCuota($cuotas): array
+    {
+        $estados = [];
+        $calculados = [];
+
+        foreach ($cuotas as $cuota) {
+            $estado = $this->calcularEstadoRecargoCuota($cuota);
+
+            $estados[$cuota->id] = $estado;
+            $calculados[$cuota->id] = (float) ($estado['recargo_monto'] ?? 0);
+        }
+
+        $puedeAjustar = $this->tipoCobroAplicaRecargoPorAtraso($this->tipos_cobro_id)
+            || $this->tipoCobroEsRecargo($this->tipos_cobro_id);
+
+        $finales = $puedeAjustar
+            ? app(RecargoSeleccionAjustador::class)->ajustar(
+                $calculados,
+                $this->recargoModo,
+                $this->recargoMontoManual
+            )
+            : $calculados;
+
+        $resultado = [];
+
+        foreach ($estados as $cuotaId => $estado) {
+            $final = (float) ($finales[$cuotaId] ?? 0);
+
+            $resultado[$cuotaId] = [
+                'estado' => $estado,
+                'recargo' => $final,
+                // Condonado si lo condonó el cajero o si ya venía condonado por
+                // las reglas del contrato (día extra por pago en efectivo).
+                'condonado' => $final <= 0 && (
+                    $this->recargoModo === 'condonar'
+                    || (bool) ($estado['recargo_condonado'] ?? false)
+                    || (float) ($calculados[$cuotaId] ?? 0) > 0
+                ),
+            ];
+        }
+
+        return $resultado;
     }
 
     protected function recalcularResumenCuotasSeleccionadas(): void
@@ -941,6 +1009,7 @@ class Crear extends Component
         $this->cuotasSeleccionadasInfo = [];
         $this->montoTotalSeleccionado = 0.0;
         $this->recargoTotalSeleccionado = 0.0;
+        $this->recargoTotalAutomatico = 0.0;
 
         $this->cuotaVencida = false;
         $this->cuotaEnGracia = false;
@@ -974,30 +1043,18 @@ class Crear extends Component
             ->orderBy('fecha_vencimiento')
             ->get();
 
+        // El modo del cajero (condonar / monto manual) se aplica sobre toda la
+        // selección y se reparte entre las cuotas.
+        $recargosFinales = $this->recargosFinalesPorCuota($cuotas);
+
         foreach ($cuotas as $index => $cuota) {
             $pendientePrincipal = max(0, (float) $cuota->monto - (float) ($cuota->pagado_total ?? 0));
-            $estadoRecargo = $this->calcularEstadoRecargoCuota($cuota);
+
+            $estadoRecargo = $recargosFinales[$cuota->id]['estado'];
+            $recargoFinal = (float) $recargosFinales[$cuota->id]['recargo'];
+            $recargoCondonado = (bool) $recargosFinales[$cuota->id]['condonado'];
 
             $recargoOriginal = (float) ($estadoRecargo['recargo_monto_original'] ?? 0);
-            $recargoCalculado = (float) ($estadoRecargo['recargo_monto'] ?? 0);
-
-            // Para una sola cuota respetar el modo elegido por el usuario
-            if (count($ids) === 1) {
-                if ($modoActual === 'condonar') {
-                    $recargoFinal = 0.0;
-                    $recargoCondonado = true;
-                } elseif ($modoActual === 'manual') {
-                    $recargoFinal = max(0, (float) $montoManualActual);
-                    $recargoCondonado = false;
-                } else {
-                    $recargoFinal = $recargoCalculado;
-                    $recargoCondonado = (bool) ($estadoRecargo['recargo_condonado'] ?? false);
-                }
-            } else {
-                // En múltiples no permitir manual/condonar individual
-                $recargoFinal = $recargoCalculado;
-                $recargoCondonado = (bool) ($estadoRecargo['recargo_condonado'] ?? false);
-            }
 
             $item = [
                 'id' => $cuota->id,
@@ -1020,6 +1077,7 @@ class Crear extends Component
             $this->cuotasSeleccionadasInfo[] = $item;
             $this->montoTotalSeleccionado += $pendientePrincipal;
             $this->recargoTotalSeleccionado += $recargoFinal;
+            $this->recargoTotalAutomatico += (float) ($estadoRecargo['recargo_monto'] ?? 0);
 
             if ($index === 0) {
                 $this->cuotaVencida = $item['cuota_vencida'];
@@ -1037,19 +1095,13 @@ class Crear extends Component
 
         $this->montoTotalSeleccionado = round($this->montoTotalSeleccionado, 2);
         $this->recargoTotalSeleccionado = round($this->recargoTotalSeleccionado, 2);
+        $this->recargoTotalAutomatico = round($this->recargoTotalAutomatico, 2);
 
-        if (count($this->cuotasSeleccionadasInfo) === 1) {
-            // Restaurar el modo elegido por el usuario
-            $this->recargoModo = $modoActual;
-            $this->recargoMontoManual = $modoActual === 'manual'
-                ? max(0, (float) $montoManualActual)
-                : null;
-        } else {
-            if ($this->recargoModo === 'manual' || $this->recargoModo === 'condonar') {
-                $this->recargoModo = 'auto';
-            }
-            $this->recargoMontoManual = null;
-        }
+        // Restaurar el modo elegido por el usuario, valga para una cuota o varias.
+        $this->recargoModo = $modoActual;
+        $this->recargoMontoManual = $modoActual === 'manual'
+            ? max(0, (float) $montoManualActual)
+            : null;
     }
 
     protected function cargarInfoDesdeContrato(): void
@@ -1513,7 +1565,7 @@ class Crear extends Component
 
     public function debeCapturarPagoRecargoSeparado(): bool
     {
-        return $this->tipoCobroEsMensualidad($this->tipos_cobro_id)
+        return $this->tipoCobroAplicaRecargoPorAtraso($this->tipos_cobro_id)
             && $this->asociarACuota
             && ! empty($this->cuotaIds)
             && (float) $this->recargoTotalSeleccionado > 0;
@@ -1651,6 +1703,23 @@ class Crear extends Component
         return $id ?: null;
     }
 
+    /**
+     * Tipo de cobro del recibo de recargo.
+     *
+     * El recargo de un servicio (luz, agua, fosa) se queda bajo el mismo tipo
+     * de cobro que el servicio, para que herede su propietario contable y el
+     * ingreso del servicio salga completo en los reportes. El de las
+     * mensualidades sí usa el tipo RECARGO, como siempre.
+     */
+    protected function tipoCobroParaReciboRecargo(): ?int
+    {
+        if ($this->tipoCobroEsServicio($this->tipos_cobro_id)) {
+            return $this->tipos_cobro_id;
+        }
+
+        return $this->obtenerTipoCobroRecargoId() ?: $this->tipos_cobro_id;
+    }
+
     protected function crearReciboConFolioSeguro(array $data, int $maxIntentos = 10): Recibo
     {
         return app(ReciboFolioService::class)->crearRecibo($data, $maxIntentos);
@@ -1670,7 +1739,7 @@ class Crear extends Component
             }
 
             if (
-                ($this->tipoCobroEsMensualidad($this->tipos_cobro_id) || $this->tipoCobroEsRecargo($this->tipos_cobro_id))
+                ($this->tipoCobroAplicaRecargoPorAtraso($this->tipos_cobro_id) || $this->tipoCobroEsRecargo($this->tipos_cobro_id))
                 && $recargo > 0
             ) {
                 $recargos++;
@@ -1726,8 +1795,10 @@ class Crear extends Component
 
         $recibosParaEnviar = [];
         $recibosParaImprimir = [];
+        // Recibos que se imprimen dentro del ticket del principal (los recargos).
+        $recibosAdjuntosParaImprimir = [];
 
-        DB::transaction(function () use (&$recibosParaEnviar, &$recibosParaImprimir, $imageUploadService, $pagosPrincipales) {
+        DB::transaction(function () use (&$recibosParaEnviar, &$recibosParaImprimir, &$recibosAdjuntosParaImprimir, $imageUploadService, $pagosPrincipales) {
             $fecha = Carbon::parse($this->fecha);
 
             $obtenerSaldoContrato = function (int $contratoId): float {
@@ -1895,15 +1966,18 @@ class Crear extends Component
 
             $esCobroDeRecargo = $this->tipoCobroEsRecargo($this->tipos_cobro_id);
 
-            foreach ($cuotas as $cuota) {
-                $estadoRecargo = $this->calcularEstadoRecargoCuota($cuota);
-                $pendientePrincipal = max(0, (float) $cuota->monto - (float) ($cuota->pagado_total ?? 0));
-                $recargoFinal = (float) ($estadoRecargo['recargo_monto'] ?? 0);
-                $recargoCondonado = (bool) ($estadoRecargo['recargo_condonado'] ?? false);
+            // El modo del cajero (automático, condonar o monto manual) ya viene
+            // aplicado y repartido entre las cuotas seleccionadas.
+            $recargosFinales = $this->recargosFinalesPorCuota($cuotas);
 
-                $aplicaRecargo = ! $recargoCondonado
-                    && $recargoFinal > 0
-                    && ($esCobroDeRecargo || $this->tipoCobroEsMensualidad($this->tipos_cobro_id));
+            $cobraRecargo = $esCobroDeRecargo
+                || $this->tipoCobroAplicaRecargoPorAtraso($this->tipos_cobro_id);
+
+            foreach ($cuotas as $cuota) {
+                $pendientePrincipal = max(0, (float) $cuota->monto - (float) ($cuota->pagado_total ?? 0));
+                $recargoFinal = (float) $recargosFinales[$cuota->id]['recargo'];
+
+                $aplicaRecargo = $cobraRecargo && $recargoFinal > 0;
 
                 $principal = $esCobroDeRecargo ? 0.0 : $pendientePrincipal;
 
@@ -2028,8 +2102,7 @@ class Crear extends Component
                     $cuotaItem->save();
                 }
 
-                $tipoRecargoId = $this->obtenerTipoCobroRecargoId();
-                $tipoCobroReciboRecargoId = $tipoRecargoId ?: $this->tipos_cobro_id;
+                $tipoCobroReciboRecargoId = $this->tipoCobroParaReciboRecargo();
                 $formaPagoRecargo = $this->recargo_forma_pago_id
                     ?: $this->getFormaPagoPrincipal($pagosPrincipales);
 
@@ -2105,6 +2178,7 @@ class Crear extends Component
 
                 $recibosParaEnviar[] = $reciboRecargo->id;
                 $recibosParaImprimir[] = $reciboRecargo->id;
+                $recibosAdjuntosParaImprimir[] = $reciboRecargo->id;
 
                 foreach ($cuotasConRecargo as $item) {
                     $cuotaItem = $item['cuota'];
@@ -2166,7 +2240,7 @@ class Crear extends Component
             if (count($recibosParaImprimir) === 1) {
                 $this->openPrintTab($recibosParaImprimir[0]);
             } else {
-                $this->openPrintBatchTab($recibosParaImprimir, agrupar: true);
+                $this->openPrintBatchTab($recibosParaImprimir, $recibosAdjuntosParaImprimir);
             }
         }
     }
@@ -2253,7 +2327,7 @@ class Crear extends Component
             return "Esta operación generará {$recargos} recibo(s) de RECARGO por un total de $".number_format((float) $this->recargoTotalSeleccionado, 2).'. ¿Desea continuar?';
         }
 
-        if ($this->tipoCobroEsMensualidad($this->tipos_cobro_id)) {
+        if ($this->tipoCobroAplicaRecargoPorAtraso($this->tipos_cobro_id)) {
             return "Esta operación generará {$principales} recibo(s) principal(es) por $".number_format((float) $this->montoTotalSeleccionado, 2).
                 " y {$recargos} recibo(s) de recargo por $".number_format((float) $this->recargoTotalSeleccionado, 2).'. ¿Desea continuar?';
         }
@@ -2339,7 +2413,7 @@ class Crear extends Component
             return true;
         }
 
-        if ($this->tipoCobroEsMensualidad($this->tipos_cobro_id)) {
+        if ($this->tipoCobroAplicaRecargoPorAtraso($this->tipos_cobro_id)) {
             return true;
         }
 
@@ -2554,7 +2628,12 @@ class Crear extends Component
         return app(PeriodoResolver::class)->idParaFecha($fechaVencimiento);
     }
 
-    protected function openPrintBatchTab(array $reciboIds, bool $agrupar = false): void
+    /**
+     * @param  array<int, int>  $reciboIds  todos los recibos del lote
+     * @param  array<int, int>  $adjuntoIds  los que van dentro del ticket de otro
+     *                                       recibo en vez de en su propia hoja
+     */
+    protected function openPrintBatchTab(array $reciboIds, array $adjuntoIds = []): void
     {
         $token = Str::uuid()->toString();
 
@@ -2564,7 +2643,7 @@ class Crear extends Component
                 'user_id' => auth()->id(),
                 'recibo_ids' => array_values($reciboIds),
                 // El recargo se imprime dentro del ticket del recibo principal.
-                'agrupar' => $agrupar,
+                'adjunto_ids' => array_values($adjuntoIds),
             ],
             now()->addMinutes(15)
         );

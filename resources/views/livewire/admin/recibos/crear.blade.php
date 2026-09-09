@@ -551,23 +551,9 @@
                     </div>
                 </div>
 
-                @if(
-                count($cuotasSeleccionadasInfo) === 1
-                && !$recargoCondonado
-                && (float)($recargoMonto ?? 0) > 0
-                && ($cuotaVencida ?? false)
-                && $tipos_cobro_id
-                && str_contains(mb_strtoupper(optional($tiposCobro->firstWhere('id', $tipos_cobro_id))->nombre ?? ''), 'MENSUAL')
-                )
+                @if($this->puedeAjustarRecargo() && (float)($recargoTotalAutomatico ?? 0) > 0)
                 @php
-                $recargoFinal = 0;
-                if (($recargoModo ?? 'auto') === 'condonar') {
-                $recargoFinal = 0;
-                } elseif (($recargoModo ?? 'auto') === 'manual') {
-                $recargoFinal = (float) ($recargoMontoManual ?? 0);
-                } else {
-                $recargoFinal = (float) ($recargoMonto ?? 0);
-                }
+                $variasCuotas = count($cuotasSeleccionadasInfo) > 1;
                 @endphp
 
                 <div class="mt-4 pt-4 border-t">
@@ -575,10 +561,13 @@
                         <div>
                             <div class="text-xs text-gray-500">Recargo a cobrar</div>
                             <div class="text-sm font-black">
-                                ${{ number_format(max(0, $recargoFinal), 2) }}
+                                ${{ number_format(max(0, (float) $recargoTotalSeleccionado), 2) }}
                             </div>
                             <div class="text-[11px] text-gray-500">
-                                En selección múltiple el recargo se usa automático por cuota. La edición manual solo aplica cuando eliges una sola cuota.
+                                Recargo automático: ${{ number_format((float) $recargoTotalAutomatico, 2) }}
+                                @if($variasCuotas)
+                                · El ajuste aplica a las {{ count($cuotasSeleccionadasInfo) }} cuotas seleccionadas.
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -595,11 +584,19 @@
 
                         @if(($recargoModo ?? 'auto') === 'manual')
                         <div>
-                            <label class="text-xs text-gray-500">Monto manual</label>
+                            <label class="text-xs text-gray-500">
+                                {{ $variasCuotas ? 'Monto total del recargo' : 'Monto manual' }}
+                            </label>
                             <input type="number" step="0.01" min="0"
                                 class="w-full rounded-xl border p-2"
                                 wire:model.lazy="recargoMontoManual">
-                            <div class="text-[11px] text-gray-500 mt-1">Puedes bajar o subir el recargo.</div>
+                            <div class="text-[11px] text-gray-500 mt-1">
+                                @if($variasCuotas)
+                                Se reparte entre las cuotas seleccionadas.
+                                @else
+                                Puedes bajar o subir el recargo.
+                                @endif
+                            </div>
                         </div>
                         @else
                         <div class="hidden sm:block"></div>

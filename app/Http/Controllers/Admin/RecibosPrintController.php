@@ -72,8 +72,8 @@ class RecibosPrintController extends Controller
 
     public function showLote(string $token)
     {
-        [$recibos, $agrupar] = $this->obtenerRecibosDesdeToken($token);
-        $tickets = $this->agruparTickets($recibos, $agrupar);
+        [$recibos, $adjuntoIds] = $this->obtenerRecibosDesdeToken($token);
+        $tickets = $this->agruparTickets($recibos, $adjuntoIds);
         $modo = 'web';
 
         return view('admin.recibos.imprimir-lote', compact('tickets', 'modo', 'token'));
@@ -81,8 +81,8 @@ class RecibosPrintController extends Controller
 
     public function pdfLote(string $token)
     {
-        [$recibos, $agrupar] = $this->obtenerRecibosDesdeToken($token);
-        $tickets = $this->agruparTickets($recibos, $agrupar);
+        [$recibos, $adjuntoIds] = $this->obtenerRecibosDesdeToken($token);
+        $tickets = $this->agruparTickets($recibos, $adjuntoIds);
         $modo = 'pdf';
 
         // Misma hoja que el recibo individual: un recibo por página, igual de largo.
@@ -113,7 +113,14 @@ class RecibosPrintController extends Controller
             ->sortBy(fn ($recibo) => $ids->search($recibo->id))
             ->values();
 
-        return [$recibos, (bool) ($payload['agrupar'] ?? false)];
+        $adjuntoIds = collect($payload['adjunto_ids'] ?? [])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        return [$recibos, $adjuntoIds];
     }
 
     protected function relations(): array
@@ -136,33 +143,32 @@ class RecibosPrintController extends Controller
     }
 
     /**
-     * Arma los tickets a imprimir. Cuando el lote viene marcado como agrupado,
-     * los recibos de recargo se pegan al ticket del recibo principal en vez de
-     * salir en su propia hoja.
+     * Arma los tickets a imprimir. Los recibos que el lote marca como adjuntos
+     * (los de recargo) se pegan al ticket del recibo principal en vez de salir
+     * en su propia hoja.
      *
+     * @param  array<int, int>  $adjuntoIds
      * @return Collection<int, array{recibo: Recibo, adjuntos: Collection<int, Recibo>}>
      */
-    protected function agruparTickets($recibos, bool $agrupar)
+    protected function agruparTickets($recibos, array $adjuntoIds)
     {
-        $esRecargo = fn (Recibo $r): bool => str_contains(
-            mb_strtoupper((string) ($r->tipoCobro?->nombre ?? '')),
-            'RECARGO'
-        );
+        $esAdjunto = fn (Recibo $r): bool => in_array((int) $r->id, $adjuntoIds, true);
 
-        if (! $agrupar || $recibos->count() < 2 || $recibos->every($esRecargo)) {
-            return $recibos->map(fn (Recibo $r) => [
+        $principales = $recibos->reject($esAdjunto)->values();
+        $adjuntos = $recibos->filter($esAdjunto)->values();
+
+        // Sin principal no hay a quién pegarlos: se imprimen solos.
+        if ($principales->isEmpty()) {
+            return $adjuntos->map(fn (Recibo $r) => [
                 'recibo' => $r,
                 'adjuntos' => collect(),
             ])->values();
         }
 
-        $principales = $recibos->reject($esRecargo)->values();
-        $recargos = $recibos->filter($esRecargo)->values();
-
         return $principales->map(fn (Recibo $r, int $i) => [
             'recibo' => $r,
-            // Los recargos del lote cuelgan del primer recibo principal.
-            'adjuntos' => $i === 0 ? $recargos : collect(),
+            // Los adjuntos del lote cuelgan del primer recibo principal.
+            'adjuntos' => $i === 0 ? $adjuntos : collect(),
         ])->values();
     }
 }

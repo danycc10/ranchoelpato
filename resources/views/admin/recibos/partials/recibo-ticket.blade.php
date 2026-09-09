@@ -114,8 +114,12 @@ $texto .= ' · ' . \Carbon\Carbon::parse($cuotaPago->fecha_vencimiento)->format(
 return $texto;
 };
 
-$conceptosDe = function ($rec, ?string $fallback = null) use ($etiquetaCuota) {
-$paraRecargo = str_contains(mb_strtoupper((string)($rec->tipoCobro?->nombre ?? '')), 'RECARGO');
+// $forzarRecargo llega en true para los recibos adjuntos: son de recargo aunque
+// su tipo de cobro sea el del servicio (la luz cobra su recargo en su mismo
+// tipo, para no cambiarle el propietario contable).
+$conceptosDe = function ($rec, ?string $fallback = null, ?bool $forzarRecargo = null) use ($etiquetaCuota) {
+$paraRecargo = $forzarRecargo
+?? str_contains(mb_strtoupper((string)($rec->tipoCobro?->nombre ?? '')), 'RECARGO');
 
 $pagosCuota = collect($rec->pagos ?? [])
 ->filter(fn ($p) => is_null($p->deleted_at ?? null)
@@ -140,7 +144,7 @@ return $pagosCuota->map(fn ($p) => [
 $conceptos = $conceptosDe($recibo, $conceptoPeriodo);
 
 foreach ($recibosAdjuntos as $adjunto) {
-$conceptos = $conceptos->concat($conceptosDe($adjunto));
+$conceptos = $conceptos->concat($conceptosDe($adjunto, null, true));
 }
 
 $conceptos = $conceptos->values();

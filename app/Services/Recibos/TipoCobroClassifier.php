@@ -28,6 +28,17 @@ class TipoCobroClassifier
         return $this->tipo($tipoCobroId)?->categoria === 'servicio';
     }
 
+    /**
+     * Los conceptos que se cobran contra un calendario de cuotas generan
+     * recargo cuando la cuota se vence: las mensualidades del terreno y los
+     * servicios (luz, agua, fosa).
+     */
+    public function aplicaRecargoPorAtraso(?int $tipoCobroId): bool
+    {
+        return $this->esMensualidad($tipoCobroId)
+            || $this->esServicio($tipoCobroId);
+    }
+
     public function requiereAsociarCuota(?int $tipoCobroId): bool
     {
         return $this->esMensualidad($tipoCobroId)
