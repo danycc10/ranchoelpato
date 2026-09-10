@@ -489,6 +489,13 @@
                     <p class="font-black mt-1">
                         #{{ $recibo->cuota?->numero ?? '—' }}
                     </p>
+
+                    @if(count($recibo->numerosDeCuota()) > 1)
+                    <p class="text-[11px] text-amber-700 mt-1">
+                        El recibo cubre las cuotas #{{ $recibo->rangoCuotas() }}.
+                        El recargo se genera solo para la #{{ $recibo->cuota?->numero }}.
+                    </p>
+                    @endif
                 </div>
             </div>
 

@@ -151,7 +151,7 @@
                         <th class="p-2.5 text-left w-[240px] whitespace-nowrap">Nombre</th>
                         <th class="p-2.5 text-left w-[90px] whitespace-nowrap">Lote</th>
                         <th class="p-2.5 text-left w-[220px] whitespace-nowrap">Fraccionamiento</th>
-                        <th class="p-2.5 text-left w-[80px] whitespace-nowrap">Cuota</th>
+                        <th class="p-2.5 text-left w-[110px] whitespace-nowrap">Cuota</th>
                         <th class="p-2.5 text-left w-[120px] whitespace-nowrap">Fecha</th>
                         <th class="p-2.5 text-left w-[120px] whitespace-nowrap">Monto</th>
                         <th class="p-2.5 text-left w-[150px] whitespace-nowrap">Tipo cobro</th>
@@ -201,7 +201,16 @@
                         </td>
 
                         <td class="p-2.5 align-middle">
-                            #{{ $recibo->cuota?->numero ?? '-' }}
+                            @php $cuotasDelRecibo = $recibo->numerosDeCuota(); @endphp
+
+                            @if(count($cuotasDelRecibo) > 1)
+                            <span class="whitespace-nowrap font-semibold"
+                                title="Recibo de {{ count($cuotasDelRecibo) }} cuotas: #{{ implode(', #', $cuotasDelRecibo) }}">
+                                #{{ $recibo->rangoCuotas() }}
+                            </span>
+                            @else
+                            #{{ $recibo->rangoCuotas() ?? '-' }}
+                            @endif
                         </td>
 
                         <td class="p-2.5 align-middle">

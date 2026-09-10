@@ -617,6 +617,7 @@ class Show extends Component
         $recibos = Recibo::query()
             ->with([
                 'tipoCobro',
+                'pagos.cuota',
                 'pagosDetalle' => fn ($q) => $q
                     ->whereNull('anulado_at')
                     ->whereNull('deleted_at')
@@ -626,7 +627,9 @@ class Show extends Component
                     ]),
             ])
             ->where('contrato_id', $this->contrato->id)
-            ->where('cuota_id', $cuotaId)
+            // Un recibo puede agrupar varias cuotas: también cuenta si la cubre
+            // por sus pagos, no solo si es su cuota ancla.
+            ->queCubrenCuota((int) $cuotaId)
             ->whereNull('anulado_at')
             ->whereNull('deleted_at')
             ->orderBy('id')
@@ -645,6 +648,8 @@ class Show extends Component
                 'recibo_id' => (int) $recibo->id,
                 'folio' => (string) $recibo->folio,
                 'concepto' => (string) ($recibo->tipoCobro?->nombre ?? '-'),
+                'cuotas' => $recibo->rangoCuotas(),
+                'cuotas_count' => count($recibo->numerosDeCuota()),
                 'monto_recibo' => (float) ($recibo->monto ?? 0),
                 'pagos_count' => (int) $pagos->count(),
                 'pagos_total' => (float) $pagos->sum(fn ($p) => (float) ($p->monto ?? 0)),
@@ -705,7 +710,7 @@ class Show extends Component
         $recibo = Recibo::query()
             ->withTrashed()
             ->where('contrato_id', $contrato->id)
-            ->where('cuota_id', (int) $this->cuotaAnularId)
+            ->queCubrenCuota((int) $this->cuotaAnularId)
             ->latest('id')
             ->first();
 

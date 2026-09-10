@@ -152,7 +152,8 @@ $conceptos = $conceptos->values();
 $totalTicket = (float) $recibo->monto + (float) $recibosAdjuntos->sum(fn ($r) => (float) $r->monto);
 
 // Con varias cuotas las fechas ya van en cada renglón, así que el encabezado
-// deja de mostrar un solo periodo.
+// muestra el rango ("33 - 35") en vez de un solo periodo.
+$rangoCuotasRecibo = $recibo->rangoCuotas();
 $mostrarPeriodoEncabezado = $conceptos->count() === 1;
 
 $formasDe = fn ($rec) => collect($rec->pagosDetalle ?? [])
@@ -259,10 +260,10 @@ $totalPagosDetalle = (float) $pagosDetalle->sum(fn ($p) => (float) ($p->monto ??
         </div>
         @endif
 
-        @if(!$mostrarPeriodoEncabezado)
+        @if(!$mostrarPeriodoEncabezado && $rangoCuotasRecibo)
         <div class="row">
-            <div class="muted">{{ $labelPeriodo }}s pagadas:</div>
-            <div class="right bold">{{ $conceptos->count() }}</div>
+            <div class="muted">{{ $labelPeriodo }}s:</div>
+            <div class="right bold">#{{ $rangoCuotasRecibo }}</div>
         </div>
         @endif
 

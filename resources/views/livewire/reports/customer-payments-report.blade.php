@@ -260,7 +260,8 @@
 
                 $esBanco = $cuenta !== '—';
 
-                $cuotaNum = $recibo?->cuota?->numero
+                // Un recibo puede cubrir varias cuotas: se muestra el rango.
+                $cuotaNum = $recibo?->rangoCuotas()
                 ?? $recibo?->cuota?->no_cuota
                 ?? $recibo?->cuota?->numero_cuota
                 ?? $recibo?->cuota_id

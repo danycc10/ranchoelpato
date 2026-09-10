@@ -1083,6 +1083,16 @@
                                         <span class="text-gray-500">
                                             ({{ $recibo['concepto'] }})
                                         </span>
+
+                                        @if(($recibo['cuotas_count'] ?? 0) > 1)
+                                        <div class="text-amber-700 font-semibold">
+                                            Cubre las cuotas #{{ $recibo['cuotas'] }} — todas regresan a pendiente.
+                                        </div>
+                                        @elseif(!empty($recibo['cuotas']))
+                                        <div class="text-gray-500">
+                                            Cuota #{{ $recibo['cuotas'] }}
+                                        </div>
+                                        @endif
                                     </div>
 
                                     <div class="text-gray-600">

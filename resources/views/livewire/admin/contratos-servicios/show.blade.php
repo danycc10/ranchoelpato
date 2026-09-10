@@ -641,6 +641,16 @@
                                         ${{ number_format((float) ($recibo['pagos_total'] ?? 0), 2) }}
                                     </div>
 
+                                    @if(($recibo['cuotas_count'] ?? 0) > 1)
+                                    <div class="text-xs font-bold text-amber-700 mt-1">
+                                        Cubre las cuotas #{{ $recibo['cuotas'] }} - todas regresan a pendiente.
+                                    </div>
+                                    @elseif(!empty($recibo['cuotas']))
+                                    <div class="text-xs text-red-800">
+                                        Cuota #{{ $recibo['cuotas'] }}
+                                    </div>
+                                    @endif
+
                                     @if(! empty($recibo['pagos']))
                                         <div class="mt-2 space-y-1">
                                             @foreach($recibo['pagos'] as $pago)

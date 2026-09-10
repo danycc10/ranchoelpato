@@ -240,6 +240,8 @@ class CustomerPaymentsReport extends Component
                 'recibo.contrato.lote.fraccionamiento',
                 'recibo.cuota',
                 'recibo.tipoCobro',
+                // Para mostrar el rango cuando el recibo cubre varias cuotas.
+                'recibo.pagos.cuota',
                 'formaPago',
                 'cuentaBancaria',
             ])
@@ -264,6 +266,7 @@ class CustomerPaymentsReport extends Component
                 'recibo.contrato.lote.fraccionamiento',
                 'recibo.cuota',
                 'recibo.tipoCobro',
+                'recibo.pagos.cuota',
                 'formaPago',
                 'cuentaBancaria',
             ])

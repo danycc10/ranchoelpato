@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Admin\Recibos\Crear;
+use App\Livewire\Admin\Recibos\Index as RecibosIndex;
 use App\Models\Cliente;
 use App\Models\Contrato;
 use App\Models\Cuota;
@@ -85,6 +86,60 @@ class ReciboAgrupadoVariasCuotasTest extends TestCase
     }
 
     #[Test]
+    public function el_recibo_muestra_el_rango_de_cuotas_que_cubre(): void
+    {
+        $datos = $this->contratoConTresCuotas();
+
+        $this->cobrarLasTresCuotas($datos);
+
+        $recibo = Recibo::query()->with('pagos.cuota')->sole();
+
+        $this->assertSame([1, 2, 3], $recibo->numerosDeCuota());
+        $this->assertSame('1 - 3', $recibo->rangoCuotas());
+
+        // En la pestaña de recibos sale el rango, no solo la cuota ancla.
+        $this->actingAs($this->usuarioConPermisos());
+
+        Livewire::test(RecibosIndex::class)
+            ->set('mes', '2026-11')
+            ->assertSee($recibo->folio)
+            ->assertSee('#1 - 3');
+    }
+
+    #[Test]
+    public function un_recibo_de_una_sola_cuota_muestra_solo_su_numero(): void
+    {
+        $datos = $this->contratoConTresCuotas();
+
+        // Solo la primera cuota: el rango no debe inventar un "1 - 1".
+        $this->cobrarLasTresCuotas($datos, [$datos['cuota_ids'][0]], 200);
+
+        $recibo = Recibo::query()->with('pagos.cuota')->sole();
+
+        $this->assertSame('1', $recibo->rangoCuotas());
+    }
+
+    #[Test]
+    public function los_recibos_de_una_cuota_se_encuentran_aunque_sea_intermedia(): void
+    {
+        $datos = $this->contratoConTresCuotas();
+
+        $this->cobrarLasTresCuotas($datos);
+
+        $recibo = Recibo::query()->sole();
+
+        // La cuota de en medio no es la cuota ancla del recibo, pero el recibo
+        // sí la cubre: si no se encuentra, la anulación desde el contrato diría
+        // que no hay recibos para esa cuota.
+        $encontrados = Recibo::query()
+            ->queCubrenCuota($datos['cuota_ids'][1])
+            ->pluck('id')
+            ->all();
+
+        $this->assertSame([$recibo->id], $encontrados);
+    }
+
+    #[Test]
     public function el_recargo_se_imprime_dentro_del_mismo_ticket(): void
     {
         $datos = $this->contratoConTresCuotas();
@@ -136,7 +191,7 @@ class ReciboAgrupadoVariasCuotasTest extends TestCase
         $this->assertStringContainsString('$650.00', $html);
     }
 
-    private function cobrarLasTresCuotas(array $datos): void
+    private function cobrarLasTresCuotas(array $datos, ?array $cuotaIds = null, float $monto = 600): void
     {
         $this->actingAs(User::factory()->create());
 
@@ -146,13 +201,13 @@ class ReciboAgrupadoVariasCuotasTest extends TestCase
             ->set('lote_id', $datos['lote_id'])
             ->set('tipos_cobro_id', $datos['tipos_cobro_id'])
             ->set('asociarACuota', true)
-            ->set('cuotaIds', $datos['cuota_ids'])
+            ->set('cuotaIds', $cuotaIds ?? $datos['cuota_ids'])
             ->set('fecha', '2026-11-05')
             ->set('metodo', 'efectivo')
             ->set('pagos', [[
                 'forma_pago_id' => $datos['forma_pago_id'],
                 'cuentas_bancarias_id' => null,
-                'monto' => 600,
+                'monto' => $monto,
                 'referencia' => null,
                 'evidencia' => null,
                 'sin_evidencia' => true,
@@ -168,7 +223,7 @@ class ReciboAgrupadoVariasCuotasTest extends TestCase
 
         $rol = Role::findOrCreate('admin', 'web');
 
-        foreach (['admin.ver', 'recibos.imprimir'] as $permiso) {
+        foreach (['admin.ver', 'recibos.imprimir', 'recibos.crear'] as $permiso) {
             $rol->givePermissionTo(Permission::findOrCreate($permiso, 'web'));
         }
 

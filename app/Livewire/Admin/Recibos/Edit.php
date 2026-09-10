@@ -66,6 +66,8 @@ class Edit extends Component
                 'periodo',
                 'pagosDetalle.formaPago',
                 'pagosDetalle.cuentaBancaria',
+                // Para mostrar el rango cuando el recibo cubre varias cuotas.
+                'pagos.cuota',
             ])
             ->where('uuid', $uuid)
             ->firstOrFail();

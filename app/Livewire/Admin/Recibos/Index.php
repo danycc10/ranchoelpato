@@ -9,7 +9,6 @@ use App\Models\Propietario;
 use App\Models\Recibo;
 use App\Models\ReciboPago;
 use App\Models\TipoCobro;
-use Maatwebsite\Excel\Facades\Excel;
 use App\Services\ImageUploadService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +18,7 @@ use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use Maatwebsite\Excel\Facades\Excel;
 
 class Index extends Component
 {
@@ -631,6 +631,8 @@ class Index extends Component
                 'tipoCobro',
                 'pagosDetalle.formaPago',
                 'pagosDetalle.cuentaBancaria',
+                // Para mostrar el rango de cuotas cuando el recibo agrupa varias.
+                'pagos.cuota',
             ])
             // El propietario del recibo es el contable: a quién le entra ese
             // dinero, que no siempre es el dueño del fraccionamiento.

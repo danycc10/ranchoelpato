@@ -183,6 +183,72 @@ class Recibo extends Model
         return $this->hasMany(Pago::class, 'recibo_id');
     }
 
+    /**
+     * Recibos que cubren una cuota. No basta con `cuota_id`, que solo apunta a
+     * la más antigua: un recibo que agrupa varias cuotas cubre las demás a
+     * través de sus `pagos`.
+     */
+    public function scopeQueCubrenCuota($query, int $cuotaId)
+    {
+        return $query->where(function ($q) use ($cuotaId) {
+            $q->where('cuota_id', $cuotaId)
+                ->orWhereHas('pagos', fn ($p) => $p->where('cuota_id', $cuotaId)
+                    ->whereNull('anulado_at')
+                );
+        });
+    }
+
+    /**
+     * Números de las cuotas que cubre el recibo, ordenados. Un recibo puede
+     * agrupar varias cuotas: el desglose vive en `pagos`, y `cuota_id` solo
+     * apunta a la más antigua.
+     *
+     * Para no pegarle a la base por cada recibo de un listado, carga la
+     * relación con `->with('pagos.cuota')`.
+     *
+     * @return array<int, int>
+     */
+    public function numerosDeCuota(): array
+    {
+        $numeros = $this->pagos
+            ->filter(fn (Pago $pago) => is_null($pago->anulado_at) && $pago->cuota)
+            ->map(fn (Pago $pago) => (int) $pago->cuota->numero)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        if ($numeros !== []) {
+            return $numeros;
+        }
+
+        // Recibos históricos o importados: no tienen pagos, solo su cuota.
+        $numero = (int) ($this->cuota?->numero ?? 0);
+
+        return $numero > 0 ? [$numero] : [];
+    }
+
+    /**
+     * Etiqueta de las cuotas del recibo: "33" cuando es una sola y "33 - 35"
+     * cuando agrupa varias.
+     */
+    public function rangoCuotas(): ?string
+    {
+        $numeros = $this->numerosDeCuota();
+
+        if ($numeros === []) {
+            return null;
+        }
+
+        $primera = reset($numeros);
+        $ultima = end($numeros);
+
+        return $primera === $ultima
+            ? (string) $primera
+            : $primera.' - '.$ultima;
+    }
+
     public function getRouteKeyName(): string
     {
         return 'uuid';
