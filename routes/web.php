@@ -31,25 +31,26 @@ use App\Livewire\Admin\Promociones\Index;
 use App\Livewire\Admin\Recibos\Crear;
 use App\Livewire\Admin\Recibos\Edit;
 use App\Livewire\Admin\Recibos\Index as RecibosIndex;
-use App\Livewire\Admin\Sistema\Index as SistemaIndex;
+use App\Livewire\Admin\Sistema\Impresion;
 /*
 |--------------------------------------------------------------------------
 | Imports – Dashboard
 |--------------------------------------------------------------------------
 */
-use App\Livewire\Admin\TipoCobroPropietarioConfigs\Index as TipoCobroPropietarioConfigsIndex;
+use App\Livewire\Admin\Sistema\Index as SistemaIndex;
 /*
 |--------------------------------------------------------------------------
 | Imports – Admin / Clientes Excelentes
 |--------------------------------------------------------------------------
 */
+use App\Livewire\Admin\TipoCobroPropietarioConfigs\Index as TipoCobroPropietarioConfigsIndex;
 use App\Livewire\Dashboard\CobranzaDashboard;
-use App\Livewire\Reports\BankMovementsReport;
 /*
 |--------------------------------------------------------------------------
 | Imports – Admin / Sistema
 |--------------------------------------------------------------------------
 */
+use App\Livewire\Reports\BankMovementsReport;
 use App\Livewire\Reports\CustomerPaymentsReport;
 use App\Livewire\Reports\DailyReceiptsReport;
 use App\Livewire\Reports\EarlyPayersReport;
@@ -132,6 +133,10 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
         */
         Route::get('/sistema', SistemaIndex::class)
             ->name('sistema.index')
+            ->middleware('permission:sistema.ver');
+
+        Route::get('/sistema/impresion', Impresion::class)
+            ->name('sistema.impresion')
             ->middleware('permission:sistema.ver');
 
         Route::get('/sistema/openai/uso', App\Livewire\Admin\OpenAiUsos\Index::class)
@@ -278,14 +283,6 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
 
         Route::get('/recibos/imprimir-lote/{token}', [RecibosPrintController::class, 'pdfLote'])
             ->name('recibos.pdf-lote')
-            ->middleware('permission:recibos.imprimir');
-
-        Route::get('/recibos/{recibo}/print-data', [RecibosPrintController::class, 'printData'])
-            ->name('recibos.print-data')
-            ->middleware('permission:recibos.imprimir');
-
-        Route::get('/recibos/{recibo}/print-token', [RecibosPrintController::class, 'printToken'])
-            ->name('recibos.print-token')
             ->middleware('permission:recibos.imprimir');
 
         Route::get('/recibos/lote/{token}/imprimir', [RecibosPrintController::class, 'showLote'])

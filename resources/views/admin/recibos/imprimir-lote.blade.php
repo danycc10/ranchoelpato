@@ -48,15 +48,9 @@
     <div class="no-print">
         <button onclick="window.print()" class="btn">Imprimir navegador</button>
 
-        <button id="btnPrintLocal" class="btn">
-            Impresora local ({{ $tickets->count() }})
-        </button>
-
         <a href="{{ route('admin.recibos.pdf-lote', ['token' => $token]) }}" class="btn btn-secondary">
             PDF
         </a>
-
-        <div id="printStatus" class="status"></div>
     </div>
 @endif
 
@@ -70,70 +64,6 @@
     </div>
 @endforeach
 
-@if(($modo ?? 'web') === 'web')
-@php
-    $recibosParaImprimir = $tickets->map(fn ($ticket) => [
-        'folio' => $ticket['recibo']->folio,
-        'id' => 'ticket-'.$ticket['recibo']->uuid,
-        'tokenUrl' => route('admin.recibos.print-token', $ticket['recibo']),
-        'dataUrl' => route('admin.recibos.print-data', $ticket['recibo']),
-    ])->values();
-@endphp
-
-@include('admin.recibos.partials.ticket-print-js')
-
-<script>
-    // Se manda un ticket a la vez, con el token de su propio recibo: es la
-    // misma llamada que la impresión individual, repetida.
-    const RECIBOS = @json($recibosParaImprimir);
-
-    const btnPrintLocal = document.getElementById('btnPrintLocal');
-    const printStatus = document.getElementById('printStatus');
-
-    async function printLocal()
-    {
-        btnPrintLocal.disabled = true;
-
-        const fallidos = [];
-        let enviados = 0;
-
-        for (const recibo of RECIBOS) {
-
-            printStatus.className = 'status';
-            printStatus.textContent = `Enviando ${enviados + fallidos.length + 1} de ${RECIBOS.length}: ${recibo.folio}...`;
-
-            try {
-
-                await enviarTicketAImpresoraLocal({
-                    tokenUrl: recibo.tokenUrl,
-                    dataUrl: recibo.dataUrl,
-                    elemento: document.getElementById(recibo.id)
-                });
-
-                enviados++;
-
-            } catch (error) {
-
-                console.error(recibo.folio, error);
-                fallidos.push(`${recibo.folio} (${error.message})`);
-
-            }
-        }
-
-        if (fallidos.length === 0) {
-            printStatus.className = 'status ok';
-            printStatus.textContent = `${enviados} ticket(s) enviados correctamente.`;
-        } else {
-            printStatus.className = 'status error';
-            printStatus.textContent = `${enviados} enviados. Fallaron: ${fallidos.join(' · ')}`;
-        }
-
-        btnPrintLocal.disabled = false;
-    }
-
-    btnPrintLocal?.addEventListener('click', printLocal);
-</script>
-@endif
 
 </body>
 </html>

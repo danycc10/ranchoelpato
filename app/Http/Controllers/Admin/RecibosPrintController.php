@@ -21,43 +21,6 @@ class RecibosPrintController extends Controller
         return view('admin.recibos.imprimir', compact('recibo', 'modo'));
     }
 
-    public function printData(Recibo $recibo)
-    {
-        $recibo->load($this->relations());
-
-        return response()->json([
-            'ok' => true,
-            'folio' => $recibo->folio,
-            'uuid' => $recibo->uuid,
-            'cliente' => trim((string) (
-                $recibo->cliente->nombre_completo
-                ?? ($recibo->cliente->nombre ?? '')
-            )),
-            'monto' => (float) $recibo->monto,
-        ]);
-    }
-
-    public function printToken(Recibo $recibo)
-    {
-        $secret = config('services.print_bridge.secret');
-
-        abort_if(blank($secret), 500, 'Print bridge secret no configurado.');
-
-        $payload = [
-            'recibo_uuid' => $recibo->uuid,
-            'user_id' => auth()->id(),
-            'expires_at' => now()->addSeconds(30)->timestamp,
-        ];
-
-        $json = json_encode($payload);
-
-        return response()->json([
-            'ok' => true,
-            'payload' => base64_encode($json),
-            'signature' => hash_hmac('sha256', $json, $secret),
-        ]);
-    }
-
     public function pdf(Recibo $recibo)
     {
         $recibo->load($this->relations());

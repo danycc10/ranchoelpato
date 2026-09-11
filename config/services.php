@@ -35,11 +35,6 @@ return [
         ],
     ],
 
-    'print_bridge' => [
-        'secret' => env('PRINT_BRIDGE_SECRET'),
-        'url' => env('PRINT_BRIDGE_URL', 'http://192.168.100.16:3001'),
-    ],
-
     'whatsapp' => [
         'provider' => env('WHATSAPP_PROVIDER', 'openwa'),
         'provider_switching_enabled' => (bool) env('WHATSAPP_PROVIDER_SWITCHING_ENABLED', false),

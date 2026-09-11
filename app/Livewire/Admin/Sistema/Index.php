@@ -70,6 +70,12 @@ class Index extends Component
         $this->redirectRoute('admin.logs.index');
     }
 
+    public function goImpresion(): void
+    {
+        $this->authorize('sistema.ver');
+        $this->redirectRoute('admin.sistema.impresion');
+    }
+
     public function goOpenAiUsos(): void
     {
         $this->authorize('logs.ver');

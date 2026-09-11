@@ -74,33 +74,24 @@ class RecibosImpresionTicketTest extends TestCase
     }
 
     #[Test]
-    public function el_lote_tambien_se_manda_a_la_impresora_local(): void
+    public function el_lote_arma_una_hoja_por_recibo(): void
     {
         $recibos = collect([$this->recibo(), $this->recibo('R-002')]);
 
         $this->actingAs($this->usuarioConPermisos());
 
-        $individual = $this->get(route('admin.recibos.imprimir', $recibos->first()))
-            ->assertOk()
-            ->getContent();
-
         $lote = $this->get(route('admin.recibos.print-lote', ['token' => $this->tokenLote($recibos->pluck('id')->all())]))
             ->assertOk()
             ->getContent();
 
-        // Las dos vistas usan el mismo envío al puente de impresión.
-        $this->assertStringContainsString('enviarTicketAImpresoraLocal', $individual);
-        $this->assertStringContainsString('enviarTicketAImpresoraLocal', $lote);
-        $this->assertStringContainsString('btnPrintLocal', $lote);
-
-        // Y el lote lleva el token propio de cada recibo, no uno solo.
         foreach ($recibos as $recibo) {
-            $this->assertStringContainsString(
-                str_replace('/', '\/', route('admin.recibos.print-token', $recibo)),
-                $lote
-            );
             $this->assertStringContainsString('ticket-'.$recibo->uuid, $lote);
         }
+
+        // El puente Node se retiró: la impresión directa la hace el agente
+        // local contra la API, no el navegador contra una IP de la red.
+        $this->assertStringNotContainsString('enviarTicketAImpresoraLocal', $lote);
+        $this->assertStringNotContainsString('btnPrintLocal', $lote);
     }
 
     private function ticketDe(string $html): string
@@ -182,11 +173,12 @@ class RecibosImpresionTicketTest extends TestCase
             ['propietario_id' => $propietario->id]
         );
 
+        // La clave sale del folio, no de un azar que puede chocar entre recibos.
         $lote = Lote::create([
             'fraccionamiento_id' => $fraccionamiento->id,
             'manzana' => '5',
-            'lote' => (string) random_int(100, 999),
-            'clave' => 'M5-L'.random_int(100, 999),
+            'lote' => $folio,
+            'clave' => 'M5-L'.$folio,
         ]);
 
         $cliente = Cliente::firstOrCreate(

@@ -52,15 +52,9 @@
         Imprimir navegador
     </button>
 
-    <button id="btnPrintLocal" class="btn">
-        Impresora local
-    </button>
-
     <a href="{{ route('admin.recibos.pdf', $recibo) }}" class="btn btn-secondary">
         PDF
     </a>
-
-    <div id="printStatus" class="status"></div>
 
 </div>
 @endif
@@ -72,47 +66,6 @@
     ])
 </div>
 
-@if(($modo ?? 'web') === 'web')
-@include('admin.recibos.partials.ticket-print-js')
-
-<script>
-    const btnPrintLocal = document.getElementById('btnPrintLocal');
-    const printStatus = document.getElementById('printStatus');
-
-    async function printLocal()
-    {
-        btnPrintLocal.disabled = true;
-        printStatus.className = 'status';
-        printStatus.textContent = 'Enviando a impresora local...';
-
-        try {
-
-            await enviarTicketAImpresoraLocal({
-                tokenUrl: @json(route('admin.recibos.print-token', $recibo)),
-                dataUrl: @json(route('admin.recibos.print-data', $recibo)),
-                elemento: document.getElementById('ticket-print-area')
-            });
-
-            printStatus.className = 'status ok';
-            printStatus.textContent = 'Ticket enviado correctamente.';
-
-        } catch (error) {
-
-            console.error(error);
-
-            printStatus.className = 'status error';
-            printStatus.textContent = 'Error: ' + error.message;
-
-        } finally {
-
-            btnPrintLocal.disabled = false;
-
-        }
-    }
-
-    btnPrintLocal?.addEventListener('click', printLocal);
-</script>
-@endif
 
 </body>
 </html>

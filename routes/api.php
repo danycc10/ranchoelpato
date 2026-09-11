@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\PrintAgentHeartbeatController;
+use App\Http\Controllers\Api\PrintAgentJobController;
 use App\Http\Controllers\Webhooks\MetaWhatsappWebhookController;
 use App\Http\Controllers\Webhooks\OpenWaWebhookController;
 use Illuminate\Http\Request;
@@ -23,3 +25,16 @@ Route::get('/whatsapp/meta/webhook', [MetaWhatsappWebhookController::class, 'ver
     ->name('webhooks.meta.verify');
 Route::post('/whatsapp/meta/webhook', [MetaWhatsappWebhookController::class, 'recibir'])
     ->name('webhooks.meta.receive');
+
+/*
+ * Agente de impresión local. Quien llama es el agente instalado en la
+ * computadora del usuario, no una sesión del navegador: se autentica con su
+ * propia clave (bearer) contra el middleware print-agent.
+ */
+Route::prefix('print-agent')->middleware(['print-agent', 'throttle:print-agent'])->group(function (): void {
+    Route::post('/heartbeat', PrintAgentHeartbeatController::class)->name('api.print-agent.heartbeat');
+    Route::post('/jobs/claim', [PrintAgentJobController::class, 'claim'])->name('api.print-agent.jobs.claim');
+    Route::get('/jobs/{printJob}/document', [PrintAgentJobController::class, 'document'])->name('api.print-agent.jobs.document');
+    Route::post('/jobs/{printJob}/complete', [PrintAgentJobController::class, 'complete'])->name('api.print-agent.jobs.complete');
+    Route::post('/jobs/{printJob}/fail', [PrintAgentJobController::class, 'fail'])->name('api.print-agent.jobs.fail');
+});
