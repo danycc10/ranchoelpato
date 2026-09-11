@@ -100,7 +100,7 @@ $conceptoPeriodo = $esRecargo ? 'Recargo' : 'Pago registrado';
 $recibosAdjuntos = collect($recibosAdjuntos ?? [])->filter()->values();
 
 // El recargo puede ser este mismo recibo o venir adjunto al ticket; en ambos
-// casos el pago no fue puntual y no corresponde agradecerlo.
+// casos el ticket cierra sin mensaje, porque el pago no fue puntual.
 $ticketConRecargo = $esRecargo || $recibosAdjuntos->isNotEmpty();
 
 // Un recibo puede cubrir varias cuotas: el desglose por cuota vive en `pagos`.
@@ -403,11 +403,9 @@ $totalPagosDetalle = (float) $pagosDetalle->sum(fn ($p) => (float) ($p->monto ??
     </div>
     @endif
 
+    @unless($ticketConRecargo)
     <div class="center bold small" style="margin-top:10px;">
-        @if($ticketConRecargo)
-        Pagando a tiempo evita recargos.
-        @else
         Gracias por su pago puntual.
-        @endif
     </div>
+    @endunless
 </div>
