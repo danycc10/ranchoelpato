@@ -99,6 +99,10 @@ $conceptoPeriodo = $esRecargo ? 'Recargo' : 'Pago registrado';
 // propio folio porque puede ir a otro propietario contable).
 $recibosAdjuntos = collect($recibosAdjuntos ?? [])->filter()->values();
 
+// El recargo puede ser este mismo recibo o venir adjunto al ticket; en ambos
+// casos el pago no fue puntual y no corresponde agradecerlo.
+$ticketConRecargo = $esRecargo || $recibosAdjuntos->isNotEmpty();
+
 // Un recibo puede cubrir varias cuotas: el desglose por cuota vive en `pagos`.
 $etiquetaCuota = function ($cuotaPago, bool $paraRecargo) use ($contratoEsSemanal, $labelPeriodo) {
 if (!$cuotaPago) {
@@ -400,7 +404,7 @@ $totalPagosDetalle = (float) $pagosDetalle->sum(fn ($p) => (float) ($p->monto ??
     @endif
 
     <div class="center bold small" style="margin-top:10px;">
-        @if($esRecargo)
+        @if($ticketConRecargo)
         Pagando a tiempo evita recargos.
         @else
         Gracias por su pago puntual.

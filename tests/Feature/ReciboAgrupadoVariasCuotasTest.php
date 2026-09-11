@@ -50,6 +50,9 @@ class ReciboAgrupadoVariasCuotasTest extends TestCase
         // Y un solo total por los tres.
         $this->assertStringContainsString('$600.00', $html);
         $this->assertSame(3, substr_count($html, '$200.00'));
+
+        // Sin recargos, el pago sí fue puntual.
+        $this->assertStringContainsString('Gracias por su pago puntual.', $html);
     }
 
     #[Test]
@@ -189,6 +192,10 @@ class ReciboAgrupadoVariasCuotasTest extends TestCase
 
         // Y el total suma las cuotas más el recargo.
         $this->assertStringContainsString('$650.00', $html);
+
+        // Si el ticket trae recargo el pago no fue puntual: no se agradece.
+        $this->assertStringNotContainsString('Gracias por su pago puntual.', $html);
+        $this->assertStringContainsString('Pagando a tiempo evita recargos.', $html);
     }
 
     private function cobrarLasTresCuotas(array $datos, ?array $cuotaIds = null, float $monto = 600): void
