@@ -289,6 +289,14 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
             ->name('recibos.print-lote')
             ->middleware('permission:recibos.imprimir');
 
+        Route::post('/recibos/{recibo}/imprimir-agente', [RecibosPrintController::class, 'agente'])
+            ->name('recibos.imprimir-agente')
+            ->middleware('permission:recibos.imprimir');
+
+        Route::post('/recibos/lote/{token}/imprimir-agente', [RecibosPrintController::class, 'agenteLote'])
+            ->name('recibos.print-lote-agente')
+            ->middleware('permission:recibos.imprimir');
+
         Route::get('/recibos/{recibo}/pdf', [RecibosPrintController::class, 'pdf'])
             ->name('recibos.pdf')
             ->middleware('permission:recibos.imprimir');

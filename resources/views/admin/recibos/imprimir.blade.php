@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Recibo {{ $recibo->folio }}</title>
 
     <style id="ticket-css">
@@ -46,17 +47,11 @@
 <body>
 
 @if(($modo ?? 'web') === 'web')
-<div class="no-print">
-
-    <button onclick="window.print()" class="btn">
-        Imprimir navegador
-    </button>
-
-    <a href="{{ route('admin.recibos.pdf', $recibo) }}" class="btn btn-secondary">
-        PDF
-    </a>
-
-</div>
+@include('admin.recibos.partials.botones-impresion', [
+    'pdfUrl' => route('admin.recibos.pdf', $recibo),
+    'agenteUrl' => route('admin.recibos.imprimir-agente', $recibo),
+    'tieneAgente' => $tieneAgente ?? false,
+])
 @endif
 
 <div id="ticket-print-area">

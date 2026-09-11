@@ -16,8 +16,6 @@ use App\Models\ReciboPago;
 use App\Models\TipoCobro;
 use App\Services\Contabilidad\PropietarioContableResolver;
 use App\Services\ImageUploadService;
-use App\Services\Impresion\ModoImpresionSelector;
-use App\Services\Impresion\PrintJobService;
 use App\Services\Recibos\CuotaAntiguedadSelector;
 use App\Services\Recibos\PeriodoResolver;
 use App\Services\Recibos\RecargoCuotaCalculator;
@@ -774,9 +772,8 @@ class Crear extends Component
     }
 
     /**
-     * Manda los recibos a imprimir por donde diga el ajuste del sistema: con el
-     * agente local sale solo en la impresora de quien captura, y si no, se abre
-     * la pestaña del ticket para imprimir desde el navegador.
+     * Abre la pestaña del ticket. Desde ahí el cajero elige si lo imprime por
+     * el navegador o lo manda directo a su impresora con el agente local.
      *
      * @param  array<int, int>  $reciboIds
      * @param  array<int, int>  $adjuntoIds  los de recargo, que van dentro del
@@ -788,11 +785,6 @@ class Crear extends Component
             return;
         }
 
-        if (app(ModoImpresionSelector::class)->esAgenteLocal()
-            && $this->enviarAlAgenteLocal($reciboIds, $adjuntoIds)) {
-            return;
-        }
-
         if (count($reciboIds) === 1) {
             $this->openPrintTab($reciboIds[0]);
 
@@ -800,65 +792,6 @@ class Crear extends Component
         }
 
         $this->openPrintBatchTab($reciboIds, $adjuntoIds);
-    }
-
-    /**
-     * Encola un trabajo por ticket. Si algo falla (agente apagado, sin
-     * emparejar) se avisa y se regresa false para caer en el navegador: nunca
-     * se deja al usuario sin su ticket.
-     *
-     * @param  array<int, int>  $reciboIds
-     * @param  array<int, int>  $adjuntoIds
-     */
-    protected function enviarAlAgenteLocal(array $reciboIds, array $adjuntoIds): bool
-    {
-        $adjuntos = array_values(array_map('intval', $adjuntoIds));
-
-        // Los adjuntos no llevan ticket propio: viajan con el principal.
-        $principales = array_values(array_diff(
-            array_map('intval', $reciboIds),
-            $adjuntos
-        ));
-
-        if (empty($principales)) {
-            $principales = array_map('intval', $reciboIds);
-            $adjuntos = [];
-        }
-
-        try {
-            $cola = app(PrintJobService::class);
-            $usuario = auth()->user();
-
-            foreach ($principales as $i => $reciboId) {
-                $recibo = Recibo::findOrFail($reciboId);
-
-                // Como en el navegador, los recargos se pegan al primer ticket.
-                $cola->queueRecibo($usuario, $recibo, $i === 0 ? $adjuntos : []);
-            }
-        } catch (\Throwable $e) {
-            Log::warning('No se pudo encolar la impresión con agente local', [
-                'recibo_ids' => $reciboIds,
-                'error' => $e->getMessage(),
-            ]);
-
-            $this->dispatch(
-                'toast',
-                type: 'warning',
-                message: $e->getMessage().' Se abrirá el ticket para imprimir desde el navegador.'
-            );
-
-            return false;
-        }
-
-        $this->dispatch(
-            'toast',
-            type: 'success',
-            message: count($principales) === 1
-                ? 'Ticket enviado a tu impresora.'
-                : count($principales).' tickets enviados a tu impresora.'
-        );
-
-        return true;
     }
 
     protected function openPrintTab(int $reciboId): void

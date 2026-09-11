@@ -2,14 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Enums\PrintingMode;
 use App\Enums\PrintJobStatus;
-use App\Models\AjusteSistema;
 use App\Models\Cliente;
 use App\Models\PrintAgent;
 use App\Models\Recibo;
 use App\Models\User;
-use App\Services\Impresion\ModoImpresionSelector;
 use App\Services\Impresion\PrintAgentPairingService;
 use App\Services\Impresion\PrintJobService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -183,22 +180,6 @@ class PrintAgentTest extends TestCase
     }
 
     #[Test]
-    public function no_se_encola_si_el_modo_es_navegador(): void
-    {
-        [$agente] = $this->agenteEmparejado();
-
-        AjusteSistema::query()->updateOrCreate(
-            ['clave' => ModoImpresionSelector::CLAVE],
-            ['valor' => PrintingMode::Browser->value],
-        );
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('no está activada');
-
-        app(PrintJobService::class)->queueRecibo($agente->user, $this->recibo());
-    }
-
-    #[Test]
     public function no_se_encola_si_el_agente_esta_desconectado(): void
     {
         [$agente] = $this->agenteEmparejado();
@@ -214,8 +195,6 @@ class PrintAgentTest extends TestCase
     #[Test]
     public function un_usuario_sin_equipo_emparejado_no_encola(): void
     {
-        $this->modoAgenteLocal();
-
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('no tiene un equipo');
 
@@ -235,8 +214,6 @@ class PrintAgentTest extends TestCase
     /** @return array{0: PrintAgent, 1: string} */
     private function agenteEmparejado(?string $correo = null): array
     {
-        $this->modoAgenteLocal();
-
         $usuario = User::factory()->create(
             $correo ? ['email' => $correo] : []
         );
@@ -247,14 +224,6 @@ class PrintAgentTest extends TestCase
         $agente->forceFill(['last_seen_at' => now()])->save();
 
         return [$agente->fresh()->load('user'), $resultado['token']];
-    }
-
-    private function modoAgenteLocal(): void
-    {
-        AjusteSistema::query()->updateOrCreate(
-            ['clave' => ModoImpresionSelector::CLAVE],
-            ['valor' => PrintingMode::LocalAgent->value],
-        );
     }
 
     private function latido(string $token)

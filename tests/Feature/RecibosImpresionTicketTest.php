@@ -7,10 +7,12 @@ use App\Models\Contrato;
 use App\Models\FormaPago;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
+use App\Models\PrintJob;
 use App\Models\Propietario;
 use App\Models\Recibo;
 use App\Models\TipoCobro;
 use App\Models\User;
+use App\Services\Impresion\PrintAgentPairingService;
 use DOMDocument;
 use DOMXPath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,6 +25,80 @@ use Tests\TestCase;
 class RecibosImpresionTicketTest extends TestCase
 {
     use RefreshDatabase;
+
+    #[Test]
+    public function sin_equipo_emparejado_el_ticket_solo_ofrece_el_navegador(): void
+    {
+        $recibo = $this->recibo();
+
+        $this->actingAs($this->usuarioConPermisos());
+
+        $this->get(route('admin.recibos.imprimir', $recibo))
+            ->assertOk()
+            ->assertSee('Imprimir navegador')
+            ->assertDontSee('Imprimir por agente');
+    }
+
+    #[Test]
+    public function con_el_equipo_emparejado_aparece_el_boton_del_agente(): void
+    {
+        $recibo = $this->recibo();
+
+        $this->actingAs($this->usuarioConAgente());
+
+        $this->get(route('admin.recibos.imprimir', $recibo))
+            ->assertOk()
+            ->assertSee('Imprimir por agente')
+            ->assertSee(route('admin.recibos.imprimir-agente', $recibo));
+    }
+
+    #[Test]
+    public function el_boton_del_agente_encola_el_ticket_del_cajero(): void
+    {
+        $recibo = $this->recibo();
+        $usuario = $this->usuarioConAgente();
+
+        $this->actingAs($usuario);
+
+        $this->post(route('admin.recibos.imprimir-agente', $recibo))
+            ->assertOk()
+            ->assertJsonPath('message', 'Ticket enviado a tu impresora.');
+
+        $job = PrintJob::sole();
+
+        $this->assertSame($recibo->id, $job->document_id);
+        $this->assertSame($usuario->id, $job->requested_by_id);
+    }
+
+    #[Test]
+    public function quien_no_tiene_equipo_no_puede_encolar_aunque_llame_a_la_ruta(): void
+    {
+        $recibo = $this->recibo();
+
+        $this->actingAs($this->usuarioConPermisos());
+
+        $this->post(route('admin.recibos.imprimir-agente', $recibo))
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'No tienes un equipo de impresión emparejado.');
+
+        $this->assertSame(0, PrintJob::count());
+    }
+
+    #[Test]
+    public function el_lote_se_encola_completo_por_el_agente(): void
+    {
+        $recibos = collect([$this->recibo(), $this->recibo('R-002')]);
+
+        $this->actingAs($this->usuarioConAgente());
+
+        $this->post(route('admin.recibos.print-lote-agente', [
+            'token' => $this->tokenLote($recibos->pluck('id')->all()),
+        ]))
+            ->assertOk()
+            ->assertJsonPath('message', '2 tickets enviados a tu impresora.');
+
+        $this->assertSame(2, PrintJob::count());
+    }
 
     #[Test]
     public function el_ticket_es_identico_impreso_solo_que_en_lote(): void
@@ -144,6 +220,17 @@ class RecibosImpresionTicketTest extends TestCase
         ], now()->addMinutes(15));
 
         return $token;
+    }
+
+    /** Un cajero con su computadora emparejada y el agente encendido. */
+    private function usuarioConAgente(): User
+    {
+        $usuario = $this->usuarioConPermisos();
+
+        $agente = app(PrintAgentPairingService::class)->pair($usuario, $usuario)['agent'];
+        $agente->forceFill(['last_seen_at' => now()])->save();
+
+        return $usuario;
     }
 
     private function usuarioConPermisos(): User

@@ -19,22 +19,13 @@ class PrintJobService
 {
     private const MAX_ATTEMPTS = 5;
 
-    public function __construct(private readonly ModoImpresionSelector $modo) {}
-
     /**
      * @param  array<int, int>  $adjuntoIds  recibos de recargo que se imprimen
      *                                       dentro del mismo ticket
      */
     public function queueRecibo(User $user, Recibo $recibo, array $adjuntoIds = [], int $copies = 1): PrintJob
     {
-        if (! $this->modo->esAgenteLocal()) {
-            throw new RuntimeException('La impresión con agente local no está activada.');
-        }
-
-        $agent = PrintAgent::query()
-            ->where('user_id', $user->id)
-            ->where('is_active', true)
-            ->first();
+        $agent = PrintAgent::deUsuario($user);
 
         if (! $agent) {
             throw new RuntimeException('Este usuario no tiene un equipo de impresión emparejado.');

@@ -2,10 +2,8 @@
 
 namespace App\Livewire\Admin\Sistema;
 
-use App\Enums\PrintingMode;
 use App\Models\PrintAgent;
 use App\Models\User;
-use App\Services\Impresion\ModoImpresionSelector;
 use App\Services\Impresion\PrintAgentPairingService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -18,8 +16,6 @@ class Impresion extends Component
 {
     use AuthorizesRequests;
 
-    public string $modoImpresion = PrintingMode::Browser->value;
-
     public ?int $usuarioId = null;
 
     public string $nombreEquipo = '';
@@ -29,25 +25,9 @@ class Impresion extends Component
 
     public ?string $claveDeUsuario = null;
 
-    public function mount(ModoImpresionSelector $selector): void
+    public function mount(): void
     {
         $this->authorize('sistema.ver');
-
-        $this->modoImpresion = $selector->activo()->value;
-    }
-
-    public function guardarModo(ModoImpresionSelector $selector): void
-    {
-        $this->authorize('sistema.ver');
-
-        $selector->seleccionar($this->modoImpresion);
-
-        activity()
-            ->causedBy(auth()->user())
-            ->withProperties(['modo' => $this->modoImpresion])
-            ->log('Modo de impresión actualizado');
-
-        $this->dispatch('toast', type: 'success', message: 'Modo de impresión actualizado.');
     }
 
     public function generarClave(PrintAgentPairingService $pairing): void
@@ -110,7 +90,6 @@ class Impresion extends Component
         return view('livewire.admin.sistema.impresion', [
             'agentes' => PrintAgent::with('user')->orderBy('name')->get(),
             'usuarios' => User::orderBy('name')->get(['id', 'name']),
-            'modos' => PrintingMode::cases(),
         ])->layout('layouts.app');
     }
 }

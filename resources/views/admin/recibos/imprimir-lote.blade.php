@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Recibos agrupados</title>
 
     <style id="ticket-css">
@@ -45,13 +46,11 @@
 <body>
 
 @if(($modo ?? 'web') === 'web')
-    <div class="no-print">
-        <button onclick="window.print()" class="btn">Imprimir navegador</button>
-
-        <a href="{{ route('admin.recibos.pdf-lote', ['token' => $token]) }}" class="btn btn-secondary">
-            PDF
-        </a>
-    </div>
+    @include('admin.recibos.partials.botones-impresion', [
+        'pdfUrl' => route('admin.recibos.pdf-lote', ['token' => $token]),
+        'agenteUrl' => route('admin.recibos.print-lote-agente', ['token' => $token]),
+        'tieneAgente' => $tieneAgente ?? false,
+    ])
 @endif
 
 @foreach($tickets as $ticket)

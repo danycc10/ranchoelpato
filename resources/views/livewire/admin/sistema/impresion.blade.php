@@ -4,8 +4,8 @@
         <div>
             <h1 class="text-2xl font-black">Equipos con impresión directa</h1>
             <p class="text-gray-500">
-                Con el agente local el ticket sale solo en la impresora de quien lo captura,
-                sin abrir el diálogo del navegador.
+                Empareja aquí la computadora de cada usuario. Con su equipo emparejado,
+                en el ticket le aparece el botón para imprimir directo, sin el diálogo del navegador.
             </p>
         </div>
 
@@ -13,48 +13,6 @@
             Volver a Sistema
         </a>
     </div>
-
-    {{-- Modo de impresión --}}
-    <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div class="border-b border-gray-200 bg-gray-950 px-5 py-4 text-white sm:px-6">
-            <p class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">Impresión de tickets</p>
-            <h2 class="mt-1 text-xl font-black">Modo de impresión</h2>
-        </div>
-
-        <div class="p-5 sm:p-6">
-            <div class="grid gap-3 md:grid-cols-2">
-                @foreach($modos as $modo)
-                    <label class="cursor-pointer rounded-2xl border-2 p-4 transition
-                        {{ $modoImpresion === $modo->value ? 'border-gray-950 bg-gray-50' : 'border-gray-200 hover:border-gray-400' }}">
-                        <input type="radio" wire:model.live="modoImpresion" value="{{ $modo->value }}" class="sr-only">
-                        <p class="font-black text-gray-950">{{ $modo->label() }}</p>
-                        <p class="mt-1 text-sm text-gray-600">
-                            {{ $modo->value === 'browser'
-                                ? 'Se abre el ticket en una pestaña y tú mandas a imprimir.'
-                                : 'El agente instalado en la computadora jala el ticket y lo imprime solo.' }}
-                        </p>
-                    </label>
-                @endforeach
-            </div>
-
-            <div class="mt-4">
-                <button wire:click="guardarModo"
-                    wire:loading.attr="disabled"
-                    wire:target="guardarModo"
-                    class="rounded-xl bg-black px-5 py-2.5 font-bold text-white disabled:opacity-50">
-                    <span wire:loading.remove wire:target="guardarModo">Guardar modo</span>
-                    <span wire:loading wire:target="guardarModo">Guardando...</span>
-                </button>
-            </div>
-
-            @if($modoImpresion === 'local_agent')
-                <p class="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
-                    Si el agente está apagado o el usuario no tiene equipo emparejado, el ticket se
-                    abre en el navegador para que nadie se quede sin imprimir.
-                </p>
-            @endif
-        </div>
-    </section>
 
     {{-- Generar clave --}}
     <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">

@@ -46,6 +46,22 @@ class PrintAgent extends Model
     }
 
     /**
+     * El equipo emparejado de un usuario, si lo tiene. Es lo que decide si en
+     * el ticket se le ofrece el botón de imprimir directo.
+     */
+    public static function deUsuario(?User $user): ?self
+    {
+        if (! $user) {
+            return null;
+        }
+
+        return static::query()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->first();
+    }
+
+    /**
      * El agente late cada pocos segundos; sin latido reciente se da por caído.
      */
     public function isOnline(): bool
