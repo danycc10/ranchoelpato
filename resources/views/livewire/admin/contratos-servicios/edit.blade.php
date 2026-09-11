@@ -195,13 +195,16 @@
                     <option value="activo">Activo</option>
                     <option value="moroso">Moroso</option>
                     <option value="liquidado">Liquidado</option>
+                    @if (($contrato->estatus ?? null) === \App\Models\Contrato::ESTATUS_ESPECIAL)
+                        <option value="especial">Caso especial</option>
+                    @endif
                 </select>
                 @error('nuevo_estatus')
                     <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
                 @enderror
 
                 <div class="text-xs text-gray-500 mt-1">
-                    El estatus cancelado se aplica desde el bloque de cancelacion.
+                    Los estatus cancelado y caso especial se aplican desde sus propios bloques.
                 </div>
             </div>
 
@@ -386,6 +389,11 @@
                 @enderror
             </div>
 
+        </div>
+
+        {{-- Caso especial --}}
+        <div class="pt-2">
+            @include('partials.contratos.caso-especial', ['contrato' => $contrato])
         </div>
 
         <div class="pt-2 flex flex-col md:flex-row gap-3 justify-between">

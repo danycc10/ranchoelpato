@@ -51,6 +51,7 @@
                     <option value="cancelado">Cancelado</option>
                     <option value="liquidado">Liquidado</option>
                     <option value="moroso">Moroso</option>
+                    <option value="especial">Caso especial</option>
                 </select>
             </div>
 
@@ -169,6 +170,7 @@
                             'cancelado' => 'bg-red-100 text-red-800',
                             'liquidado' => 'bg-blue-100 text-blue-800',
                             'moroso' => 'bg-yellow-100 text-yellow-800',
+                            'especial' => 'bg-indigo-100 text-indigo-800',
                             default => 'bg-gray-100 text-gray-700',
                         };
                     @endphp
@@ -182,7 +184,7 @@
                         <td class="p-3">{{ $c->frecuencia === 'semanal' ? 'Semanal' : 'Mensual' }}</td>
                         <td class="p-3">
                             <span class="px-2 py-1 rounded-full text-xs font-bold {{ $estatusClase }}">
-                                {{ ucfirst($c->estatus) }}
+                                {{ $c->estatus === 'especial' ? 'Caso especial' : ucfirst($c->estatus) }}
                             </span>
                         </td>
                         <td class="p-3 font-bold">${{ number_format((float) $c->saldo_actual, 2) }}</td>
@@ -240,7 +242,7 @@
                         <div class="font-black">{{ $saldo }}</div>
 
                         <div class="mt-2 text-xs text-gray-500">Estatus</div>
-                        <div class="font-semibold">{{ ucfirst($c->estatus) }}</div>
+                        <div class="font-semibold">{{ $c->estatus === 'especial' ? 'Caso especial' : ucfirst($c->estatus) }}</div>
                     </div>
                 </div>
 

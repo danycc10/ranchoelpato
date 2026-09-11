@@ -48,6 +48,7 @@
                     <option value="liquidado">Liquidado</option>
                     <option value="moroso">Moroso</option>
                         <option value="donacion">Donacion</option>
+                    <option value="especial">Caso especial</option>
                 </select>
             </div>
 
@@ -180,6 +181,7 @@ TABLA (md+)
                         'liquidado' => 'bg-blue-100 text-blue-800',
                         'moroso' => 'bg-yellow-100 text-yellow-800',
                         'donacion' => 'bg-purple-100 text-purple-800',
+                        'especial' => 'bg-indigo-100 text-indigo-800',
                         default => 'bg-gray-100 text-gray-700',
                     };
                 @endphp
@@ -210,7 +212,7 @@ TABLA (md+)
 
                         <span class="px-2 py-1 rounded-full text-xs font-bold {{ $estatusClase }}">
 
-                            {{ ucfirst($it->estatus) }}
+                            {{ $it->estatus === 'especial' ? 'Caso especial' : ucfirst($it->estatus) }}
 
                         </span>
 
@@ -271,13 +273,14 @@ TABLA (md+)
         $frecuencia = $it->frecuencia === 'semanal' ? 'Semanal' : 'Mensual';
         $inicio = optional($it->fecha_inicio)->format('d/m/Y') ?? '—';
         $saldo = '$'.number_format((float)$it->saldo_actual, 2);
-        $estatus = ucfirst($it->estatus);
+        $estatus = $it->estatus === 'especial' ? 'Caso especial' : ucfirst($it->estatus);
         $estatusClase = match($it->estatus) {
             'activo' => 'bg-green-100 text-green-800',
             'cancelado' => 'bg-red-100 text-red-800',
             'liquidado' => 'bg-blue-100 text-blue-800',
             'moroso' => 'bg-yellow-100 text-yellow-800',
             'donacion' => 'bg-purple-100 text-purple-800',
+            'especial' => 'bg-indigo-100 text-indigo-800',
             default => 'bg-gray-100 text-gray-700',
         };
         @endphp

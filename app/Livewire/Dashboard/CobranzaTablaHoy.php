@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Dashboard;
 
+use App\Models\Contrato;
 use App\Models\Cuota;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Reactive;
@@ -29,6 +30,11 @@ class CobranzaTablaHoy extends Component
 
     protected function aplicarFiltrosBase(Builder $q): Builder
     {
+        $q->whereDoesntHave('contrato', function ($c) {
+            $c->withTrashed()
+                ->whereIn('estatus', Contrato::ESTATUS_FUERA_DE_COBRANZA);
+        });
+
         if ($this->propietarioId) {
             $q->whereHas('contrato.lote.fraccionamiento', function ($qq) {
                 $qq->where('propietario_id', $this->propietarioId);

@@ -8,6 +8,7 @@ use App\Models\ContratoHistorial;
 use App\Models\Cuota;
 use App\Models\Fraccionamiento;
 use App\Models\Pago;
+use App\Services\Contratos\CasoEspecialService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -57,6 +58,12 @@ class Edit extends Component
     public bool $confirmar_cancelacion = false;
 
     public bool $confirmar_descancelacion = false;
+
+    public bool $confirmar_caso_especial = false;
+
+    public ?string $nota_caso_especial = null;
+
+    public bool $confirmar_resolver_especial = false;
 
     public function mount(string $uuid): void
     {
@@ -153,7 +160,9 @@ class Edit extends Component
         $rules = [
             'cliente_id' => ['required', 'integer', 'exists:clientes,id'],
             'fraccionamiento_id' => ['required', 'integer', 'exists:fraccionamientos,id'],
-            'nuevo_estatus' => ['required', 'in:activo,moroso,liquidado,donacion'],
+            'nuevo_estatus' => $this->contrato->esCasoEspecial()
+                ? ['required', 'in:'.Contrato::ESTATUS_ESPECIAL]
+                : ['required', 'in:activo,moroso,liquidado,donacion'],
             'nueva_fecha_inicio' => ['nullable', 'date'],
             'nueva_frecuencia' => ['required', 'in:semanal,mensual'],
             'nueva_fecha_primera_cuota' => ['nullable', 'date'],
@@ -921,6 +930,72 @@ class Edit extends Component
         }
 
         return $candidate;
+    }
+
+    public function marcarCasoEspecial(CasoEspecialService $casosEspeciales): void
+    {
+        $this->resetErrorBag('confirmar_caso_especial');
+
+        if (! $this->confirmar_caso_especial) {
+            $this->addError('confirmar_caso_especial', 'Debes confirmar que el contrato pasa a caso especial.');
+
+            return;
+        }
+
+        try {
+            $this->contrato = $casosEspeciales->marcar(
+                $this->contrato->refresh(),
+                $this->nota_caso_especial,
+                auth()->id(),
+            );
+        } catch (\RuntimeException $e) {
+            $this->dispatch('toast', type: 'warning', message: $e->getMessage());
+
+            return;
+        }
+
+        $this->nuevo_estatus = (string) $this->contrato->estatus;
+        $this->confirmar_caso_especial = false;
+        $this->nota_caso_especial = null;
+
+        $this->dispatch(
+            'toast',
+            type: 'success',
+            message: 'Contrato marcado como caso especial. Sus cuotas ya no cuentan para cobranza ni reportes.'
+        );
+    }
+
+    public function resolverCasoEspecial(CasoEspecialService $casosEspeciales): void
+    {
+        $this->resetErrorBag('confirmar_resolver_especial');
+
+        if (! $this->confirmar_resolver_especial) {
+            $this->addError('confirmar_resolver_especial', 'Debes confirmar que la situacion quedo resuelta.');
+
+            return;
+        }
+
+        try {
+            $this->contrato = $casosEspeciales->resolver(
+                $this->contrato->refresh(),
+                $this->nota_caso_especial,
+                auth()->id(),
+            );
+        } catch (\RuntimeException $e) {
+            $this->dispatch('toast', type: 'warning', message: $e->getMessage());
+
+            return;
+        }
+
+        $this->nuevo_estatus = (string) $this->contrato->estatus;
+        $this->confirmar_resolver_especial = false;
+        $this->nota_caso_especial = null;
+
+        $this->dispatch(
+            'toast',
+            type: 'success',
+            message: "Caso especial resuelto. El contrato regreso a '{$this->contrato->estatus}'."
+        );
     }
 
     public function getFraccionamientosProperty()

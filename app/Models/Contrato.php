@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -15,6 +16,18 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class Contrato extends Model
 {
     use LogsActivity,SoftDeletes;
+
+    /**
+     * Caso especial: el contrato existe y se le puede cobrar, pero su situación
+     * está sin resolver, así que sus cuotas no entran a cobranza ni a reportes.
+     */
+    public const ESTATUS_ESPECIAL = 'especial';
+
+    /**
+     * Estatus cuyas cuotas quedan fuera de cobranza (atrasos, vencimientos del
+     * día, notificaciones automáticas y KPIs del dashboard).
+     */
+    public const ESTATUS_FUERA_DE_COBRANZA = [self::ESTATUS_ESPECIAL];
 
     protected $table = 'contratos';
 
@@ -36,7 +49,7 @@ class Contrato extends Model
         'valor_recargo',
         'dias_gracia',
         'frecuencia_recargo_dias',
-        'estatus',        // activo|moroso|liquidado|cancelado
+        'estatus',        // activo|moroso|liquidado|cancelado|donacion|especial
         'liquidado_at',
         'archivo_contrato',
         'tipo',
@@ -115,6 +128,19 @@ class Contrato extends Model
         'medida_este_snapshot' => 'decimal:2',
         'medida_oeste_snapshot' => 'decimal:2',
     ];
+
+    public function esCasoEspecial(): bool
+    {
+        return (string) $this->estatus === self::ESTATUS_ESPECIAL;
+    }
+
+    /**
+     * Deja fuera los contratos cuyas cuotas no deben contar para cobranza.
+     */
+    public function scopeCobrable(Builder $query): Builder
+    {
+        return $query->whereNotIn('estatus', self::ESTATUS_FUERA_DE_COBRANZA);
+    }
 
     public static function frecuenciaRecargoDiasPorGracia(int $diasGracia): int
     {

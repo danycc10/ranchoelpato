@@ -3,6 +3,7 @@
 namespace App\Livewire\Dashboard;
 
 use App\Exports\CobranzaPendientesExport;
+use App\Models\Contrato;
 use App\Models\Cuota;
 use App\Models\Notificacion;
 use App\Models\Propietario;
@@ -62,6 +63,11 @@ class CobranzaDashboard extends Component
 
     protected function aplicarFiltrosBase(Builder $q): Builder
     {
+        $q->whereDoesntHave('contrato', function ($c) {
+            $c->withTrashed()
+                ->whereIn('estatus', Contrato::ESTATUS_FUERA_DE_COBRANZA);
+        });
+
         if ($this->propietarioId) {
             $q->whereHas('contrato.lote.fraccionamiento', function ($qq) {
                 $qq->where('propietario_id', $this->propietarioId);

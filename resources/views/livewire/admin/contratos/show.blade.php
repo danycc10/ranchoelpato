@@ -1,5 +1,6 @@
 @php
     $contratoCancelado = strtolower((string) ($contrato->estatus ?? '')) === 'cancelado';
+    $contratoEspecial = strtolower((string) ($contrato->estatus ?? '')) === \App\Models\Contrato::ESTATUS_ESPECIAL;
     $contratoHistorico = (bool) ($contrato->solo_documentos ?? false);
     $documentosContrato = $documentosContrato ?? [];
     $documentosCollection = collect($documentosContrato);
@@ -28,6 +29,10 @@
                 @if($contratoCancelado)
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-red-100 text-red-800 border border-red-200">
                         Cancelado
+                    </span>
+                @elseif($contratoEspecial)
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                        Caso especial
                     </span>
                 @else
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -154,6 +159,16 @@
         </div>
     @endif
 
+    @if($contratoEspecial)
+        <div class="mb-4 p-4 rounded-2xl bg-indigo-50 text-indigo-900 border border-indigo-200">
+            <div class="font-black">Contrato en caso especial</div>
+            <div class="text-sm mt-1">
+                Sus cuotas no cuentan para cobranza, atrasos, notificaciones ni reportes mientras
+                se resuelve su situación. Se le puede seguir cobrando con normalidad.
+            </div>
+        </div>
+    @endif
+
     @if (session()->has('ok'))
         <div class="mb-4 p-3 rounded-xl bg-green-50 text-green-800 border border-green-200">
             {{ session('ok') }}
@@ -186,6 +201,10 @@
                 @if($contratoCancelado)
                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
                         Cancelado
+                    </span>
+                @elseif($contratoEspecial)
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                        Caso especial
                     </span>
                 @else
                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -430,6 +449,15 @@
                                             <br>
                                             <b>Cuotas eliminadas:</b> {{ $despues['cuotas_eliminadas'] }}
                                         @endif
+                                        @if($h->nota)
+                                            <br><span class="text-gray-500">{{ $h->nota }}</span>
+                                        @endif
+                                    </div>
+                                @elseif(in_array($tipo, ['marcar_caso_especial', 'resolver_caso_especial'], true))
+                                    <div class="text-xs">
+                                        <b>Contrato:</b>
+                                        {{ $antes['estatus_contrato'] ?? '-' }}
+                                        -> {{ $despues['estatus_contrato'] ?? '-' }}
                                         @if($h->nota)
                                             <br><span class="text-gray-500">{{ $h->nota }}</span>
                                         @endif
