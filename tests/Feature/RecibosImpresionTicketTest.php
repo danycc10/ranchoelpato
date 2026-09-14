@@ -50,6 +50,33 @@ class RecibosImpresionTicketTest extends TestCase
     }
 
     #[Test]
+    public function la_hoja_del_agente_termina_donde_termina_el_ticket(): void
+    {
+        $servicio = app(ReciboTicketPdfService::class);
+
+        $corto = $servicio->generar($this->recibo('R-CORTO'));
+
+        $largo = $servicio->generar($this->recibo(
+            'R-LARGO',
+            str_repeat('Observacion larga que empuja el ticket hacia abajo. ', 12)
+        ));
+
+        // Un solo ticket es una sola hoja: partirlo seria peor que la cola.
+        $this->assertSame(1, $this->paginasDe($corto));
+        $this->assertSame(1, $this->paginasDe($largo));
+
+        $altoCorto = $this->altoDeLaHoja($corto);
+        $altoLargo = $this->altoDeLaHoja($largo);
+
+        // La hoja se ajusta al contenido, como el `size: 80mm auto` del
+        // navegador, en vez de medir siempre lo mismo.
+        $this->assertGreaterThan($altoCorto, $altoLargo);
+
+        // Y no se queda con la cola en blanco de la hoja fija de 700 pt.
+        $this->assertLessThan(700, $altoCorto);
+    }
+
+    #[Test]
     public function sin_equipo_emparejado_el_ticket_solo_ofrece_el_navegador(): void
     {
         $recibo = $this->recibo();
@@ -245,6 +272,23 @@ class RecibosImpresionTicketTest extends TestCase
         return $token;
     }
 
+    private function paginasDe(string $pdf): int
+    {
+        return preg_match_all('#/Type\s*/Page[^s]#', $pdf);
+    }
+
+    /** Alto de la hoja en puntos, leido del MediaBox del PDF. */
+    private function altoDeLaHoja(string $pdf): float
+    {
+        $this->assertSame(
+            1,
+            preg_match('#/MediaBox\s*\[\s*[\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)#', $pdf, $caja),
+            'El PDF del ticket no trae MediaBox.'
+        );
+
+        return (float) $caja[2];
+    }
+
     /** Un cajero con su computadora emparejada y el agente encendido. */
     private function usuarioConAgente(): User
     {
@@ -271,7 +315,7 @@ class RecibosImpresionTicketTest extends TestCase
         return $usuario;
     }
 
-    private function recibo(string $folio = 'R-001'): Recibo
+    private function recibo(string $folio = 'R-001', ?string $observaciones = null): Recibo
     {
         $propietario = Propietario::firstOrCreate(
             ['nombre' => 'El Pato'],
@@ -331,7 +375,7 @@ class RecibosImpresionTicketTest extends TestCase
             'monto' => 3000,
             'saldo_anterior' => 90000,
             'saldo_posterior' => 87000,
-            'observaciones' => 'Pago recibido en efectivo en oficina.',
+            'observaciones' => $observaciones ?? 'Pago recibido en efectivo en oficina.',
         ]);
     }
 }
