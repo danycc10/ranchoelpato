@@ -13,6 +13,7 @@ use App\Models\Recibo;
 use App\Models\TipoCobro;
 use App\Models\User;
 use App\Services\Impresion\PrintAgentPairingService;
+use App\Services\Impresion\ReciboTicketPdfService;
 use DOMDocument;
 use DOMXPath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,6 +26,28 @@ use Tests\TestCase;
 class RecibosImpresionTicketTest extends TestCase
 {
     use RefreshDatabase;
+
+    #[Test]
+    public function el_pdf_del_agente_usa_la_misma_tipografia_que_el_navegador(): void
+    {
+        $pdf = app(ReciboTicketPdfService::class)->generar($this->recibo());
+
+        preg_match_all('#/BaseFont\s*/([A-Za-z0-9+,\-]+)#', $pdf, $coincidencias);
+
+        $fuentes = array_values(array_unique($coincidencias[1]));
+
+        // El ticket pide Arial. Dompdf solo resuelve los pesos 400 y 700 de esa
+        // familia: con 600 u 800 cae a Times y el ticket sale con otra letra.
+        $this->assertNotEmpty($fuentes);
+
+        foreach ($fuentes as $fuente) {
+            $this->assertStringStartsWith(
+                'Helvetica',
+                $fuente,
+                "El ticket del agente salió con la fuente {$fuente} en vez de Helvetica/Arial."
+            );
+        }
+    }
 
     #[Test]
     public function sin_equipo_emparejado_el_ticket_solo_ofrece_el_navegador(): void

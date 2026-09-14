@@ -40,13 +40,15 @@ body{
 
 .center{ text-align:center; }
 .right{ text-align:right; }
-.bold{ font-weight: 800; }
+/* Solo 400 y 700 existen en Arial/Helvetica: con 600 u 800 el PDF del
+   agente cae a una serif y el ticket sale con otra tipografia. */
+.bold{ font-weight: 700; }
 .small{ font-size: var(--small); }
 
 .muted{
     font-size: var(--small);
     color:#000;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .hr{
