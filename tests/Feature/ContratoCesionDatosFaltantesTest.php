@@ -9,6 +9,7 @@ use App\Models\Fraccionamiento;
 use App\Models\Lote;
 use App\Models\Propietario;
 use App\Models\User;
+use App\Services\Contratos\ContratoWordService;
 use App\Services\Contratos\DatosContratoCesionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -66,6 +67,42 @@ class ContratoCesionDatosFaltantesTest extends TestCase
         $claves = collect(DatosContratoCesionService::faltantes($contrato->fresh()))->pluck('clave');
 
         $this->assertNotContains('contrato.area_m2_snapshot', $claves);
+    }
+
+    #[Test]
+    public function la_superficie_sale_del_lote_cuando_el_contrato_no_la_congelo(): void
+    {
+        Storage::fake('private');
+
+        $this->artisan('contratos:plantilla-cesion')->assertSuccessful();
+
+        $contrato = $this->contratoSinDatos();
+        $contrato->lote->update(['area_m2' => 250]);
+
+        $texto = $this->textoDocx(Storage::disk('private')->path(
+            (new ContratoWordService)->generarDocx($contrato->fresh(), 'contrato_cesion_derechos')
+        ));
+
+        $this->assertStringContainsString('250.00 m²', $texto);
+    }
+
+    #[Test]
+    public function sin_superficie_capturada_el_documento_deja_la_raya(): void
+    {
+        Storage::fake('private');
+
+        $this->artisan('contratos:plantilla-cesion')->assertSuccessful();
+
+        // Ni el contrato ni el lote la traen: un 0.00 seria un dato falso en
+        // un documento legal, asi que se deja la raya para llenarla a mano.
+        $contrato = $this->contratoSinDatos();
+
+        $texto = $this->textoDocx(Storage::disk('private')->path(
+            (new ContratoWordService)->generarDocx($contrato->fresh(), 'contrato_cesion_derechos')
+        ));
+
+        $this->assertStringNotContainsString('0.00 m²', $texto);
+        $this->assertStringContainsString('____________________', $texto);
     }
 
     #[Test]

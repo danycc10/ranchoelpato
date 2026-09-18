@@ -306,7 +306,12 @@ class ContratoWordService
         $template->setValue('manzana', $this->safe($contrato->lote?->manzana));
         $template->setValue('clave_lote', $this->safe($contrato->lote?->clave));
 
-        $template->setValue('area_m2', number_format((float) $contrato->area_m2_snapshot, 2));
+        $area = $this->areaDelLote($contrato);
+
+        // Sin superficie capturada se deja la raya para llenarla a mano: un
+        // 0.00 en un documento legal seria un dato falso.
+        $template->setValue('area_m2', $area > 0 ? number_format($area, 2) : '');
+        $template->setValue('superficie', $this->linea($area > 0 ? number_format($area, 2).' m²' : null, 20));
 
         $template->setValue('medida_norte', $this->formatMedida($contrato->medida_norte_snapshot));
         $template->setValue('medida_sur', $this->formatMedida($contrato->medida_sur_snapshot));
@@ -451,9 +456,6 @@ class ContratoWordService
         $template->setValue('ejido', $this->linea($fraccionamiento?->ejido, 30));
         $template->setValue('municipio', $this->linea($fraccionamiento?->municipio, 25));
 
-        $area = (float) ($contrato->area_m2_snapshot ?: $contrato->lote?->area_m2);
-        $template->setValue('superficie', $this->linea($area > 0 ? number_format($area, 2).' m²' : null, 20));
-
         $precioTotal = (float) $contrato->precio_total;
 
         $template->setValue('precio_total_numero', $this->formatMoney($precioTotal));
@@ -574,9 +576,6 @@ class ContratoWordService
         $template->setValue('municipio', $this->linea($fraccionamiento?->municipio, 25));
 
         $template->setValue('lote_identificacion', $this->linea($this->descripcionLoteCesion($contrato)));
-
-        $area = (float) ($contrato->area_m2_snapshot ?: $contrato->lote?->area_m2);
-        $template->setValue('superficie', $this->linea($area > 0 ? number_format($area, 2).' m²' : null, 20));
 
         foreach (['norte', 'sur', 'este', 'oeste'] as $lado) {
             $template->setValue('lote_'.$lado, $this->linea($this->ladoLote($contrato, $lado), 40));
@@ -869,6 +868,15 @@ class ContratoWordService
     /**
      * Valor listo para imprimir: el dato o una línea para llenarse a mano.
      */
+    /**
+     * Superficie del lote: la que quedó congelada al firmarse y, para los
+     * contratos viejos que no la traen, la que tenga el lote.
+     */
+    protected function areaDelLote(Contrato $contrato): float
+    {
+        return (float) ($contrato->area_m2_snapshot ?: $contrato->lote?->area_m2);
+    }
+
     protected function linea($valor, int $largo = 30): string
     {
         $valor = $this->safe($valor);
