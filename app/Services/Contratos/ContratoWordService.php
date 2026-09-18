@@ -5,6 +5,7 @@ namespace App\Services\Contratos;
 use App\Models\Contrato;
 use App\Models\CuentaBancaria;
 use App\Models\Propietario;
+use App\Models\Recibo;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -27,7 +28,7 @@ class ContratoWordService
             'tipos' => ['terreno'],
         ],
         'contrato_contado' => [
-            'label' => 'Contrato pagado de contado',
+            'label' => 'Contrato de infraestructura eléctrica pagado de contado',
             'template' => 'plantillas/CONTRATO_CONTADO.docx',
             'docx_field' => 'archivo_contrato_contado_docx',
             'scan_field' => 'archivo_contrato_contado',
@@ -36,6 +37,9 @@ class ContratoWordService
             'uses_fraccionamiento_template' => false,
             // Reemplaza al contrato a plazos: uno u otro, nunca los dos.
             'solo_contado' => true,
+            // La plantilla es la de aportación eléctrica: no sirve para un lote.
+            'tipos' => ['servicio'],
+            'servicio_tipos' => ['electricidad'],
         ],
         'constancia_terminacion_pago' => [
             'label' => 'Constancia de terminación de pago',
@@ -225,6 +229,10 @@ class ContratoWordService
 
         if ($tipo === 'contrato_financiamiento_electrico') {
             $this->setFinanciamientoElectricoValues($template, $contrato);
+        }
+
+        if ($tipo === 'contrato_contado') {
+            $this->setContadoValues($template, $contrato);
         }
 
         if ($tipo === 'contrato_cesion_derechos') {
@@ -448,7 +456,11 @@ class ContratoWordService
      * Lo que no existe en el sistema (forma de pago, identificación oficial, etc.)
      * se deja como línea en blanco para llenarse a mano.
      */
-    protected function setFinanciamientoElectricoValues(TemplateProcessor $template, Contrato $contrato): void
+    /**
+     * Quiénes firman y sobre qué lotes. Lo comparten el contrato de
+     * financiamiento eléctrico y el de contado, que salieron del mismo formato.
+     */
+    protected function setDatosDeLasPartes(TemplateProcessor $template, Contrato $contrato): void
     {
         $contrato->loadMissing([
             'cliente',
@@ -479,6 +491,52 @@ class ContratoWordService
             $contrato->comprador_ine_frente ? 'Credencial para votar (INE)' : null,
             35
         ));
+    }
+
+    /**
+     * Contrato pagado de contado.
+     *
+     * Usa el mismo vocabulario que el de financiamiento porque salió de ese
+     * formato, pero las cláusulas de crédito se llenan como lo que realmente
+     * pasó: un solo pago por el total, sin enganche ni plazos.
+     */
+    protected function setContadoValues(TemplateProcessor $template, Contrato $contrato): void
+    {
+        $this->setDatosDeLasPartes($template, $contrato);
+
+        $precioTotal = (float) $contrato->precio_total;
+
+        $template->setValue('precio_total_numero', $this->formatMoney($precioTotal));
+        $template->setValue('precio_total_letra', $this->montoEnLetra($precioTotal));
+
+        // No hay crédito: nada de enganche y el total se cubre de una vez.
+        $template->setValue('enganche_numero', $this->formatMoney(0));
+        $template->setValue('saldo_financiado_numero', $this->formatMoney($precioTotal));
+        $template->setValue('numero_pagos', '1');
+        $template->setValue('monto_pago_numero', $this->formatMoney($precioTotal));
+
+        $template->setValue('forma_pago', $this->linea($this->formaPagoDeContado($contrato), 40));
+
+        $template->setValue('ciudad_firma', 'Piedras Negras');
+        $template->setValue('fecha_firma_larga', $this->fechaLarga($contrato->liquidado_at ?: now()));
+    }
+
+    /**
+     * Cómo se pagó, tomado del recibo de contado que emitió el contrato.
+     */
+    protected function formaPagoDeContado(Contrato $contrato): ?string
+    {
+        return Recibo::query()
+            ->where('contrato_id', $contrato->id)
+            ->whereHas('tipoCobro', fn ($q) => $q->where('nombre', VentaContadoService::TIPO_COBRO))
+            ->with('formaPago')
+            ->latest('id')
+            ->first()?->formaPago?->nombre;
+    }
+
+    protected function setFinanciamientoElectricoValues(TemplateProcessor $template, Contrato $contrato): void
+    {
+        $this->setDatosDeLasPartes($template, $contrato);
 
         $precioTotal = (float) $contrato->precio_total;
 

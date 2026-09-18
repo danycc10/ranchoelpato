@@ -108,19 +108,37 @@ class ContratoContadoTest extends TestCase
     }
 
     #[Test]
-    public function el_contado_cambia_el_formato_de_contrato_que_se_genera(): void
+    public function el_contado_deja_fuera_los_formatos_de_credito(): void
     {
         $contado = $this->contratoDeContado(150000);
 
         $formatos = array_keys(ContratoWordService::documentTypesFor($contado));
 
-        // Lleva su propio formato en vez del contrato a plazos.
-        $this->assertContains('contrato_contado', $formatos);
+        // Pagado al firmar: no hay contrato a plazos ni adeudo que convenir.
         $this->assertNotContains('contrato', $formatos);
-
-        // Y no le aplican los formatos que solo tienen sentido con un adeudo.
         $this->assertNotContains('convenio_pago', $formatos);
         $this->assertNotContains('convenio_pago_reconocimiento_adeudo', $formatos);
+    }
+
+    #[Test]
+    public function el_formato_de_contado_es_el_de_luz_y_no_aplica_a_un_lote(): void
+    {
+        // La plantilla instalada es la de aportación eléctrica: en un contrato
+        // de terreno saldría un documento que no corresponde.
+        $terreno = $this->contratoDeContado(150000);
+
+        $this->assertNotContains(
+            'contrato_contado',
+            array_keys(ContratoWordService::documentTypesFor($terreno))
+        );
+
+        $luz = $this->contratoDeContado(15000, 'CT-LUZ', 'L-LUZ');
+        $luz->update(['tipo' => 'servicio', 'servicio_tipo' => 'electricidad']);
+
+        $this->assertContains(
+            'contrato_contado',
+            array_keys(ContratoWordService::documentTypesFor($luz->fresh()))
+        );
     }
 
     #[Test]
@@ -134,6 +152,28 @@ class ContratoContadoTest extends TestCase
         $this->assertContains('contrato', $formatos);
         $this->assertContains('convenio_pago', $formatos);
         $this->assertNotContains('contrato_contado', $formatos);
+    }
+
+    #[Test]
+    public function el_documento_dice_como_se_pago(): void
+    {
+        $luz = $this->contratoDeContado(15000, 'CT-LUZ', 'L-LUZ');
+        $luz->update(['tipo' => 'servicio', 'servicio_tipo' => 'electricidad']);
+
+        $transferencia = FormaPago::create(['nombre' => 'TRANSFERENCIA']);
+
+        app(VentaContadoService::class)->generarRecibo($luz->fresh(), [
+            'forma_pago_id' => $transferencia->id,
+        ]);
+
+        $reflexion = new \ReflectionMethod(ContratoWordService::class, 'formaPagoDeContado');
+        $reflexion->setAccessible(true);
+
+        // El contrato declara la forma de pago que quedó en su recibo.
+        $this->assertSame(
+            'TRANSFERENCIA',
+            $reflexion->invoke(new ContratoWordService, $luz->fresh())
+        );
     }
 
     #[Test]
