@@ -3,10 +3,13 @@
 namespace App\Livewire\Admin\ContratosServicios;
 
 use App\Models\Contrato;
+use App\Models\CuentaBancaria;
 use App\Models\Cuota;
+use App\Models\FormaPago;
 use App\Models\Promocion;
 use App\Services\Contratos\ContratoPlanService;
 use App\Services\Contratos\ContratoWordService;
+use App\Services\Contratos\VentaContadoService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -41,6 +44,17 @@ class Create extends Component
     public ?int $dia_semana = null;
 
     public ?int $dia_mes = null;
+
+    /** Venta de contado: el servicio se paga completo al firmar, sin cuotas. */
+    public bool $es_contado = false;
+
+    public ?int $contado_forma_pago_id = null;
+
+    public ?int $contado_cuentas_bancarias_id = null;
+
+    public ?string $contado_fecha = null;
+
+    public ?string $contado_observaciones = null;
 
     public float $precio_total = 0.0;
 
@@ -157,6 +171,7 @@ class Create extends Component
             'contrato_base_id',
             'servicio_tipo',
             'promocion_id',
+            'es_contado',
             'precio_total',
             'enganche',
             'monto_pago',
@@ -197,6 +212,20 @@ class Create extends Component
     protected function recalcular(): void
     {
         $this->precio_total = max(0, (float) $this->precio_total);
+
+        if ($this->es_contado) {
+            // Se paga completo al firmar: no hay saldo ni calendario.
+            $this->enganche = 0;
+            $this->saldo_inicial = 0;
+            $this->saldo_actual = 0;
+            $this->monto_pago = 0;
+            $this->valor_recargo = 0;
+            $this->dias_gracia = 0;
+            $this->planPreview = [];
+
+            return;
+        }
+
         $this->enganche = max(0, (float) $this->enganche);
         $this->monto_pago = max(0, (float) $this->monto_pago);
 
@@ -228,6 +257,10 @@ class Create extends Component
     protected function refreshPreview(): void
     {
         $this->planPreview = [];
+
+        if ($this->es_contado) {
+            return;
+        }
 
         if (! $this->fecha_inicio || $this->saldo_inicial <= 0 || $this->monto_pago <= 0 || ! $this->contrato_base_id) {
             return;
@@ -278,6 +311,29 @@ class Create extends Component
         }
 
         if ($this->step === 2) {
+
+            if ($this->es_contado) {
+
+                // Solo importa el precio y como entro el dinero.
+                $this->validate([
+                    'precio_total' => ['required', 'numeric', 'min:0.01'],
+                    'contado_forma_pago_id' => ['required', 'integer', 'exists:formas_pago,id'],
+                    'contado_fecha' => ['required', 'date'],
+                    'contado_cuentas_bancarias_id' => [
+                        $this->contadoRequiereCuenta ? 'required' : 'nullable',
+                        'integer',
+                        'exists:cuentas_bancarias,id',
+                    ],
+                    'contado_observaciones' => ['nullable', 'string', 'max:255'],
+                ], [], [
+                    'contado_forma_pago_id' => 'forma de pago',
+                    'contado_fecha' => 'fecha del pago',
+                    'contado_cuentas_bancarias_id' => 'cuenta bancaria',
+                ]);
+
+                return;
+            }
+
             $this->validate([
                 'precio_total' => ['required', 'numeric', 'min:0.01'],
                 'enganche' => ['required', 'numeric', 'min:0'],
@@ -300,22 +356,52 @@ class Create extends Component
         return ($base->folio_contrato ?? 'CT')."-{$sigla}-".now()->format('YmdHis');
     }
 
-    public function guardar(ContratoWordService $contratoWordService)
+    public function getFormasPagoContadoProperty()
     {
+        return FormaPago::query()->orderBy('nombre')->get(['id', 'nombre']);
+    }
+
+    public function getCuentasBancariasContadoProperty()
+    {
+        return CuentaBancaria::query()
+            ->where('activa', true)
+            ->orderBy('alias')
+            ->get(['id', 'alias', 'banco']);
+    }
+
+    /** Las formas de pago que exigen decir a qué cuenta entró el dinero. */
+    public function getContadoRequiereCuentaProperty(): bool
+    {
+        if (! $this->contado_forma_pago_id) {
+            return false;
+        }
+
+        $nombre = mb_strtoupper((string) FormaPago::find($this->contado_forma_pago_id)?->nombre);
+
+        return $nombre !== '' && ! str_contains($nombre, 'EFECTIVO');
+    }
+
+    public function guardar(
+        ContratoWordService $contratoWordService,
+        VentaContadoService $ventaContado,
+    ) {
         $this->step = 1;
         $this->validateStep();
         $this->step = 2;
         $this->validateStep();
 
         $data = $this->payloadContrato();
-        ContratoPlanService::aplicarPromocionEconomica($data, $this->promocion);
+
+        if (! $this->es_contado) {
+            ContratoPlanService::aplicarPromocionEconomica($data, $this->promocion);
+        }
 
         $contrato = null;
 
-        DB::transaction(function () use ($data, &$contrato) {
+        DB::transaction(function () use ($data, &$contrato, $ventaContado) {
             $base = Contrato::query()->lockForUpdate()->findOrFail($this->contrato_base_id);
 
-            $contrato = Contrato::query()->create([
+            $contrato = Contrato::query()->create(array_merge([
                 'cliente_id' => $base->cliente_id,
                 'lote_id' => $base->lote_id,
                 'promocion_id' => $this->promocion_id,
@@ -359,7 +445,25 @@ class Create extends Component
                 'colindancia_sur_snapshot' => $base->colindancia_sur_snapshot,
                 'colindancia_este_snapshot' => $base->colindancia_este_snapshot,
                 'colindancia_oeste_snapshot' => $base->colindancia_oeste_snapshot,
-            ]);
+            ], $this->es_contado
+                ? $ventaContado->camposDelContrato(
+                    (float) $data['precio_total'],
+                    Carbon::parse($this->contado_fecha),
+                )
+                : []
+            ));
+
+            if ($this->es_contado) {
+                $ventaContado->generarRecibo($contrato, [
+                    'forma_pago_id' => (int) $this->contado_forma_pago_id,
+                    'cuentas_bancarias_id' => $this->contado_cuentas_bancarias_id,
+                    'fecha' => $this->contado_fecha,
+                    'observaciones' => $this->contado_observaciones,
+                ], auth()->id());
+
+                // Pagado al firmar: no hay calendario que generar.
+                return;
+            }
 
             $plan = ContratoPlanService::generarCuotas($data, $this->promocion);
 
@@ -396,7 +500,9 @@ class Create extends Component
             }
         }
 
-        $this->dispatch('toast', type: 'success', message: 'Contrato de servicio creado y cuotas generadas.');
+        $this->dispatch('toast', type: 'success', message: $this->es_contado
+            ? 'Contrato de servicio de contado creado, con su recibo generado.'
+            : 'Contrato de servicio creado y cuotas generadas.');
 
         return redirect()->route('admin.contratos-servicios.show', $contrato?->uuid);
     }

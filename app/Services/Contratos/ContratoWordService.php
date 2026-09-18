@@ -26,6 +26,17 @@ class ContratoWordService
             // Es el contrato de compraventa del lote: no aplica a contratos de servicio.
             'tipos' => ['terreno'],
         ],
+        'contrato_contado' => [
+            'label' => 'Contrato pagado de contado',
+            'template' => 'plantillas/CONTRATO_CONTADO.docx',
+            'docx_field' => 'archivo_contrato_contado_docx',
+            'scan_field' => 'archivo_contrato_contado',
+            'filename_slug' => 'contrato-contado',
+            'scan_filename' => 'contrato-contado.pdf',
+            'uses_fraccionamiento_template' => false,
+            // Reemplaza al contrato a plazos: uno u otro, nunca los dos.
+            'solo_contado' => true,
+        ],
         'constancia_terminacion_pago' => [
             'label' => 'Constancia de terminación de pago',
             'template' => 'plantillas/CONSTANCIA_DE_TERMINACION_DE_PAGO.docx',
@@ -141,12 +152,18 @@ class ContratoWordService
     {
         $tipos = $documento['tipos'] ?? null;
         $servicioTipos = $documento['servicio_tipos'] ?? null;
+        $soloContado = (bool) ($documento['solo_contado'] ?? false);
 
-        if (empty($tipos) && empty($servicioTipos)) {
-            return true;
+        if (empty($tipos) && empty($servicioTipos) && ! $soloContado) {
+            return $contrato === null || ! $contrato->es_contado || ! self::esDeFinanciamiento($documento);
         }
 
         if (! $contrato) {
+            return false;
+        }
+
+        // Un contrato de contado lleva su propio formato en vez del de plazos.
+        if ($soloContado !== (bool) $contrato->es_contado) {
             return false;
         }
 
@@ -162,6 +179,23 @@ class ContratoWordService
 
         return $tipoContrato === 'servicio'
             && in_array((string) $contrato->servicio_tipo, $servicioTipos, true);
+    }
+
+    /**
+     * Formatos que solo tienen sentido con un saldo a plazos: en una venta de
+     * contado no hay calendario que convenir ni adeudo que reconocer.
+     */
+    protected static function esDeFinanciamiento(array $documento): bool
+    {
+        return in_array(
+            $documento['docx_field'] ?? '',
+            [
+                'archivo_contrato_docx',
+                'archivo_convenio_pago_docx',
+                'archivo_convenio_pago_reconocimiento_adeudo_docx',
+            ],
+            true
+        );
     }
 
     public function generarDocx(Contrato $contrato, string $tipo = 'contrato'): string

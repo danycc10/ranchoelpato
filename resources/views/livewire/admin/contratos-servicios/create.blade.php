@@ -200,6 +200,86 @@
         @if($step === 2)
             <div class="space-y-5">
 
+                {{-- Pagado de contado --}}
+                <div class="rounded-2xl border p-4 bg-white">
+                    <div class="flex items-center justify-between gap-4">
+                        <div>
+                            <p class="font-bold text-sm">Pagado de contado</p>
+                            <p class="text-xs text-gray-500">
+                                Se paga completo al firmar: sin cuotas y con su recibo.
+                            </p>
+                        </div>
+
+                        <button type="button"
+                                wire:click="$toggle('es_contado')"
+                                class="relative inline-flex h-8 w-14 items-center rounded-full transition
+                                {{ $es_contado ? 'bg-indigo-500' : 'bg-gray-300' }}">
+                            <span class="inline-block h-6 w-6 transform rounded-full bg-white transition
+                                {{ $es_contado ? 'translate-x-7' : 'translate-x-1' }}"></span>
+                        </button>
+                    </div>
+                </div>
+
+                @if($es_contado)
+                    <div class="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-4">
+                        <div>
+                            <h3 class="text-base font-black">Pago de contado</h3>
+                            <p class="text-xs text-gray-600">
+                                Con estos datos se emite el recibo por el total al guardar el contrato.
+                            </p>
+                        </div>
+
+                        <div class="grid lg:grid-cols-12 gap-4">
+                            <div class="lg:col-span-6">
+                                <label class="block text-sm font-bold text-gray-900 mb-1">Precio instalación</label>
+                                <input wire:model.lazy="precio_total" type="number" step="0.01"
+                                       class="w-full border rounded-xl px-3 py-2.5" />
+                                @error('precio_total') <div class="text-red-600 text-sm mt-1 font-semibold">{{ $message }}</div> @enderror
+                            </div>
+
+                            <div class="lg:col-span-6">
+                                <label class="block text-sm font-bold text-gray-900 mb-1">Fecha del pago</label>
+                                <input wire:model.lazy="contado_fecha" type="date"
+                                       class="w-full border rounded-xl px-3 py-2.5" />
+                                @error('contado_fecha') <div class="text-red-600 text-sm mt-1 font-semibold">{{ $message }}</div> @enderror
+                            </div>
+
+                            <div class="lg:col-span-6">
+                                <label class="block text-sm font-bold text-gray-900 mb-1">Forma de pago</label>
+                                <select wire:model.live="contado_forma_pago_id" class="w-full border rounded-xl px-3 py-2.5">
+                                    <option value="">Selecciona...</option>
+                                    @foreach($this->formasPagoContado as $forma)
+                                        <option value="{{ $forma->id }}">{{ $forma->nombre }}</option>
+                                    @endforeach
+                                </select>
+                                @error('contado_forma_pago_id') <div class="text-red-600 text-sm mt-1 font-semibold">{{ $message }}</div> @enderror
+                            </div>
+
+                            @if($this->contadoRequiereCuenta)
+                                <div class="lg:col-span-6">
+                                    <label class="block text-sm font-bold text-gray-900 mb-1">Cuenta bancaria</label>
+                                    <select wire:model.live="contado_cuentas_bancarias_id" class="w-full border rounded-xl px-3 py-2.5">
+                                        <option value="">Selecciona...</option>
+                                        @foreach($this->cuentasBancariasContado as $cuenta)
+                                            <option value="{{ $cuenta->id }}">{{ $cuenta->alias }}{{ $cuenta->banco ? ' - '.$cuenta->banco : '' }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('contado_cuentas_bancarias_id') <div class="text-red-600 text-sm mt-1 font-semibold">{{ $message }}</div> @enderror
+                                </div>
+                            @endif
+
+                            <div class="lg:col-span-12">
+                                <label class="block text-sm font-bold text-gray-900 mb-1">Observaciones del recibo (opcional)</label>
+                                <input wire:model.lazy="contado_observaciones" type="text"
+                                       placeholder="Pago de contado al firmar el contrato."
+                                       class="w-full border rounded-xl px-3 py-2.5" />
+                                @error('contado_observaciones') <div class="text-red-600 text-sm mt-1 font-semibold">{{ $message }}</div> @enderror
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                @unless($es_contado)
                 <div class="grid lg:grid-cols-12 gap-4">
                     <div class="lg:col-span-4">
                         <label class="block text-sm font-bold text-gray-900 mb-1">Precio instalación</label>
@@ -268,6 +348,7 @@
                         </div>
                     </div>
                 </div>
+                @endunless
 
             </div>
         @endif
@@ -275,10 +356,22 @@
         {{-- STEP 3 --}}
         @if($step === 3)
             <div class="space-y-4">
+                @if($es_contado)
+                    <div class="rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+                        <p class="text-sm font-black text-indigo-900">Venta de contado</p>
+                        <p class="text-xs text-indigo-800 mt-1">
+                            El contrato nace liquidado por ${{ number_format((float) $precio_total, 2) }}:
+                            no genera cuotas y al guardarlo se emite su recibo con el concepto CONTADO.
+                        </p>
+                    </div>
+                @endif
+
                 <div class="flex items-center justify-between">
                     <div>
                         <h2 class="text-xl font-black text-gray-900">Preview de cuotas</h2>
-                        <p class="text-gray-500 text-sm">Primeras 12 cuotas generadas.</p>
+                        <p class="text-gray-500 text-sm">
+                            {{ $es_contado ? 'Sin cuotas: se paga de contado.' : 'Primeras 12 cuotas generadas.' }}
+                        </p>
                     </div>
                     <span class="px-3 py-1 rounded-full bg-gray-100 font-semibold text-sm">
                         {{ $servicio_tipo === 'agua' ? 'Agua' : 'Electricidad' }}

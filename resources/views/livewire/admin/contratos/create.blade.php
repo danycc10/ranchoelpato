@@ -154,6 +154,41 @@
                         </p>
                     </div>
                     @endif
+
+                    @unless($es_donacion)
+                    <div class="mt-4 border-t pt-4">
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <p class="font-bold text-sm">Pagado de contado</p>
+                                <p class="text-xs text-gray-500">
+                                    Se paga completo al firmar: sin cuotas y con su recibo.
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                wire:click="$toggle('es_contado')"
+                                class="relative inline-flex h-8 w-14 items-center rounded-full transition
+                    {{ $es_contado ? 'bg-indigo-500' : 'bg-gray-300' }}">
+                                <span class="inline-block h-6 w-6 transform rounded-full bg-white transition
+                    {{ $es_contado ? 'translate-x-7' : 'translate-x-1' }}">
+                                </span>
+                            </button>
+                        </div>
+
+                        @if($es_contado)
+                        <div class="mt-3 rounded-xl bg-indigo-50 border border-indigo-200 p-3">
+                            <p class="text-sm font-semibold text-indigo-800">
+                                Venta de contado
+                            </p>
+                            <p class="text-xs text-indigo-700 mt-1">
+                                El contrato nace liquidado, usa su propio formato de Word y
+                                genera un recibo por el total con el concepto CONTADO.
+                            </p>
+                        </div>
+                        @endif
+                    </div>
+                    @endunless
                 </div>
             </div>
 
@@ -255,7 +290,83 @@
         @if($step === 2)
         <div class="space-y-6">
 
+            {{-- Venta de contado: precio y como entro el dinero --}}
+            @if($es_contado)
+            <div class="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 sm:p-5">
+                <div class="mb-4">
+                    <h3 class="text-base sm:text-lg font-black">Pago de contado</h3>
+                    <p class="text-xs sm:text-sm text-gray-600">
+                        Con estos datos se emite el recibo por el total al guardar el contrato.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm font-semibold">Precio total</label>
+                        <input type="number" step="0.01"
+                            wire:model.lazy.fill="precio_total"
+                            class="w-full mt-1 rounded-xl border-gray-300">
+                        @error('precio_total')
+                        <p class="text-red-600 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="text-sm font-semibold">Fecha del pago</label>
+                        <input type="date"
+                            wire:model.lazy="contado_fecha"
+                            class="w-full mt-1 rounded-xl border-gray-300">
+                        @error('contado_fecha')
+                        <p class="text-red-600 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="text-sm font-semibold">Forma de pago</label>
+                        <select wire:model.live="contado_forma_pago_id"
+                            class="w-full mt-1 rounded-xl border-gray-300">
+                            <option value="">Selecciona...</option>
+                            @foreach($this->formasPagoContado as $forma)
+                            <option value="{{ $forma->id }}">{{ $forma->nombre }}</option>
+                            @endforeach
+                        </select>
+                        @error('contado_forma_pago_id')
+                        <p class="text-red-600 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    @if($this->contadoRequiereCuenta)
+                    <div>
+                        <label class="text-sm font-semibold">Cuenta bancaria</label>
+                        <select wire:model.live="contado_cuentas_bancarias_id"
+                            class="w-full mt-1 rounded-xl border-gray-300">
+                            <option value="">Selecciona...</option>
+                            @foreach($this->cuentasBancariasContado as $cuenta)
+                            <option value="{{ $cuenta->id }}">{{ $cuenta->alias }}{{ $cuenta->banco ? ' - '.$cuenta->banco : '' }}</option>
+                            @endforeach
+                        </select>
+                        @error('contado_cuentas_bancarias_id')
+                        <p class="text-red-600 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    @endif
+
+                    <div class="md:col-span-2">
+                        <label class="text-sm font-semibold">Observaciones del recibo (opcional)</label>
+                        <input type="text"
+                            wire:model.lazy="contado_observaciones"
+                            placeholder="Pago de contado al firmar el contrato."
+                            class="w-full mt-1 rounded-xl border-gray-300">
+                        @error('contado_observaciones')
+                        <p class="text-red-600 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+            </div>
+            @endif
+
             {{-- Condiciones económicas --}}
+            @unless($es_contado)
             <div class="rounded-2xl border p-4 sm:p-5">
                 <div class="mb-4">
                     <h3 class="text-base sm:text-lg font-black">Condiciones económicas</h3>
@@ -336,6 +447,7 @@
                     </div>
                 </div>
             </div>
+            @endunless
 
             {{-- Documento legal --}}
             <div class="rounded-2xl border bg-gray-50 p-4 sm:p-5 space-y-4">
@@ -721,6 +833,10 @@
                         <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
                             DONACIÓN
                         </span>
+                        @elseif($es_contado)
+                        <span class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold">
+                            CONTADO
+                        </span>
                         @else
                         <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">
                             VENTA / FINANCIAMIENTO
@@ -728,7 +844,7 @@
                         @endif
                     </div>
 
-                    @if(!$es_donacion)
+                    @if(!$es_donacion && !$es_contado)
                     <div><b>Frecuencia:</b> {{ ucfirst($frecuencia) }}</div>
 
                     <div>
@@ -760,7 +876,7 @@
                         {{ $vendedor_nombre_legal ?: '—' }} / {{ $comprador_nombre_legal ?: '—' }}
                     </div>
 
-                    @if(!$es_donacion)
+                    @if(!$es_donacion && !$es_contado)
                     <div class="md:col-span-2">
                         <b>Anualidad:</b>
                         @if($tiene_anualidad)
@@ -783,7 +899,7 @@
                 </div>
             </div>
 
-            @if(!$es_donacion)
+            @if(!$es_donacion && !$es_contado)
             {{-- Configuración manual --}}
             <div class="rounded-2xl border bg-white p-4 sm:p-5 space-y-4">
                 <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">

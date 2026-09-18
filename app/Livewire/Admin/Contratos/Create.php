@@ -4,7 +4,9 @@ namespace App\Livewire\Admin\Contratos;
 
 use App\Models\Cliente;
 use App\Models\Contrato;
+use App\Models\CuentaBancaria;
 use App\Models\Cuota;
+use App\Models\FormaPago;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
 use App\Models\Promocion;
@@ -12,6 +14,7 @@ use App\Services\Contratos\CondicionesCesionService;
 use App\Services\Contratos\ContratoFolioService;
 use App\Services\Contratos\ContratoPlanService;
 use App\Services\Contratos\ContratoWordService;
+use App\Services\Contratos\VentaContadoService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -27,6 +30,17 @@ class Create extends Component
     public int $step = 1;
 
     public bool $es_donacion = false;
+
+    /** Venta de contado: se paga completo al firmar, sin calendario de cuotas. */
+    public bool $es_contado = false;
+
+    public ?int $contado_forma_pago_id = null;
+
+    public ?int $contado_cuentas_bancarias_id = null;
+
+    public ?string $contado_fecha = null;
+
+    public ?string $contado_observaciones = null;
 
     public string $cliente_q = '';
 
@@ -203,6 +217,36 @@ class Create extends Component
     public function getEsDonacionProperty(): bool
     {
         return $this->es_donacion;
+    }
+
+    public function getEsContadoProperty(): bool
+    {
+        return $this->es_contado && ! $this->es_donacion;
+    }
+
+    public function getFormasPagoContadoProperty()
+    {
+        return FormaPago::query()->orderBy('nombre')->get(['id', 'nombre']);
+    }
+
+    public function getCuentasBancariasContadoProperty()
+    {
+        return CuentaBancaria::query()
+            ->where('activa', true)
+            ->orderBy('alias')
+            ->get(['id', 'alias', 'banco']);
+    }
+
+    /** Las formas de pago que exigen decir a qué cuenta entró el dinero. */
+    public function getContadoRequiereCuentaProperty(): bool
+    {
+        if (! $this->contado_forma_pago_id) {
+            return false;
+        }
+
+        $nombre = mb_strtoupper((string) FormaPago::find($this->contado_forma_pago_id)?->nombre);
+
+        return $nombre !== '' && ! str_contains($nombre, 'EFECTIVO');
     }
 
     // ===========================
@@ -485,6 +529,7 @@ class Create extends Component
             'manzana',
             'lote_id',
             'promocion_id',
+            'es_contado',
             'precio_total',
             'enganche',
             'monto_pago',
@@ -556,6 +601,25 @@ class Create extends Component
             $this->anualidad_fecha = null;
         }
 
+        if ($this->esContado) {
+            // Se paga completo al firmar: no hay saldo ni calendario.
+            $this->enganche = 0;
+            $this->saldo_inicial = 0;
+            $this->saldo_actual = 0;
+            $this->monto_pago = 0;
+
+            $this->tipo_recargo = 'fijo';
+            $this->valor_recargo = 0;
+            $this->dias_gracia = 0;
+
+            $this->tiene_anualidad = false;
+            $this->anualidad_fecha = null;
+            $this->anualidad_monto = 0;
+
+            $this->usar_configuracion_manual = false;
+            $this->previewCuotas = [];
+        }
+
         if ($this->esDonacion) {
             $this->enganche = 0;
             $this->saldo_inicial = 0;
@@ -588,7 +652,7 @@ class Create extends Component
     protected function generarPreviewAutomatico(): array
     {
 
-        if ($this->esDonacion) {
+        if ($this->esDonacion || $this->esContado) {
             return [];
         }
         if (
@@ -821,6 +885,7 @@ class Create extends Component
                 'frecuencia' => ['required', Rule::in(['semanal', 'mensual'])],
                 'promocion_id' => ['nullable'],
                 'es_donacion' => ['boolean'],
+                'es_contado' => ['boolean'],
             ]);
 
             if ($this->frecuencia === 'semanal') {
@@ -841,6 +906,28 @@ class Create extends Component
         }
 
         if ($this->step === 2) {
+
+            if ($this->esContado) {
+
+                // Solo importa el precio y como entro el dinero.
+                $this->validate([
+                    'precio_total' => ['required', 'numeric', 'min:0.01'],
+                    'contado_forma_pago_id' => ['required', 'integer', 'exists:formas_pago,id'],
+                    'contado_fecha' => ['required', 'date'],
+                    'contado_cuentas_bancarias_id' => [
+                        $this->contadoRequiereCuenta ? 'required' : 'nullable',
+                        'integer',
+                        'exists:cuentas_bancarias,id',
+                    ],
+                    'contado_observaciones' => ['nullable', 'string', 'max:255'],
+                ], [], [
+                    'contado_forma_pago_id' => 'forma de pago',
+                    'contado_fecha' => 'fecha del pago',
+                    'contado_cuentas_bancarias_id' => 'cuenta bancaria',
+                ]);
+
+                return;
+            }
 
             if ($this->esDonacion) {
 
@@ -1031,6 +1118,7 @@ class Create extends Component
 
     public function guardar(
         ContratoWordService $contratoWordService,
+        VentaContadoService $ventaContado,
     ) {
         $this->resetErrorBag();
 
@@ -1049,7 +1137,7 @@ class Create extends Component
 
         $data = $this->payloadContrato();
 
-        if (! $this->esDonacion) {
+        if (! $this->esDonacion && ! $this->esContado) {
             ContratoPlanService::aplicarPromocionEconomica($data, $this->promocion);
         }
 
@@ -1153,6 +1241,24 @@ class Create extends Component
                         : $this->obtenerPlanFinal();
                 }
 
+                if ($this->esContado) {
+                    $contratoData = array_merge(
+                        $contratoData,
+                        $ventaContado->camposDelContrato(
+                            (float) $data['precio_total'],
+                            Carbon::parse($this->contado_fecha),
+                        )
+                    );
+
+                    if (Schema::hasColumn('contratos', 'calendario_tipo')) {
+                        $contratoData['calendario_tipo'] = 'sin_cuotas';
+                    }
+
+                    if (Schema::hasColumn('contratos', 'calendario_json')) {
+                        $contratoData['calendario_json'] = [];
+                    }
+                }
+
                 $contrato = Contrato::query()->create($contratoData);
 
                 $baseContrato = $this->buildContratoPrivateBase($lote, $contrato);
@@ -1201,7 +1307,7 @@ class Create extends Component
                     ])
                     ->log($this->esDonacion ? 'Contrato creado por donación' : 'Contrato creado');
 
-                if (! $this->esDonacion) {
+                if (! $this->esDonacion && ! $this->esContado) {
                     $plan = $this->obtenerPlanFinal();
 
                     foreach ($plan as $row) {
@@ -1217,6 +1323,15 @@ class Create extends Component
                             'concepto' => $row['concepto'] ?? null,
                         ]);
                     }
+                }
+
+                if ($this->esContado) {
+                    $ventaContado->generarRecibo($contrato, [
+                        'forma_pago_id' => (int) $this->contado_forma_pago_id,
+                        'cuentas_bancarias_id' => $this->contado_cuentas_bancarias_id,
+                        'fecha' => $this->contado_fecha,
+                        'observaciones' => $this->contado_observaciones,
+                    ], auth()->id());
                 }
 
                 $lote->update([
@@ -1236,9 +1351,11 @@ class Create extends Component
 
             session()->flash(
                 'success',
-                $this->esDonacion
-                    ? 'Contrato de donación creado y documento generado correctamente.'
-                    : 'Contrato creado y documento generado correctamente.'
+                match (true) {
+                    $this->esDonacion => 'Contrato de donación creado y documento generado correctamente.',
+                    $this->esContado => 'Contrato de contado creado, con su recibo y documento generados.',
+                    default => 'Contrato creado y documento generado correctamente.',
+                }
             );
 
             return redirect()->route('admin.contratos.show', [

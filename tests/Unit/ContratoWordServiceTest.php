@@ -13,6 +13,7 @@ class ContratoWordServiceTest extends TestCase
         $this->assertSame(
             [
                 'contrato',
+                'contrato_contado',
                 'constancia_terminacion_pago',
                 'convenio_pago',
                 'convenio_pago_reconocimiento_adeudo',

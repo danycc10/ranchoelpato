@@ -57,6 +57,9 @@ class Contrato extends Model
         'contrato_base_id',
         'es_financiamiento_instalacion',
         'solo_documentos',
+        'es_contado',
+        'archivo_contrato_contado',
+        'archivo_contrato_contado_docx',
         'archivo_contrato_disk',
 
         'archivo_contrato_docx',
@@ -120,6 +123,7 @@ class Contrato extends Model
         'dia_mes' => 'integer',
         'es_financiamiento_instalacion' => 'boolean',
         'solo_documentos' => 'boolean',
+        'es_contado' => 'boolean',
         'alerta_convenio' => 'boolean',
 
         'area_m2_snapshot' => 'decimal:2',
