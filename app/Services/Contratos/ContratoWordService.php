@@ -27,6 +27,19 @@ class ContratoWordService
             // Es el contrato de compraventa del lote: no aplica a contratos de servicio.
             'tipos' => ['terreno'],
         ],
+        'contrato_contado_terreno' => [
+            'label' => 'Contrato de compraventa de contado',
+            'template' => 'plantillas/CONTRATO_CONTADO_TERRENO.docx',
+            // Comparte columnas con el contado de luz: a un contrato le aplica
+            // uno o el otro, nunca los dos.
+            'docx_field' => 'archivo_contrato_contado_docx',
+            'scan_field' => 'archivo_contrato_contado',
+            'filename_slug' => 'contrato-contado',
+            'scan_filename' => 'contrato-contado.pdf',
+            'uses_fraccionamiento_template' => false,
+            'solo_contado' => true,
+            'tipos' => ['terreno'],
+        ],
         'contrato_contado' => [
             'label' => 'Contrato de infraestructura eléctrica pagado de contado',
             'template' => 'plantillas/CONTRATO_CONTADO.docx',
@@ -233,6 +246,12 @@ class ContratoWordService
 
         if ($tipo === 'contrato_contado') {
             $this->setContadoValues($template, $contrato);
+        }
+
+        if ($tipo === 'contrato_contado_terreno') {
+            // El resto del formato es el del contrato a plazos, que ya llena
+            // setCommonValues; solo falta decir cómo se pagó.
+            $template->setValue('forma_pago', $this->linea($this->formaPagoDeContado($contrato), 30));
         }
 
         if ($tipo === 'contrato_cesion_derechos') {

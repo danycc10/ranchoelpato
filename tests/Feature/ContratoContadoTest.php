@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\Contratos\ContratoWordService;
 use App\Services\Contratos\VentaContadoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
@@ -121,24 +122,61 @@ class ContratoContadoTest extends TestCase
     }
 
     #[Test]
-    public function el_formato_de_contado_es_el_de_luz_y_no_aplica_a_un_lote(): void
+    public function cada_contado_lleva_el_formato_que_le_toca(): void
     {
-        // La plantilla instalada es la de aportación eléctrica: en un contrato
-        // de terreno saldría un documento que no corresponde.
+        // El terreno lleva la compraventa de contado...
         $terreno = $this->contratoDeContado(150000);
+        $formatosTerreno = array_keys(ContratoWordService::documentTypesFor($terreno));
 
-        $this->assertNotContains(
-            'contrato_contado',
-            array_keys(ContratoWordService::documentTypesFor($terreno))
-        );
+        $this->assertContains('contrato_contado_terreno', $formatosTerreno);
+        $this->assertNotContains('contrato_contado', $formatosTerreno);
 
+        // ...y la luz, la aportación eléctrica. Nunca se cruzan.
         $luz = $this->contratoDeContado(15000, 'CT-LUZ', 'L-LUZ');
         $luz->update(['tipo' => 'servicio', 'servicio_tipo' => 'electricidad']);
 
-        $this->assertContains(
-            'contrato_contado',
-            array_keys(ContratoWordService::documentTypesFor($luz->fresh()))
+        $formatosLuz = array_keys(ContratoWordService::documentTypesFor($luz->fresh()));
+
+        $this->assertContains('contrato_contado', $formatosLuz);
+        $this->assertNotContains('contrato_contado_terreno', $formatosLuz);
+    }
+
+    #[Test]
+    public function el_contrato_de_terreno_de_contado_no_habla_de_plazos(): void
+    {
+        $contrato = $this->contratoDeContado(150000);
+
+        $efectivo = FormaPago::create(['nombre' => 'EFECTIVO']);
+
+        app(VentaContadoService::class)->generarRecibo($contrato, [
+            'forma_pago_id' => $efectivo->id,
+        ]);
+
+        $texto = $this->textoDelDocx(
+            (new ContratoWordService)->generarDocx($contrato->fresh(), 'contrato_contado_terreno')
         );
+
+        // El documento no puede quedar con marcadores a medio llenar.
+        $this->assertStringNotContainsString('${', $texto);
+
+        $this->assertStringContainsString('COMPRAVENTA DE CONTADO', $texto);
+        $this->assertStringContainsString('cubre íntegramente de contado', $texto);
+        $this->assertStringContainsString('EFECTIVO', $texto);
+
+        // Y no quedan rastros del credito: ni enganche, ni recargos, ni plazos.
+        $this->assertStringNotContainsString('A PLAZOS', $texto);
+        $this->assertStringNotContainsString('Enganche', $texto);
+        $this->assertStringNotContainsString('penalización', $texto);
+    }
+
+    private function textoDelDocx(string $rutaRelativa): string
+    {
+        $zip = new \ZipArchive;
+        $zip->open(Storage::disk('private')->path($rutaRelativa));
+        $xml = $zip->getFromName('word/document.xml');
+        $zip->close();
+
+        return html_entity_decode(strip_tags($xml), ENT_QUOTES | ENT_XML1, 'UTF-8');
     }
 
     #[Test]
