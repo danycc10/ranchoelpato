@@ -7,10 +7,13 @@ use App\Models\Contrato;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
 use App\Models\Propietario;
+use App\Models\User;
 use App\Services\Contratos\ContratoWordService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -23,6 +26,46 @@ class DocumentosDesactualizadosTest extends TestCase
     use RefreshDatabase;
 
     private const TIPO = 'contrato_cesion_derechos';
+
+    #[Test]
+    public function cada_descarga_vuelve_a_generar_el_documento(): void
+    {
+        $contrato = $this->contratoConDocumento();
+
+        // Se marca el archivo como viejo para ver si la descarga lo rehace.
+        $this->envejecerDocumento($contrato);
+
+        $ruta = Storage::disk('private')->path($contrato->archivo_contrato_cesion_docx);
+        $antes = filemtime($ruta);
+
+        $this->actingAs($this->usuarioConPermisos())
+            ->get(route('admin.private.contratos.documentos.docx.download', [
+                'uuid' => $contrato->uuid,
+                'tipo' => self::TIPO,
+            ]))
+            ->assertOk();
+
+        clearstatcache(true, $ruta);
+
+        $this->assertGreaterThan($antes, filemtime($ruta));
+    }
+
+    #[Test]
+    public function si_no_hay_plantilla_la_descarga_entrega_el_ultimo_generado(): void
+    {
+        $contrato = $this->contratoConDocumento();
+
+        // Sin plantilla no se puede rehacer, pero el usuario no debe quedarse
+        // sin su documento.
+        Storage::disk('private')->delete('plantillas/CONTRATO_CESION_DERECHOS_POSESORIOS.docx');
+
+        $this->actingAs($this->usuarioConPermisos())
+            ->get(route('admin.private.contratos.documentos.docx.download', [
+                'uuid' => $contrato->uuid,
+                'tipo' => self::TIPO,
+            ]))
+            ->assertOk();
+    }
 
     #[Test]
     public function un_contrato_sin_documento_se_considera_pendiente(): void
@@ -99,6 +142,23 @@ class DocumentosDesactualizadosTest extends TestCase
         $this->assertFalse(
             app(ContratoWordService::class)->estaDesactualizado($contrato, self::TIPO)
         );
+    }
+
+    private function usuarioConPermisos(): User
+    {
+        $usuario = User::factory()->create();
+
+        $rol = Role::findOrCreate('admin', 'web');
+
+        foreach (['admin.ver', 'sistema.ver'] as $permiso) {
+            $rol->givePermissionTo(
+                Permission::findOrCreate($permiso, 'web')
+            );
+        }
+
+        $usuario->assignRole($rol);
+
+        return $usuario;
     }
 
     /** Lo pone como generado hace meses, antes de la plantilla de hoy. */
