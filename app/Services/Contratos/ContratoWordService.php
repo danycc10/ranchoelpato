@@ -220,6 +220,49 @@ class ContratoWordService
         return $relativePath;
     }
 
+    /**
+     * ¿El documento guardado se quedó atrás de su plantilla?
+     *
+     * Los documentos se generan una sola vez y se reusan, así que al cambiar
+     * una plantilla los que ya existían seguirían saliendo con el texto viejo.
+     * Se compara contra la plantilla que le toca a este contrato, que puede ser
+     * la del fraccionamiento y no la general.
+     */
+    public function estaDesactualizado(Contrato $contrato, string $tipo): bool
+    {
+        $documento = self::documentTypeFor($tipo, $contrato);
+
+        if (! $documento) {
+            return false;
+        }
+
+        $disk = $contrato->archivo_contrato_disk ?: 'private';
+        $relativePath = $contrato->{$documento['docx_field']};
+
+        // Sin archivo no hay nada que comparar: hay que generarlo.
+        if (! $relativePath || ! Storage::disk($disk)->exists($relativePath)) {
+            return true;
+        }
+
+        try {
+            $plantilla = $this->resolveTemplatePath($contrato, $documento);
+        } catch (RuntimeException) {
+            // Sin plantilla instalada no se puede regenerar: se deja como está.
+            return false;
+        }
+
+        $generado = Storage::disk($disk)->path($relativePath);
+
+        $fechaPlantilla = @filemtime($plantilla);
+        $fechaGenerado = @filemtime($generado);
+
+        if ($fechaPlantilla === false || $fechaGenerado === false) {
+            return false;
+        }
+
+        return $fechaPlantilla > $fechaGenerado;
+    }
+
     public function limpiarMetadatosPersonales(string $absolutePath): void
     {
         $zip = new ZipArchive;

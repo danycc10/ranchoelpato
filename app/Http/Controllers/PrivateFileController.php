@@ -170,7 +170,9 @@ class PrivateFileController extends Controller
         $field = $documento['docx_field'];
         $relativePath = $contrato->{$field};
 
-        if (! $relativePath || ! Storage::disk($disk)->exists($relativePath)) {
+        // Se regenera si falta o si la plantilla cambió después de haberlo
+        // generado: de lo contrario el documento saldría con el texto viejo.
+        if ($contratoWordService->estaDesactualizado($contrato, $tipo)) {
             $relativePath = $contratoWordService->generarDocx($contrato, $tipo);
 
             $contrato->update([
