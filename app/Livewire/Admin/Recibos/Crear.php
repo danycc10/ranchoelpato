@@ -11,13 +11,11 @@ use App\Models\FormaPago;
 use App\Models\Lote;
 use App\Models\Pago;
 use App\Models\Periodo;
-use App\Models\PrintAgent;
 use App\Models\Recibo;
 use App\Models\ReciboPago;
 use App\Models\TipoCobro;
 use App\Services\Contabilidad\PropietarioContableResolver;
 use App\Services\ImageUploadService;
-use App\Services\Impresion\PrintJobService;
 use App\Services\Recibos\CuotaAntiguedadSelector;
 use App\Services\Recibos\PeriodoResolver;
 use App\Services\Recibos\RecargoCuotaCalculator;
@@ -787,11 +785,6 @@ class Crear extends Component
             return;
         }
 
-        // Con equipo emparejado el ticket sale solo en la impresora del cajero.
-        if ($this->enviarAlAgenteLocal($reciboIds, $adjuntoIds)) {
-            return;
-        }
-
         if (count($reciboIds) === 1) {
             $this->openPrintTab($reciboIds[0]);
 
@@ -799,83 +792,6 @@ class Crear extends Component
         }
 
         $this->openPrintBatchTab($reciboIds, $adjuntoIds);
-    }
-
-    /**
-     * Encola un trabajo por ticket en el agente del cajero.
-     *
-     * Devuelve false cuando hay que caer al navegador: sin equipo emparejado
-     * (el caso normal de quien no lo usa) o cuando no se pudo encolar nada.
-     *
-     * @param  array<int, int>  $reciboIds
-     * @param  array<int, int>  $adjuntoIds
-     */
-    protected function enviarAlAgenteLocal(array $reciboIds, array $adjuntoIds): bool
-    {
-        $usuario = auth()->user();
-
-        if (! $usuario || ! PrintAgent::deUsuario($usuario)) {
-            return false;
-        }
-
-        $adjuntos = array_values(array_map('intval', $adjuntoIds));
-
-        // Los adjuntos no llevan ticket propio: viajan con el principal.
-        $principales = array_values(array_diff(array_map('intval', $reciboIds), $adjuntos));
-
-        if (empty($principales)) {
-            $principales = array_map('intval', $reciboIds);
-            $adjuntos = [];
-        }
-
-        $encolados = 0;
-
-        try {
-            $cola = app(PrintJobService::class);
-
-            foreach ($principales as $i => $reciboId) {
-                // Como en el navegador, los recargos se pegan al primer ticket.
-                $cola->queueRecibo($usuario, Recibo::findOrFail($reciboId), $i === 0 ? $adjuntos : []);
-
-                $encolados++;
-            }
-        } catch (\Throwable $e) {
-            Log::warning('No se pudo encolar la impresión con agente local', [
-                'recibo_ids' => $reciboIds,
-                'encolados' => $encolados,
-                'error' => $e->getMessage(),
-            ]);
-
-            // Si ya salió algo, abrir la pestaña lo imprimiría dos veces.
-            if ($encolados > 0) {
-                $this->dispatch(
-                    'toast',
-                    type: 'warning',
-                    message: $encolados.' de '.count($principales).' tickets se enviaron a tu impresora. '
-                        .'El resto quedó pendiente: '.$e->getMessage()
-                );
-
-                return true;
-            }
-
-            $this->dispatch(
-                'toast',
-                type: 'warning',
-                message: $e->getMessage().' Se abrirá el ticket para imprimir desde el navegador.'
-            );
-
-            return false;
-        }
-
-        $this->dispatch(
-            'toast',
-            type: 'success',
-            message: $encolados === 1
-                ? 'Ticket enviado a tu impresora.'
-                : $encolados.' tickets enviados a tu impresora.'
-        );
-
-        return true;
     }
 
     protected function openPrintTab(int $reciboId): void
