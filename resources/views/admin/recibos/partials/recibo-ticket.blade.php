@@ -63,6 +63,9 @@ $cuota = $recibo->cuota ?? null;
 
 $labelPeriodo = $contratoEsSemanal ? 'Semana' : 'Mes';
 
+// El plural va aparte: pegarle una "s" a "Mes" daba "Mess".
+$labelPeriodoPlural = $contratoEsSemanal ? 'Semanas' : 'Meses';
+
 $numeroPeriodo = $cuota?->numero;
 if (!$numeroPeriodo) {
 $numeroPeriodo = $contratoEsSemanal
@@ -266,7 +269,7 @@ $totalPagosDetalle = (float) $pagosDetalle->sum(fn ($p) => (float) ($p->monto ??
 
         @if(!$mostrarPeriodoEncabezado && $rangoCuotasRecibo)
         <div class="row">
-            <div class="muted">{{ $labelPeriodo }}s:</div>
+            <div class="muted">{{ $labelPeriodoPlural }}:</div>
             <div class="right bold">#{{ $rangoCuotasRecibo }}</div>
         </div>
         @endif

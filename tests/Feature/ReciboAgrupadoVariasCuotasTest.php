@@ -53,6 +53,10 @@ class ReciboAgrupadoVariasCuotasTest extends TestCase
 
         // Sin recargos, el pago sí fue puntual.
         $this->assertStringContainsString('Gracias por su pago puntual.', $html);
+
+        // El plural de "Mes" es "Meses": pegarle una "s" daba "Mess".
+        $this->assertStringContainsString('Meses:', $html);
+        $this->assertStringNotContainsString('Mess', $html);
     }
 
     #[Test]
