@@ -29,6 +29,8 @@
         ];
     @endphp
 
+    @include('partials.recibos.ticket-contado')
+
     <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div class="min-w-0">
             <h1 class="text-2xl font-black break-words">

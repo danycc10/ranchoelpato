@@ -20,6 +20,8 @@
         : null;
 @endphp
 
+    @include('partials.recibos.ticket-contado')
+
 <div class="max-w-6xl mx-auto p-4">
     <div class="flex items-center justify-between mb-4">
         <div>

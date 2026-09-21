@@ -7,9 +7,11 @@ use App\Models\CuentaBancaria;
 use App\Models\Cuota;
 use App\Models\FormaPago;
 use App\Models\Promocion;
+use App\Models\Recibo;
 use App\Services\Contratos\ContratoPlanService;
 use App\Services\Contratos\ContratoWordService;
 use App\Services\Contratos\VentaContadoService;
+use App\Services\Impresion\EnvioDeTicket;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -241,6 +243,28 @@ class Create extends Component
         return $datos;
     }
 
+    /**
+     * Manda el ticket del contado a la impresora del cajero.
+     *
+     * Si no tiene equipo emparejado se deja la liga en la sesión: esta
+     * pantalla redirige, y un evento de navegador no sobrevive al redirect.
+     */
+    protected function mandarTicketDeContado(Recibo $recibo): void
+    {
+        $envio = app(EnvioDeTicket::class)->enviar(auth()->user(), $recibo);
+
+        if ($envio['aviso']) {
+            session()->flash('ticket_contado_aviso', $envio['aviso']);
+        }
+
+        if (! $envio['enviado']) {
+            session()->flash(
+                'ticket_contado_url',
+                route('admin.recibos.imprimir', ['recibo' => $recibo->uuid ?: $recibo->id])
+            );
+        }
+    }
+
     protected function recalcular(): void
     {
         $this->precio_total = max(0, (float) $this->precio_total);
@@ -429,8 +453,9 @@ class Create extends Component
         }
 
         $contrato = null;
+        $reciboContado = null;
 
-        DB::transaction(function () use ($data, &$contrato, $ventaContado) {
+        DB::transaction(function () use ($data, &$contrato, &$reciboContado, $ventaContado) {
             $base = Contrato::query()->lockForUpdate()->findOrFail($this->contrato_base_id);
 
             $contrato = Contrato::query()->create(array_merge([
@@ -487,7 +512,7 @@ class Create extends Component
             ));
 
             if ($this->es_contado) {
-                $ventaContado->generarRecibo($contrato, [
+                $reciboContado = $ventaContado->generarRecibo($contrato, [
                     'forma_pago_id' => (int) $this->contado_forma_pago_id,
                     'cuentas_bancarias_id' => $this->contado_cuentas_bancarias_id,
                     'fecha' => $this->contado_fecha,
@@ -531,6 +556,10 @@ class Create extends Component
             } catch (\Throwable $e) {
                 report($e);
             }
+        }
+
+        if ($reciboContado) {
+            $this->mandarTicketDeContado($reciboContado);
         }
 
         $this->dispatch('toast', type: 'success', message: $this->es_contado

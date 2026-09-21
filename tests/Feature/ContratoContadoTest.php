@@ -9,12 +9,15 @@ use App\Models\Cuota;
 use App\Models\FormaPago;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
+use App\Models\PrintJob;
 use App\Models\Propietario;
 use App\Models\Recibo;
 use App\Models\TipoCobro;
 use App\Models\User;
 use App\Services\Contratos\ContratoWordService;
 use App\Services\Contratos\VentaContadoService;
+use App\Services\Impresion\EnvioDeTicket;
+use App\Services\Impresion\PrintAgentPairingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -212,6 +215,67 @@ class ContratoContadoTest extends TestCase
             'TRANSFERENCIA',
             $reflexion->invoke(new ContratoWordService, $luz->fresh())
         );
+    }
+
+    #[Test]
+    public function con_agente_el_ticket_del_contado_se_encola(): void
+    {
+        $contrato = $this->contratoDeContado(150000);
+        $forma = FormaPago::create(['nombre' => 'EFECTIVO']);
+
+        $cajero = User::factory()->create();
+        $agente = app(PrintAgentPairingService::class)->pair($cajero, $cajero)['agent'];
+        $agente->forceFill(['last_seen_at' => now()])->save();
+
+        $recibo = app(VentaContadoService::class)->generarRecibo($contrato, [
+            'forma_pago_id' => $forma->id,
+        ]);
+
+        $envio = app(EnvioDeTicket::class)->enviar($cajero, $recibo);
+
+        $this->assertTrue($envio['enviado']);
+        $this->assertSame(1, PrintJob::count());
+        $this->assertSame($recibo->id, (int) PrintJob::sole()->document_id);
+    }
+
+    #[Test]
+    public function sin_agente_el_ticket_del_contado_cae_al_navegador(): void
+    {
+        $contrato = $this->contratoDeContado(150000);
+        $forma = FormaPago::create(['nombre' => 'EFECTIVO']);
+
+        $recibo = app(VentaContadoService::class)->generarRecibo($contrato, [
+            'forma_pago_id' => $forma->id,
+        ]);
+
+        $envio = app(EnvioDeTicket::class)->enviar(User::factory()->create(), $recibo);
+
+        $this->assertFalse($envio['enviado']);
+
+        // Quien no usa agente no tiene por qué ver un aviso de error.
+        $this->assertNull($envio['aviso']);
+        $this->assertSame(0, PrintJob::count());
+    }
+
+    #[Test]
+    public function con_el_agente_apagado_se_avisa(): void
+    {
+        $contrato = $this->contratoDeContado(150000);
+        $forma = FormaPago::create(['nombre' => 'EFECTIVO']);
+
+        $cajero = User::factory()->create();
+        app(PrintAgentPairingService::class)->pair($cajero, $cajero);
+
+        $recibo = app(VentaContadoService::class)->generarRecibo($contrato, [
+            'forma_pago_id' => $forma->id,
+        ]);
+
+        // Emparejado pero sin latido: el ticket no sale y hay que avisar.
+        $envio = app(EnvioDeTicket::class)->enviar($cajero, $recibo);
+
+        $this->assertFalse($envio['enviado']);
+        $this->assertStringContainsString('desconectado', (string) $envio['aviso']);
+        $this->assertSame(0, PrintJob::count());
     }
 
     #[Test]

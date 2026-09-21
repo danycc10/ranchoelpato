@@ -10,11 +10,13 @@ use App\Models\FormaPago;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
 use App\Models\Promocion;
+use App\Models\Recibo;
 use App\Services\Contratos\CondicionesCesionService;
 use App\Services\Contratos\ContratoFolioService;
 use App\Services\Contratos\ContratoPlanService;
 use App\Services\Contratos\ContratoWordService;
 use App\Services\Contratos\VentaContadoService;
+use App\Services\Impresion\EnvioDeTicket;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -1142,9 +1144,10 @@ class Create extends Component
         }
 
         $contrato = null;
+        $reciboContado = null;
 
         try {
-            DB::transaction(function () use ($data, &$contrato) {
+            DB::transaction(function () use ($data, &$contrato, &$reciboContado) {
                 $lote = Lote::query()
                     ->with('fraccionamiento')
                     ->lockForUpdate()
@@ -1326,7 +1329,7 @@ class Create extends Component
                 }
 
                 if ($this->esContado) {
-                    $ventaContado->generarRecibo($contrato, [
+                    $reciboContado = $ventaContado->generarRecibo($contrato, [
                         'forma_pago_id' => (int) $this->contado_forma_pago_id,
                         'cuentas_bancarias_id' => $this->contado_cuentas_bancarias_id,
                         'fecha' => $this->contado_fecha,
@@ -1348,6 +1351,10 @@ class Create extends Component
             $contrato->update(
                 $contratoWordService->generarTodosDocx($contrato)
             );
+
+            if ($reciboContado) {
+                $this->mandarTicketDeContado($reciboContado);
+            }
 
             session()->flash(
                 'success',
@@ -1371,6 +1378,28 @@ class Create extends Component
             );
 
             return;
+        }
+    }
+
+    /**
+     * Manda el ticket del contado a la impresora del cajero.
+     *
+     * Si no tiene equipo emparejado se deja la liga en la sesión: esta pantalla
+     * redirige al contrato, y un evento de navegador no sobrevive al redirect.
+     */
+    protected function mandarTicketDeContado(Recibo $recibo): void
+    {
+        $envio = app(EnvioDeTicket::class)->enviar(auth()->user(), $recibo);
+
+        if ($envio['aviso']) {
+            session()->flash('ticket_contado_aviso', $envio['aviso']);
+        }
+
+        if (! $envio['enviado']) {
+            session()->flash(
+                'ticket_contado_url',
+                route('admin.recibos.imprimir', ['recibo' => $recibo->uuid ?: $recibo->id])
+            );
         }
     }
 
