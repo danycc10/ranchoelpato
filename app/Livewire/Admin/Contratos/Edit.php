@@ -257,7 +257,21 @@ class Edit extends Component
             $saldoAnterior = (float) ($this->contrato->saldo_actual ?? 0);
             $estatusAnterior = (string) ($this->contrato->estatus ?? 'activo');
 
+            $clienteAnterior = (int) $this->contrato->cliente_id;
+
             $this->contrato->cliente_id = (int) $this->cliente_id;
+
+            // Al cambiar de comprador hay que volver a tomar sus datos: los
+            // documentos se arman con los que el contrato tiene congelados, y
+            // si no se refrescan seguirían nombrando al cliente anterior.
+            if ($clienteAnterior !== (int) $this->cliente_id) {
+                $nuevoCliente = Cliente::find($this->cliente_id);
+
+                if ($nuevoCliente) {
+                    $this->contrato->forceFill($nuevoCliente->datosComoComprador());
+                }
+            }
+
             $this->contrato->estatus = $this->nuevo_estatus;
             $this->contrato->liquidado_at = match (true) {
                 in_array($this->nuevo_estatus, ['liquidado', 'donacion'], true)

@@ -73,4 +73,25 @@ class Cliente extends Model
     {
         return trim(($this->nombres ?? '').' '.($this->apellidos ?? ''));
     }
+
+    /**
+     * Cómo queda este cliente congelado como comprador en un contrato.
+     *
+     * Los contratos guardan estos datos aparte para que un documento ya
+     * firmado no cambie si después se corrige el catálogo. Por eso hay que
+     * volver a tomarlos cuando el contrato cambia de cliente: si no, el
+     * contrato seguiría nombrando al comprador anterior.
+     *
+     * @return array<string, string|null>
+     */
+    public function datosComoComprador(): array
+    {
+        return [
+            'comprador_nombre_legal' => $this->nombre_legal ?: $this->nombre_completo,
+            'comprador_curp' => $this->curp,
+            // La credencial del comprador anterior no puede quedarse pegada.
+            'comprador_ine_frente' => $this->ine_frente,
+            'comprador_ine_reverso' => $this->ine_reverso,
+        ];
+    }
 }

@@ -209,6 +209,38 @@ class Create extends Component
         }
     }
 
+    /**
+     * Datos del comprador para el contrato de servicio.
+     *
+     * Salen del cliente actual; si a ese cliente le falta algo, se cae a lo
+     * que el contrato de terreno tenga guardado.
+     *
+     * @return array<string, string|null>
+     */
+    protected function datosDelComprador(Contrato $base): array
+    {
+        $delContrato = [
+            'comprador_nombre_legal' => $base->comprador_nombre_legal,
+            'comprador_curp' => $base->comprador_curp,
+            'comprador_ine_frente' => $base->comprador_ine_frente,
+            'comprador_ine_reverso' => $base->comprador_ine_reverso,
+        ];
+
+        $cliente = $base->cliente;
+
+        if (! $cliente) {
+            return $delContrato;
+        }
+
+        $datos = [];
+
+        foreach ($cliente->datosComoComprador() as $campo => $valor) {
+            $datos[$campo] = $valor ?: $delContrato[$campo];
+        }
+
+        return $datos;
+    }
+
     protected function recalcular(): void
     {
         $this->precio_total = max(0, (float) $this->precio_total);
@@ -428,10 +460,11 @@ class Create extends Component
 
                 'vendedor_nombre_legal' => $base->vendedor_nombre_legal,
                 'vendedor_curp' => $base->vendedor_curp,
-                'comprador_nombre_legal' => $base->comprador_nombre_legal,
-                'comprador_curp' => $base->comprador_curp,
-                'comprador_ine_frente' => $base->comprador_ine_frente,
-                'comprador_ine_reverso' => $base->comprador_ine_reverso,
+                // El comprador se toma del cliente de hoy, no de lo que el
+                // contrato de terreno haya congelado en su momento: si ese
+                // contrato cambió de cliente, su copia nombra al anterior.
+                ...$this->datosDelComprador($base),
+
                 'vendedor_ine_frente' => $base->vendedor_ine_frente,
                 'vendedor_ine_reverso' => $base->vendedor_ine_reverso,
                 'credenciales_disk' => $base->credenciales_disk,
