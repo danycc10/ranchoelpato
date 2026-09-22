@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Clientes;
 
 use App\Models\Cliente;
+use App\Services\Clientes\SolicitudDatosClienteService;
 use App\Services\Contratos\DatosIdentidadService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -22,6 +23,11 @@ class Index extends Component
     public string $sortDir = 'desc';
 
     public bool $modal = false;
+
+    /** Liga recién generada: se muestra una sola vez para copiarla. */
+    public ?string $ligaDatos = null;
+
+    public ?string $ligaDatosCliente = null;
 
     public ?int $editId = null;
 
@@ -412,6 +418,39 @@ class Index extends Component
         return $this->ine_reverso
             ? strtolower(pathinfo($this->ine_reverso, PATHINFO_EXTENSION)) === 'pdf'
             : false;
+    }
+
+    /**
+     * Genera la liga con la que el cliente captura sus propios datos.
+     *
+     * Se muestra una sola vez: en la base queda solo su hash.
+     */
+    public function generarLigaDatos(int $id, SolicitudDatosClienteService $solicitudes): void
+    {
+        $cliente = Cliente::query()->findOrFail($id);
+
+        $resultado = $solicitudes->crear($cliente, auth()->user());
+
+        $this->ligaDatos = route('publico.datos-cliente', $resultado['token']);
+        $this->ligaDatosCliente = $cliente->nombre_completo;
+
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($cliente)
+            ->withProperties(['expira_en' => $resultado['solicitud']->expira_en->toDateTimeString()])
+            ->log('Generó liga para que el cliente capture sus datos');
+
+        $this->dispatch(
+            'toast',
+            type: 'success',
+            message: 'Liga generada. Cópiala y mándasela al cliente.'
+        );
+    }
+
+    public function cerrarLigaDatos(): void
+    {
+        $this->ligaDatos = null;
+        $this->ligaDatosCliente = null;
     }
 
     public function toggleEstatus(int $id): void

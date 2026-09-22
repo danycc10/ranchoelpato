@@ -1,11 +1,50 @@
 <div class="max-w-6xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
 
+    {{-- Liga recien generada: se muestra una sola vez --}}
+    @if($ligaDatos)
+    <div class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4">
+        <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div class="border-b px-5 py-4">
+                <h2 class="text-lg font-black">Liga para {{ $ligaDatosCliente }}</h2>
+                <p class="mt-1 text-sm text-gray-600">
+                    Mándasela al cliente para que complete sus datos. Vence en una semana
+                    y deja de servir en cuanto se revise lo que capture.
+                </p>
+            </div>
+
+            <div class="space-y-3 p-5">
+                <input type="text" readonly value="{{ $ligaDatos }}"
+                    onclick="this.select()"
+                    class="w-full rounded-xl border bg-gray-50 px-3 py-2.5 font-mono text-xs">
+
+                <div class="flex justify-end gap-2">
+                    <button type="button"
+                        onclick="navigator.clipboard.writeText(@js($ligaDatos)); this.textContent='Copiada';"
+                        class="rounded-xl bg-black px-4 py-2 text-sm font-bold text-white">
+                        Copiar liga
+                    </button>
+
+                    <button wire:click="cerrarLigaDatos"
+                        class="rounded-xl border px-4 py-2 text-sm font-bold hover:bg-gray-50">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     {{-- Header --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
             <h1 class="text-2xl font-black">Clientes</h1>
             <p class="text-gray-500 text-sm">Alta y administración de clientes.</p>
         </div>
+
+        <a href="{{ route('admin.clientes.revision-datos') }}"
+            class="w-full sm:w-auto px-4 py-2 rounded-xl border font-bold text-center hover:bg-gray-50">
+            Datos por revisar
+        </a>
 
         <button
             wire:click="crear"
@@ -90,6 +129,12 @@
                         <button wire:click="editar({{ $it->id }})"
                             class="px-3 py-1 rounded-xl border hover:bg-gray-50">
                             Editar
+                        </button>
+
+                        <button wire:click="generarLigaDatos({{ $it->id }})"
+                            class="px-3 py-1 rounded-xl border hover:bg-gray-50"
+                            title="Genera una liga para que el cliente capture sus datos">
+                            Pedir datos
                         </button>
 
                         <button wire:click="toggleEstatus({{ $it->id }})"

@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\ContratosPdfController;
 use App\Http\Controllers\Admin\ReciboFirmaController;
 use App\Http\Controllers\Admin\RecibosPrintController;
 use App\Http\Controllers\PrivateFileController;
+use App\Livewire\Admin\Clientes\RevisionDatos;
 use App\Livewire\Admin\ClientesExcelentes\Contrato as ClientesExcelentesContrato;
 use App\Livewire\Admin\ClientesExcelentes\Index as ClientesExcelentesIndex;
 use App\Livewire\Admin\Comprobantes\Index as ComprobantesIndex;
@@ -21,35 +22,36 @@ use App\Livewire\Admin\ContratosServicios\Create as ContratoServicioCreate;
 use App\Livewire\Admin\ContratosServicios\Edit as ContratosServiciosEdit;
 use App\Livewire\Admin\ContratosServicios\Index as ContratoServicioIndex;
 use App\Livewire\Admin\ContratosServicios\Show as ContratoServicioShow;
-use App\Livewire\Admin\Permisos\Index as PermisosIndex;
 /*
 |--------------------------------------------------------------------------
 | Imports – Reports
 |--------------------------------------------------------------------------
 */
+use App\Livewire\Admin\Permisos\Index as PermisosIndex;
 use App\Livewire\Admin\Promociones\Index;
 use App\Livewire\Admin\Recibos\Crear;
 use App\Livewire\Admin\Recibos\Edit;
 use App\Livewire\Admin\Recibos\Index as RecibosIndex;
-use App\Livewire\Admin\Sistema\Impresion;
 /*
 |--------------------------------------------------------------------------
 | Imports – Dashboard
 |--------------------------------------------------------------------------
 */
-use App\Livewire\Admin\Sistema\Index as SistemaIndex;
+use App\Livewire\Admin\Sistema\Impresion;
 /*
 |--------------------------------------------------------------------------
 | Imports – Admin / Clientes Excelentes
 |--------------------------------------------------------------------------
 */
+use App\Livewire\Admin\Sistema\Index as SistemaIndex;
 use App\Livewire\Admin\TipoCobroPropietarioConfigs\Index as TipoCobroPropietarioConfigsIndex;
-use App\Livewire\Dashboard\CobranzaDashboard;
 /*
 |--------------------------------------------------------------------------
 | Imports – Admin / Sistema
 |--------------------------------------------------------------------------
 */
+use App\Livewire\Dashboard\CobranzaDashboard;
+use App\Livewire\Publico\CapturaDatosCliente;
 use App\Livewire\Reports\BankMovementsReport;
 use App\Livewire\Reports\CustomerPaymentsReport;
 use App\Livewire\Reports\DailyReceiptsReport;
@@ -180,6 +182,10 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
 
         Route::get('/clientes', App\Livewire\Admin\Clientes\Index::class)
             ->name('clientes')
+            ->middleware('permission:clientes.ver');
+
+        Route::get('/clientes/datos-por-revisar', RevisionDatos::class)
+            ->name('clientes.revision-datos')
             ->middleware('permission:clientes.ver');
 
         Route::get('/configuracion-propietarios-contables', TipoCobroPropietarioConfigsIndex::class)
@@ -346,3 +352,14 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
             ->middleware('permission:logs.ver');
 
     });
+
+/*
+ * Captura de datos del cliente con liga temporal.
+ *
+ * Es la unica pantalla sin sesion: el control de acceso es el token de la
+ * liga, que caduca y deja de servir al usarse. Con limite de intentos para
+ * que nadie ande adivinando tokens.
+ */
+Route::get('/datos/{token}', CapturaDatosCliente::class)
+    ->middleware('throttle:20,1')
+    ->name('publico.datos-cliente');
