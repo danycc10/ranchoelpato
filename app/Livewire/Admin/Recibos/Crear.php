@@ -1796,7 +1796,7 @@ class Crear extends Component
 
         $this->sincronizarPeriodoDesdeCuotasSeleccionadas();
 
-        $this->validate();
+        $this->validarAvisando();
 
         $montoEsperadoPagos = ! $this->asociarACuota
             ? (float) $this->monto
@@ -1809,9 +1809,7 @@ class Crear extends Component
         $pagosPrincipales = $this->normalizarPagosPrincipales($montoEsperadoPagos);
 
         if ($this->tipoCobroEsRecargo($this->tipos_cobro_id) && empty($this->cuotaIds)) {
-            throw ValidationException::withMessages([
-                'cuotaIds' => 'Debes seleccionar al menos una cuota para generar recargos.',
-            ]);
+            $this->detenerCon('cuotaIds', 'Debes seleccionar al menos una cuota para generar recargos.');
         }
 
         $imageUploadService ??= app(ImageUploadService::class);
@@ -1936,9 +1934,7 @@ class Crear extends Component
                 ->values();
 
             if ($cuotaIds->isEmpty()) {
-                throw ValidationException::withMessages([
-                    'cuotaIds' => 'Debes seleccionar al menos una cuota.',
-                ]);
+                $this->detenerCon('cuotaIds', 'Debes seleccionar al menos una cuota.');
             }
 
             $cuotasPendientesQuery = Cuota::query()
@@ -1961,9 +1957,7 @@ class Crear extends Component
                 $cuotaIds->all(),
                 $this->cuotaFueraDeOrdenAutorizada
             )) {
-                throw ValidationException::withMessages([
-                    'cuotaIds' => 'Debes cobrar la cuota más antigua o confirmar la excepción para continuar con otra cuota.',
-                ]);
+                $this->detenerCon('cuotaIds', 'Debes cobrar la cuota más antigua o confirmar la excepción para continuar con otra cuota.');
             }
 
             $cuotas = Cuota::with('contrato')
@@ -1975,9 +1969,7 @@ class Crear extends Component
                 ->get();
 
             if ($cuotas->count() !== $cuotaIds->count()) {
-                throw ValidationException::withMessages([
-                    'cuotaIds' => 'Hay cuotas inválidas o que no pertenecen al contrato seleccionado.',
-                ]);
+                $this->detenerCon('cuotaIds', 'Hay cuotas inválidas o que no pertenecen al contrato seleccionado.');
             }
 
             // Un solo recibo agrupa todas las cuotas seleccionadas: el desglose
@@ -2352,6 +2344,82 @@ class Crear extends Component
         }
 
         return "Esta operación generará {$principales} recibo(s). ¿Desea continuar?";
+    }
+
+    /**
+     * Nombres con los que el usuario conoce cada campo.
+     *
+     * Sin esto los avisos hablarían de "recargo forma pago id".
+     *
+     * @return array<string, string>
+     */
+    protected function validationAttributes(): array
+    {
+        return [
+            'cliente_id' => 'cliente',
+            'contrato_id' => 'contrato',
+            'lote_id' => 'lote',
+            'tipos_cobro_id' => 'tipo de cobro',
+            'forma_pago_id' => 'forma de pago',
+            'cuentas_bancarias_id' => 'cuenta bancaria',
+            'periodo_id' => 'periodo',
+            'fecha' => 'fecha',
+            'monto' => 'monto',
+            'metodo' => 'método de pago',
+            'referencia' => 'referencia',
+            'recargo_forma_pago_id' => 'forma de pago del recargo',
+            'recargo_cuentas_bancarias_id' => 'cuenta bancaria del recargo',
+            'recargo_metodo' => 'método de pago del recargo',
+            'recargo_referencia' => 'referencia del recargo',
+            'recargo_evidencia' => 'evidencia del recargo',
+            'cuotaIds' => 'cuotas',
+            'pagos' => 'pagos',
+        ];
+    }
+
+    /**
+     * Valida avisando con un toast lo que falte.
+     *
+     * El recibo se guarda desde varios lados, y algunos —como el modal que
+     * confirma el recargo— cierran la ventana antes de mostrar el error junto
+     * al campo: sin el aviso, al usuario le parece que el botón no hace nada.
+     */
+    protected function validarAvisando(): void
+    {
+        try {
+            $this->validate();
+        } catch (ValidationException $e) {
+            $mensajes = collect($e->validator->errors()->all())
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($mensajes->isNotEmpty()) {
+                $aviso = $mensajes->first();
+
+                if ($mensajes->count() > 1) {
+                    $aviso .= ' Faltan '.($mensajes->count() - 1).' dato(s) más por capturar.';
+                }
+
+                $this->dispatch('toast', type: 'error', message: $aviso);
+            }
+
+            // Se relanza para que Livewire marque también el campo en pantalla.
+            throw $e;
+        }
+    }
+
+    /**
+     * Corta el guardado avisando en pantalla.
+     *
+     * Marca el campo y además lanza el toast: cuando se guarda desde el modal
+     * del recargo, el error junto al campo se queda sin verse.
+     */
+    protected function detenerCon(string $campo, string $mensaje): never
+    {
+        $this->dispatch('toast', type: 'error', message: $mensaje);
+
+        throw ValidationException::withMessages([$campo => $mensaje]);
     }
 
     public function intentarGuardar(bool $imprimir = false): void
