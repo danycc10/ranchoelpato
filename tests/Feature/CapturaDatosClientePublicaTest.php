@@ -122,6 +122,39 @@ class CapturaDatosClientePublicaTest extends TestCase
     }
 
     #[Test]
+    public function la_caja_de_la_foto_invita_a_tocarla_en_vez_del_input_crudo(): void
+    {
+        $token = $this->ligaDe($this->cliente());
+
+        $html = Livewire::test(CapturaDatosCliente::class, ['token' => $token])->html();
+
+        $this->assertStringContainsString('Toca para agregar la foto', $html);
+        $this->assertStringContainsString('Cámara o galería', $html);
+
+        // El input sigue ahí, pero oculto: la caja entera es el disparador.
+        $this->assertStringContainsString('class="sr-only"', $html);
+    }
+
+    #[Test]
+    public function al_elegir_la_foto_se_ve_la_vista_previa_y_se_puede_quitar(): void
+    {
+        Storage::fake('private');
+
+        $token = $this->ligaDe($this->cliente());
+
+        $componente = Livewire::test(CapturaDatosCliente::class, ['token' => $token])
+            ->set('ine_frente', UploadedFile::fake()->image('ine.jpg'));
+
+        $componente->assertSee('Foto lista', false)
+            ->assertSee('Quitar foto');
+
+        // Y se puede descartar sin recargar la página.
+        $componente->call('quitarFrente')
+            ->assertSet('ine_frente', null)
+            ->assertSee('Toca para agregar la foto');
+    }
+
+    #[Test]
     public function un_archivo_que_no_es_imagen_se_rechaza(): void
     {
         Storage::fake('private');

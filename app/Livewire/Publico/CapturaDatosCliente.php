@@ -62,6 +62,30 @@ class CapturaDatosCliente extends Component
         return ['INE', 'Pasaporte', 'Cédula profesional', 'Licencia de conducir'];
     }
 
+    /**
+     * Avisa en cuanto eligen el archivo, sin esperar a que manden el
+     * formulario: así se dan cuenta ahí mismo de que no era una foto.
+     */
+    public function updatedIneFrente(): void
+    {
+        $this->validateOnly('ine_frente', ['ine_frente' => ['nullable', 'image', 'max:8192']]);
+    }
+
+    public function updatedIneReverso(): void
+    {
+        $this->validateOnly('ine_reverso', ['ine_reverso' => ['nullable', 'image', 'max:8192']]);
+    }
+
+    public function quitarFrente(): void
+    {
+        $this->ine_frente = null;
+    }
+
+    public function quitarReverso(): void
+    {
+        $this->ine_reverso = null;
+    }
+
     public function guardar(SolicitudDatosClienteService $solicitudes): void
     {
         if (! $this->solicitud || ! $this->solicitud->abierta()) {

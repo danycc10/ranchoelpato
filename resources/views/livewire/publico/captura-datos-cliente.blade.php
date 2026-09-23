@@ -118,25 +118,88 @@
                 <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                     <p class="text-sm font-bold text-gray-900">Foto de tu identificación</p>
                     <p class="mt-1 text-xs text-gray-600">
-                        Puedes tomarle foto con el celular. Cuida que se lea bien y que salga completa.
+                        Tómale foto con el celular o elige una que ya tengas.
+                        Cuida que se lea bien, que salga completa y sin reflejos.
                     </p>
 
-                    <div class="mt-3 grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <label class="text-xs font-semibold text-gray-700">Frente</label>
-                            <input type="file" wire:model="ine_frente" accept="image/*"
-                                   class="mt-1 w-full text-sm">
-                            <div wire:loading wire:target="ine_frente" class="mt-1 text-xs text-gray-500">Subiendo...</div>
-                            @error('ine_frente') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                        </div>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                        @foreach([
+                            ['campo' => 'ine_frente', 'titulo' => 'Frente', 'archivo' => $ine_frente, 'quitar' => 'quitarFrente'],
+                            ['campo' => 'ine_reverso', 'titulo' => 'Reverso', 'archivo' => $ine_reverso, 'quitar' => 'quitarReverso'],
+                        ] as $lado)
+                            <div wire:key="lado-{{ $lado['campo'] }}">
+                                <p class="mb-1 text-xs font-bold text-gray-700">{{ $lado['titulo'] }}</p>
 
-                        <div>
-                            <label class="text-xs font-semibold text-gray-700">Reverso</label>
-                            <input type="file" wire:model="ine_reverso" accept="image/*"
-                                   class="mt-1 w-full text-sm">
-                            <div wire:loading wire:target="ine_reverso" class="mt-1 text-xs text-gray-500">Subiendo...</div>
-                            @error('ine_reverso') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                        </div>
+                                {{-- Toda la caja es el disparador: en el celular
+                                     el input de archivo es muy chico para atinarle. --}}
+                                <label class="relative flex aspect-[1.6/1] cursor-pointer items-center justify-center overflow-hidden
+                                              rounded-xl border-2 border-dashed border-gray-300 bg-white transition
+                                              hover:border-gray-900 hover:bg-gray-50">
+
+                                    <input type="file" class="sr-only"
+                                           wire:model="{{ $lado['campo'] }}"
+                                           accept="image/*">
+
+                                    {{-- Subiendo --}}
+                                    <div wire:loading wire:target="{{ $lado['campo'] }}"
+                                         class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/90">
+                                        <svg class="h-6 w-6 animate-spin text-gray-900" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <circle class="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4Z"></path>
+                                        </svg>
+                                        <span class="text-xs font-semibold text-gray-700">Subiendo la foto...</span>
+                                    </div>
+
+                                    <div wire:loading.remove wire:target="{{ $lado['campo'] }}" class="h-full w-full">
+                                        @php
+                                            // Un archivo que no es imagen no se puede previsualizar:
+                                            // pedirle la miniatura tumbaría la página.
+                                            $sePuedeVer = $lado['archivo']
+                                                && method_exists($lado['archivo'], 'isPreviewable')
+                                                && $lado['archivo']->isPreviewable();
+                                        @endphp
+
+                                        @if($sePuedeVer)
+                                            <img src="{{ $lado['archivo']->temporaryUrl() }}"
+                                                 alt="Foto del {{ mb_strtolower($lado['titulo']) }} de tu identificación"
+                                                 class="h-full w-full object-cover">
+
+                                            <span class="absolute bottom-2 left-2 rounded-lg bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white">
+                                                Foto lista · toca para cambiarla
+                                            </span>
+                                        @elseif($lado['archivo'])
+                                            <div class="flex h-full flex-col items-center justify-center gap-2 px-3 text-center">
+                                                <svg class="h-8 w-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                                                </svg>
+                                                <span class="text-xs font-bold text-red-700">Eso no es una foto</span>
+                                                <span class="text-[11px] text-gray-600">Toca para elegir una imagen</span>
+                                            </div>
+                                        @else
+                                            <div class="flex h-full flex-col items-center justify-center gap-2 px-3 text-center">
+                                                <svg class="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
+                                                </svg>
+                                                <span class="text-xs font-bold text-gray-700">Toca para agregar la foto</span>
+                                                <span class="text-[11px] text-gray-500">Cámara o galería</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </label>
+
+                                @if($lado['archivo'])
+                                    <button type="button" wire:click="{{ $lado['quitar'] }}"
+                                            class="mt-1 text-xs font-semibold text-red-600 underline">
+                                        Quitar foto
+                                    </button>
+                                @endif
+
+                                @error($lado['campo'])
+                                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        @endforeach
                     </div>
                 </div>
 
