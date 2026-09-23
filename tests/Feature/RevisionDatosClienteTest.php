@@ -37,6 +37,25 @@ class RevisionDatosClienteTest extends TestCase
     }
 
     #[Test]
+    public function la_tabla_ofrece_las_tres_acciones_con_su_etiqueta(): void
+    {
+        $this->cliente();
+
+        $html = Livewire::actingAs($this->usuario())
+            ->test(ClientesIndex::class)
+            ->html();
+
+        // Los botones de la tabla son solo icono: sin estas etiquetas nadie
+        // sabría cuál es cuál, ni con lector de pantalla ni al pasar el mouse.
+        $this->assertStringContainsString('aria-label="Editar cliente"', $html);
+        $this->assertStringContainsString('aria-label="Pedir datos al cliente"', $html);
+        $this->assertStringContainsString('aria-label="Desactivar cliente"', $html);
+
+        // Y en la tarjeta del celular van con texto, incluida la de pedir datos.
+        $this->assertStringContainsString('Pedir datos', $html);
+    }
+
+    #[Test]
     public function lo_capturado_aparece_comparado_contra_lo_que_habia(): void
     {
         $cliente = $this->cliente();

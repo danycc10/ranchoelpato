@@ -125,22 +125,44 @@
                         </span>
                     </td>
 
-                    <td class="p-3 text-right space-x-2 whitespace-nowrap">
-                        <button wire:click="editar({{ $it->id }})"
-                            class="px-3 py-1 rounded-xl border hover:bg-gray-50">
-                            Editar
-                        </button>
+                    <td class="p-3 whitespace-nowrap">
+                        <div class="flex items-center justify-end gap-1">
 
-                        <button wire:click="generarLigaDatos({{ $it->id }})"
-                            class="px-3 py-1 rounded-xl border hover:bg-gray-50"
-                            title="Genera una liga para que el cliente capture sus datos">
-                            Pedir datos
-                        </button>
+                            <button wire:click="editar({{ $it->id }})"
+                                title="Editar cliente" aria-label="Editar cliente"
+                                class="rounded-xl border p-2 text-gray-700 transition hover:bg-gray-50 hover:text-black">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                                </svg>
+                            </button>
 
-                        <button wire:click="toggleEstatus({{ $it->id }})"
-                            class="px-3 py-1 rounded-xl border hover:bg-gray-50">
-                            {{ $it->estatus === 'activo' ? 'Desactivar' : 'Activar' }}
-                        </button>
+                            <button wire:click="generarLigaDatos({{ $it->id }})"
+                                title="Generar liga para que el cliente capture sus datos"
+                                aria-label="Pedir datos al cliente"
+                                class="rounded-xl border p-2 text-indigo-600 transition hover:bg-indigo-50">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+                                </svg>
+                            </button>
+
+                            @if($it->estatus === 'activo')
+                                <button wire:click="toggleEstatus({{ $it->id }})"
+                                    title="Desactivar cliente" aria-label="Desactivar cliente"
+                                    class="rounded-xl border p-2 text-amber-600 transition hover:bg-amber-50">
+                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                                    </svg>
+                                </button>
+                            @else
+                                <button wire:click="toggleEstatus({{ $it->id }})"
+                                    title="Activar cliente" aria-label="Activar cliente"
+                                    class="rounded-xl border p-2 text-emerald-600 transition hover:bg-emerald-50">
+                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m9 12.75 2.25 2.25L15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                    </svg>
+                                </button>
+                            @endif
+                        </div>
                     </td>
                 </tr>
                 @empty
@@ -222,14 +244,37 @@
             <div class="mt-4 grid grid-cols-1 gap-2">
                 <button
                     wire:click="editar({{ $it->id }})"
-                    class="w-full px-4 py-2 rounded-xl border hover:bg-gray-50 font-semibold">
+                    class="flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 font-semibold hover:bg-gray-50">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                    </svg>
                     Editar
                 </button>
 
                 <button
+                    wire:click="generarLigaDatos({{ $it->id }})"
+                    class="flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 font-semibold text-indigo-700 hover:bg-indigo-50">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+                    </svg>
+                    Pedir datos
+                </button>
+
+                <button
                     wire:click="toggleEstatus({{ $it->id }})"
-                    class="w-full px-4 py-2 rounded-xl border hover:bg-gray-50 font-semibold">
-                    {{ $it->estatus === 'activo' ? 'Desactivar' : 'Activar' }}
+                    class="flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 font-semibold hover:bg-gray-50
+                        {{ $it->estatus === 'activo' ? 'text-amber-700' : 'text-emerald-700' }}">
+                    @if($it->estatus === 'activo')
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        Desactivar
+                    @else
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m9 12.75 2.25 2.25L15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                        Activar
+                    @endif
                 </button>
             </div>
         </div>
