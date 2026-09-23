@@ -92,10 +92,10 @@ class RevisionDatosClienteTest extends TestCase
 
         $sinLiga = $this->cliente();
 
-        $conLiga = Cliente::create(['nombres' => 'Beto', 'apellidos' => 'Enviada']);
+        $conLiga = Cliente::create(['nombres' => 'Beto', 'apellidos' => 'Xilitla']);
         $servicio->crear($conLiga);
 
-        $contesto = Cliente::create(['nombres' => 'Caro', 'apellidos' => 'Contesto']);
+        $contesto = Cliente::create(['nombres' => 'Caro', 'apellidos' => 'Wadley']);
         $this->capturaDe($contesto, ['curp' => 'COAC900101MCLXXX01']);
 
         $html = Livewire::actingAs($this->usuario())->test(ClientesIndex::class)->html();
@@ -110,7 +110,7 @@ class RevisionDatosClienteTest extends TestCase
     #[Test]
     public function una_liga_vencida_se_distingue_de_una_viva(): void
     {
-        $cliente = Cliente::create(['nombres' => 'Dani', 'apellidos' => 'Vencida']);
+        $cliente = Cliente::create(['nombres' => 'Dani', 'apellidos' => 'Yecapixtla']);
 
         $resultado = app(SolicitudDatosClienteService::class)->crear($cliente);
         $resultado['solicitud']->forceFill(['expira_en' => now()->subDay()])->save();
@@ -119,6 +119,85 @@ class RevisionDatosClienteTest extends TestCase
 
         $this->assertStringContainsString('Liga vencida', $html);
         $this->assertStringNotContainsString('Enviada · sin contestar', $html);
+    }
+
+    #[Test]
+    public function el_filtro_acota_por_el_estado_de_la_liga(): void
+    {
+        $este = $this->clientesDeCadaEstado();
+
+        $componente = Livewire::actingAs($this->usuario())->test(ClientesIndex::class);
+
+        // Sin filtro salen todos.
+        $componente->assertSee('Zumpango')->assertSee('Wadley')->assertSee('Yecapixtla');
+
+        $componente->set('ligaFilter', 'contestada')
+            ->assertSee('Wadley')
+            ->assertDontSee('Zumpango')
+            ->assertDontSee('Xilitla')
+            ->assertDontSee('Yecapixtla');
+
+        $componente->set('ligaFilter', 'enviada')
+            ->assertSee('Xilitla')
+            ->assertDontSee('Wadley')
+            ->assertDontSee('Yecapixtla');
+
+        $componente->set('ligaFilter', 'vencida')
+            ->assertSee('Yecapixtla')
+            ->assertDontSee('Xilitla')
+            ->assertDontSee('Wadley');
+
+        $componente->set('ligaFilter', 'sin')
+            ->assertSee('Zumpango')
+            ->assertDontSee('Wadley')
+            ->assertDontSee('Xilitla');
+
+        $this->assertCount(4, $este);
+    }
+
+    #[Test]
+    public function un_cliente_cuya_liga_ya_se_aplico_vuelve_a_contar_como_sin_liga(): void
+    {
+        $cliente = Cliente::create(['nombres' => 'Eva', 'apellidos' => 'Aplicada']);
+
+        $solicitud = $this->capturaDe($cliente, ['curp' => 'APEV900101MCLXXX01']);
+        app(SolicitudDatosClienteService::class)->aplicar($solicitud);
+
+        Livewire::actingAs($this->usuario())
+            ->test(ClientesIndex::class)
+            ->set('ligaFilter', 'sin')
+            ->assertSee('Aplicada');
+    }
+
+    #[Test]
+    public function el_filtro_regresa_a_la_primera_pagina(): void
+    {
+        $this->clientesDeCadaEstado();
+
+        Livewire::actingAs($this->usuario())
+            ->test(ClientesIndex::class)
+            ->call('gotoPage', 3)
+            ->set('ligaFilter', 'contestada')
+            ->assertSet('paginators.page', 1);
+    }
+
+    /** Un cliente por cada estado posible de la liga. */
+    private function clientesDeCadaEstado(): array
+    {
+        $servicio = app(SolicitudDatosClienteService::class);
+
+        $sin = Cliente::create(['nombres' => 'Ana', 'apellidos' => 'Zumpango']);
+
+        $enviada = Cliente::create(['nombres' => 'Beto', 'apellidos' => 'Xilitla']);
+        $servicio->crear($enviada);
+
+        $contesto = Cliente::create(['nombres' => 'Caro', 'apellidos' => 'Wadley']);
+        $this->capturaDe($contesto, ['curp' => 'COAC900101MCLXXX01']);
+
+        $vencida = Cliente::create(['nombres' => 'Dani', 'apellidos' => 'Yecapixtla']);
+        $servicio->crear($vencida)['solicitud']->forceFill(['expira_en' => now()->subDay()])->save();
+
+        return [$sin, $enviada, $contesto, $vencida];
     }
 
     #[Test]

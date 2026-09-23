@@ -53,14 +53,40 @@
         </button>
     </div>
 
-    {{-- Buscar --}}
-    <div>
+    {{-- Buscar y filtrar --}}
+    <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
         <input
             type="text"
             wire:model.live.debounce.300ms="q"
             class="w-full rounded-xl border-gray-300"
             placeholder="Buscar por nombre, apellidos, nombre legal, teléfono, correo, CURP o RFC...">
+
+        <select wire:model.live="ligaFilter"
+                class="w-full rounded-xl border-gray-300 sm:w-64"
+                aria-label="Filtrar por el estado de la liga">
+            <option value="">Todas las ligas</option>
+            <option value="contestada">Contestadas · por revisar</option>
+            <option value="enviada">Enviadas · sin contestar</option>
+            <option value="vencida">Vencidas</option>
+            <option value="sin">Sin liga</option>
+        </select>
     </div>
+
+    @if($ligaFilter !== '')
+        <div class="flex items-center gap-2 text-sm text-gray-600">
+            <span>Mostrando solo: <span class="font-bold">{{ [
+                'contestada' => 'contestadas, por revisar',
+                'enviada' => 'enviadas sin contestar',
+                'vencida' => 'ligas vencidas',
+                'sin' => 'clientes sin liga',
+            ][$ligaFilter] ?? '' }}</span></span>
+
+            <button type="button" wire:click="$set('ligaFilter', '')"
+                    class="font-semibold text-indigo-700 underline">
+                Quitar filtro
+            </button>
+        </div>
+    @endif
 
     {{-- TABLA --}}
     <div class="hidden md:block overflow-x-auto bg-white rounded-2xl border">

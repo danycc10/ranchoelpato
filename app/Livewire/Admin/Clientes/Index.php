@@ -55,8 +55,12 @@ class Index extends Component
 
     public ?string $documentos_disk = 'private';
 
+    /** Filtro por el estado de la liga de captura: '', sin, enviada, contestada, vencida. */
+    public string $ligaFilter = '';
+
     protected $queryString = [
         'q' => ['except' => ''],
+        'ligaFilter' => ['except' => ''],
         'sortBy' => ['except' => 'id'],
         'sortDir' => ['except' => 'desc'],
     ];
@@ -64,6 +68,48 @@ class Index extends Component
     public function updatedQ(): void
     {
         $this->resetPage();
+    }
+
+    public function updatedLigaFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    /**
+     * Acota la lista por cómo va la liga de cada cliente.
+     *
+     * Sigue el mismo criterio que la columna: solo cuentan las ligas vivas
+     * —pendientes o ya contestadas—, y de esas hay a lo más una por cliente.
+     */
+    protected function filtrarPorLiga($query): void
+    {
+        $abiertas = [SolicitudDatosCliente::PENDIENTE, SolicitudDatosCliente::CAPTURADA];
+
+        match ($this->ligaFilter) {
+            'sin' => $query->whereDoesntHave(
+                'solicitudesDatos',
+                fn ($q) => $q->whereIn('estatus', $abiertas)
+            ),
+
+            'contestada' => $query->whereHas(
+                'solicitudesDatos',
+                fn ($q) => $q->where('estatus', SolicitudDatosCliente::CAPTURADA)
+            ),
+
+            'enviada' => $query->whereHas(
+                'solicitudesDatos',
+                fn ($q) => $q->where('estatus', SolicitudDatosCliente::PENDIENTE)
+                    ->where('expira_en', '>', now())
+            ),
+
+            'vencida' => $query->whereHas(
+                'solicitudesDatos',
+                fn ($q) => $q->where('estatus', SolicitudDatosCliente::PENDIENTE)
+                    ->where('expira_en', '<=', now())
+            ),
+
+            default => null,
+        };
     }
 
     public function sort(string $field): void
@@ -479,6 +525,10 @@ class Index extends Component
                     ->orWhere('curp', 'like', "%{$q}%")
                     ->orWhere('rfc', 'like', "%{$q}%");
             });
+        }
+
+        if ($this->ligaFilter !== '') {
+            $this->filtrarPorLiga($query);
         }
 
         $allowed = ['id', 'nombres', 'apellidos', 'nombre_legal', 'telefono', 'correo', 'estatus'];

@@ -64,6 +64,12 @@ class Cliente extends Model
         return $this->hasMany(Contrato::class, 'cliente_id');
     }
 
+    /** Las ligas que se le han mandado para que capture sus datos. */
+    public function solicitudesDatos(): HasMany
+    {
+        return $this->hasMany(SolicitudDatosCliente::class, 'cliente_id');
+    }
+
     public function recibos(): HasMany
     {
         return $this->hasMany(Recibo::class, 'cliente_id');
