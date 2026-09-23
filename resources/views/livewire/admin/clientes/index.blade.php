@@ -73,9 +73,6 @@
                     <th class="text-left p-3">
                         <button type="button" wire:click="sort('nombres')" class="font-bold">Cliente</button>
                     </th>
-                    <th class="text-left p-3">
-                        <button type="button" wire:click="sort('nombre_legal')" class="font-bold">Nombre legal</button>
-                    </th>
                     <th class="text-left p-3">Teléfono</th>
                     <th class="text-left p-3">Correo</th>
                     <th class="text-left p-3">CURP</th>
@@ -98,7 +95,6 @@
                         <div class="text-xs text-gray-500">{{ $it->direccion ?: '—' }}</div>
                     </td>
 
-                    <td class="p-3">{{ $it->nombre_legal ?: '—' }}</td>
                     <td class="p-3">{{ $it->telefono ?: '—' }}</td>
 
                     <td class="p-3">
@@ -219,7 +215,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td class="p-4 text-gray-500" colspan="12">Sin clientes.</td>
+                    <td class="p-4 text-gray-500" colspan="11">Sin clientes.</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -236,11 +232,6 @@
                 <div class="min-w-0">
                     <div class="font-black leading-tight break-words">
                         {{ $it->nombre_completo }}
-                    </div>
-
-                    <div class="mt-1 text-sm text-gray-600 break-words">
-                        <span class="text-gray-500">Nombre legal:</span>
-                        <span class="font-semibold">{{ $it->nombre_legal ?: '—' }}</span>
                     </div>
 
                     <div class="mt-1 text-sm text-gray-600 break-words">
