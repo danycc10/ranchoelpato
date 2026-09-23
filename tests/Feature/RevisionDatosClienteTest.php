@@ -56,6 +56,72 @@ class RevisionDatosClienteTest extends TestCase
     }
 
     #[Test]
+    public function la_tabla_muestra_cuanto_le_falta_al_expediente(): void
+    {
+        $vacio = $this->cliente();
+
+        $completo = Cliente::create([
+            'nombres' => 'Ana', 'apellidos' => 'Completa',
+            'nombre_legal' => 'ANA COMPLETA', 'curp' => 'COAA900101MCLXXX01',
+            'rfc' => 'COAA900101RN9', 'telefono' => '8781234567',
+            'correo' => 'ana@example.test', 'direccion' => 'Calle 1',
+            'nacionalidad' => 'Mexicana', 'estado_civil' => 'Soltera',
+            'ocupacion' => 'Enfermera', 'identificacion_tipo' => 'INE',
+            'identificacion_numero' => '1234', 'ine_frente' => 'ine/f.jpg',
+            'ine_reverso' => 'ine/r.jpg',
+        ]);
+
+        $html = Livewire::actingAs($this->usuario())->test(ClientesIndex::class)->html();
+
+        // El que no trae nada arranca muy abajo y el completo llega al 100%.
+        $this->assertStringContainsString('0/13', $html);
+        $this->assertStringContainsString('13/13', $html);
+        $this->assertStringContainsString('100%', $html);
+
+        // Y se puede ver qué le falta sin entrar al cliente.
+        $this->assertStringContainsString('Faltan: ', $html);
+
+        $this->assertNotNull($vacio->id);
+        $this->assertNotNull($completo->id);
+    }
+
+    #[Test]
+    public function la_tabla_dice_en_que_va_la_liga_de_cada_cliente(): void
+    {
+        $servicio = app(SolicitudDatosClienteService::class);
+
+        $sinLiga = $this->cliente();
+
+        $conLiga = Cliente::create(['nombres' => 'Beto', 'apellidos' => 'Enviada']);
+        $servicio->crear($conLiga);
+
+        $contesto = Cliente::create(['nombres' => 'Caro', 'apellidos' => 'Contesto']);
+        $this->capturaDe($contesto, ['curp' => 'COAC900101MCLXXX01']);
+
+        $html = Livewire::actingAs($this->usuario())->test(ClientesIndex::class)->html();
+
+        $this->assertStringContainsString('Sin liga', $html);
+        $this->assertStringContainsString('Enviada · sin contestar', $html);
+        $this->assertStringContainsString('Contestada · revisar', $html);
+
+        $this->assertNotNull($sinLiga->id);
+    }
+
+    #[Test]
+    public function una_liga_vencida_se_distingue_de_una_viva(): void
+    {
+        $cliente = Cliente::create(['nombres' => 'Dani', 'apellidos' => 'Vencida']);
+
+        $resultado = app(SolicitudDatosClienteService::class)->crear($cliente);
+        $resultado['solicitud']->forceFill(['expira_en' => now()->subDay()])->save();
+
+        $html = Livewire::actingAs($this->usuario())->test(ClientesIndex::class)->html();
+
+        $this->assertStringContainsString('Liga vencida', $html);
+        $this->assertStringNotContainsString('Enviada · sin contestar', $html);
+    }
+
+    #[Test]
     public function lo_capturado_aparece_comparado_contra_lo_que_habia(): void
     {
         $cliente = $this->cliente();

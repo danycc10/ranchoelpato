@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Clientes;
 
 use App\Models\Cliente;
+use App\Models\SolicitudDatosCliente;
 use App\Services\Clientes\SolicitudDatosClienteService;
 use App\Services\Contratos\DatosIdentidadService;
 use Illuminate\Support\Facades\Storage;
@@ -488,8 +489,24 @@ class Index extends Component
             ->orderBy($sortBy, $sortDir)
             ->paginate(12);
 
+        // Las ligas vivas de esta página, en una sola consulta.
+        $ligas = SolicitudDatosCliente::query()
+            ->whereIn('cliente_id', $items->pluck('id'))
+            ->whereIn('estatus', [SolicitudDatosCliente::PENDIENTE, SolicitudDatosCliente::CAPTURADA])
+            ->orderBy('id')
+            ->get()
+            ->keyBy('cliente_id');
+
+        $servicio = app(SolicitudDatosClienteService::class);
+
+        $progresos = $items->mapWithKeys(
+            fn ($cliente) => [$cliente->id => $servicio->progreso($cliente)]
+        );
+
         return view('livewire.admin.clientes.index', [
             'items' => $items,
+            'ligas' => $ligas,
+            'progresos' => $progresos,
         ])->layout('layouts.app');
     }
 }

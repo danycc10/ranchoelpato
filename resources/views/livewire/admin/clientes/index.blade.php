@@ -80,6 +80,8 @@
                     <th class="text-left p-3">Correo</th>
                     <th class="text-left p-3">CURP</th>
                     <th class="text-left p-3">INE</th>
+                    <th class="text-left p-3">Expediente</th>
+                    <th class="text-left p-3">Liga</th>
                     <th class="text-left p-3">
                         <button type="button" wire:click="sort('estatus')" class="font-bold">Estatus</button>
                     </th>
@@ -116,6 +118,56 @@
                                 Reverso {{ $it->ine_reverso ? '✓' : '—' }}
                             </span>
                         </div>
+                    </td>
+
+                    {{-- Qué tan completo está su expediente --}}
+                    @php
+                        $avance = $progresos[$it->id];
+                        $barra = match (true) {
+                            $avance['porcentaje'] >= 100 => 'bg-emerald-500',
+                            $avance['porcentaje'] >= 60 => 'bg-amber-500',
+                            default => 'bg-red-500',
+                        };
+                    @endphp
+
+                    <td class="p-3">
+                        <div class="w-32"
+                             title="{{ $avance['faltan'] ? 'Faltan: '.implode(', ', $avance['faltan']) : 'Expediente completo' }}">
+                            <div class="flex items-center justify-between text-xs font-semibold">
+                                <span class="{{ $avance['porcentaje'] >= 100 ? 'text-emerald-700' : 'text-gray-700' }}">
+                                    {{ $avance['llenos'] }}/{{ $avance['total'] }}
+                                </span>
+                                <span class="text-gray-500">{{ $avance['porcentaje'] }}%</span>
+                            </div>
+
+                            <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                                <div class="h-full rounded-full {{ $barra }}" style="width: {{ $avance['porcentaje'] }}%"></div>
+                            </div>
+                        </div>
+                    </td>
+
+                    {{-- Estado de la liga que se le mandó --}}
+                    @php $liga = $ligas[$it->id] ?? null; @endphp
+
+                    <td class="p-3">
+                        @if(! $liga)
+                            <span class="text-xs text-gray-400">Sin liga</span>
+                        @elseif($liga->esperaRevision())
+                            <a href="{{ route('admin.clientes.revision-datos') }}"
+                               class="inline-flex items-center gap-1 rounded-lg bg-indigo-100 px-2 py-1 text-xs font-bold text-indigo-800 hover:bg-indigo-200">
+                                Contestada · revisar
+                            </a>
+                        @elseif($liga->vencida())
+                            <span class="rounded-lg bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600"
+                                  title="Venció el {{ $liga->expira_en->format('d/m/Y') }}">
+                                Liga vencida
+                            </span>
+                        @else
+                            <span class="rounded-lg bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900"
+                                  title="Vence el {{ $liga->expira_en->format('d/m/Y') }}">
+                                Enviada · sin contestar
+                            </span>
+                        @endif
                     </td>
 
                     <td class="p-3">
@@ -167,7 +219,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td class="p-4 text-gray-500" colspan="9">Sin clientes.</td>
+                    <td class="p-4 text-gray-500" colspan="12">Sin clientes.</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -237,6 +289,55 @@
                         <span class="px-2 py-1 rounded-lg text-xs font-semibold {{ $it->ine_reverso ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600' }}">
                             Reverso {{ $it->ine_reverso ? '✓' : '—' }}
                         </span>
+                    </div>
+                </div>
+
+                {{-- Avance del expediente y estado de la liga --}}
+                @php
+                    $avance = $progresos[$it->id];
+                    $liga = $ligas[$it->id] ?? null;
+                    $barra = match (true) {
+                        $avance['porcentaje'] >= 100 => 'bg-emerald-500',
+                        $avance['porcentaje'] >= 60 => 'bg-amber-500',
+                        default => 'bg-red-500',
+                    };
+                @endphp
+
+                <div class="pt-1">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-500">Expediente</span>
+                        <span class="font-bold {{ $avance['porcentaje'] >= 100 ? 'text-emerald-700' : 'text-gray-700' }}">
+                            {{ $avance['llenos'] }}/{{ $avance['total'] }} · {{ $avance['porcentaje'] }}%
+                        </span>
+                    </div>
+
+                    <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                        <div class="h-full rounded-full {{ $barra }}" style="width: {{ $avance['porcentaje'] }}%"></div>
+                    </div>
+
+                    @if($avance['faltan'])
+                        <p class="mt-1 text-[11px] text-gray-500">
+                            Falta: {{ implode(', ', array_slice($avance['faltan'], 0, 3)) }}@if(count($avance['faltan']) > 3) y {{ count($avance['faltan']) - 3 }} más @endif
+                        </p>
+                    @endif
+
+                    <div class="mt-2">
+                        @if(! $liga)
+                            <span class="text-xs text-gray-400">Sin liga generada</span>
+                        @elseif($liga->esperaRevision())
+                            <a href="{{ route('admin.clientes.revision-datos') }}"
+                               class="inline-block rounded-lg bg-indigo-100 px-2 py-1 text-xs font-bold text-indigo-800">
+                                Contestada · revisar
+                            </a>
+                        @elseif($liga->vencida())
+                            <span class="rounded-lg bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
+                                Liga vencida
+                            </span>
+                        @else
+                            <span class="rounded-lg bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
+                                Enviada · vence {{ $liga->expira_en->format('d/m') }}
+                            </span>
+                        @endif
                     </div>
                 </div>
             </div>

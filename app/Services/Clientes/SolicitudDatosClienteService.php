@@ -193,6 +193,34 @@ class SolicitudDatosClienteService
             }
         }
 
+        // La identificación también hace falta para armar el contrato.
+        if (blank($cliente->ine_frente ?? null)) {
+            $faltan['ine_frente'] = 'Identificación (frente)';
+        }
+
+        if (blank($cliente->ine_reverso ?? null)) {
+            $faltan['ine_reverso'] = 'Identificación (reverso)';
+        }
+
         return $faltan;
+    }
+
+    /**
+     * Qué tan completo está el expediente del cliente.
+     *
+     * @return array{llenos: int, total: int, porcentaje: int, faltan: array<string, string>}
+     */
+    public function progreso(Cliente $cliente): array
+    {
+        $total = count(self::CAMPOS) + 2; // los dos lados de la identificación
+        $faltan = $this->faltantes($cliente);
+        $llenos = $total - count($faltan);
+
+        return [
+            'llenos' => $llenos,
+            'total' => $total,
+            'porcentaje' => $total > 0 ? (int) round($llenos / $total * 100) : 0,
+            'faltan' => $faltan,
+        ];
     }
 }
