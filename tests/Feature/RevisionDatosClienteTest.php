@@ -9,6 +9,7 @@ use App\Models\SolicitudDatosCliente;
 use App\Models\User;
 use App\Services\Clientes\SolicitudDatosClienteService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Permission\Models\Permission;
@@ -250,6 +251,90 @@ class RevisionDatosClienteTest extends TestCase
 
         $this->assertSame('PEJU800101HCLXXX01', $cliente->fresh()->curp);
         $this->assertSame(SolicitudDatosCliente::APLICADA, $solicitud->fresh()->estatus);
+    }
+
+    #[Test]
+    public function lo_palomeado_al_abrir_es_lo_que_de_verdad_se_aplica(): void
+    {
+        $cliente = $this->cliente();
+        $cliente->update(['telefono' => '8781234567']);
+
+        $solicitud = $this->capturaDe($cliente, [
+            'curp' => 'PEJU800101HCLXXX01',
+            'telefono' => '8781234567',
+        ]);
+
+        $componente = Livewire::actingAs($this->usuario())->test(RevisionDatos::class);
+
+        // La selección existe de verdad, no solo se ve palomeada: si estuviera
+        // vacía, al aplicar pasaría algo distinto de lo que muestra la pantalla.
+        $seleccion = $componente->get('seleccion')[$solicitud->id];
+
+        $this->assertContains('curp', $seleccion);
+        $this->assertNotContains('telefono', $seleccion);
+    }
+
+    #[Test]
+    public function destildar_un_dato_lo_deja_fuera_al_aplicar(): void
+    {
+        $cliente = $this->cliente();
+
+        $solicitud = $this->capturaDe($cliente, [
+            'curp' => 'PEJU800101HCLXXX01',
+            'ocupacion' => 'Albanil',
+        ]);
+
+        Livewire::actingAs($this->usuario())
+            ->test(RevisionDatos::class)
+            // El revisor deja solo la ocupación.
+            ->set('seleccion.'.$solicitud->id, ['ocupacion'])
+            ->call('aplicar', $solicitud->id);
+
+        $actualizado = $cliente->fresh();
+
+        $this->assertSame('Albanil', $actualizado->ocupacion);
+        $this->assertNull($actualizado->curp);
+    }
+
+    #[Test]
+    public function la_credencial_capturada_se_muestra_para_poder_revisarla(): void
+    {
+        $cliente = $this->cliente();
+
+        $solicitud = $this->capturaDe($cliente, ['curp' => 'PEJU800101HCLXXX01']);
+        $solicitud->forceFill([
+            'ine_frente' => 'clientes/1/identificacion/frente.jpg',
+            'ine_reverso' => 'clientes/1/identificacion/reverso.jpg',
+        ])->save();
+
+        $html = Livewire::actingAs($this->usuario())->test(RevisionDatos::class)->html();
+
+        // Sin ver la foto no se puede validar: tiene que venir la imagen.
+        foreach (['frente', 'reverso'] as $lado) {
+            $this->assertStringContainsString(
+                route('admin.clientes.solicitud-ine', ['solicitud' => $solicitud->id, 'lado' => $lado], false),
+                $html
+            );
+        }
+
+        $this->assertStringContainsString('<img', $html);
+    }
+
+    #[Test]
+    public function la_credencial_solo_se_sirve_a_quien_tiene_permiso(): void
+    {
+        Storage::fake('private');
+        Storage::disk('private')->put('clientes/1/ine.jpg', 'contenido');
+
+        $solicitud = $this->capturaDe($this->cliente(), ['curp' => 'PEJU800101HCLXXX01']);
+        $solicitud->forceFill(['ine_frente' => 'clientes/1/ine.jpg'])->save();
+
+        $url = route('admin.clientes.solicitud-ine', ['solicitud' => $solicitud->id, 'lado' => 'frente']);
+
+        // Es una identificación oficial: no puede quedar al alcance de cualquiera.
+        $this->get($url)->assertRedirect();
+
+        $this->actingAs($this->usuario())->get($url)->assertOk();
     }
 
     #[Test]

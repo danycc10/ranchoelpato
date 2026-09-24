@@ -16,7 +16,6 @@
     @forelse($solicitudes as $solicitud)
         @php
             $filas = $this->comparacion($solicitud);
-            $porDefecto = $this->camposPorDefecto($solicitud);
         @endphp
 
         <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
@@ -63,8 +62,7 @@
                                     <input type="checkbox"
                                            class="rounded"
                                            value="{{ $fila['campo'] }}"
-                                           wire:model="seleccion.{{ $solicitud->id }}"
-                                           @checked(in_array($fila['campo'], $porDefecto, true))>
+                                           wire:model.live="seleccion.{{ $solicitud->id }}">
                                 </td>
                                 <td class="p-3 font-semibold">{{ $fila['etiqueta'] }}</td>
                                 <td class="p-3">{{ $fila['actual'] ?: '—' }}</td>
@@ -77,23 +75,33 @@
                             </tr>
                         @endforeach
 
-                        @if($solicitud->ine_frente || $solicitud->ine_reverso)
-                            <tr class="border-t">
-                                <td class="p-3">
-                                    <input type="checkbox" class="rounded" value="ine_frente"
-                                           wire:model="seleccion.{{ $solicitud->id }}"
-                                           @checked(in_array('ine_frente', $porDefecto, true))
-                                           @disabled(! $solicitud->ine_frente)>
+                        @foreach([
+                            ['campo' => 'ine_frente', 'titulo' => 'Identificación (frente)', 'lado' => 'frente', 'archivo' => $solicitud->ine_frente, 'actual' => $solicitud->cliente?->ine_frente],
+                            ['campo' => 'ine_reverso', 'titulo' => 'Identificación (reverso)', 'lado' => 'reverso', 'archivo' => $solicitud->ine_reverso, 'actual' => $solicitud->cliente?->ine_reverso],
+                        ] as $credencial)
+                            @continue(! $credencial['archivo'])
+
+                            <tr class="border-t" wire:key="ine-{{ $solicitud->id }}-{{ $credencial['campo'] }}">
+                                <td class="p-3 align-top">
+                                    <input type="checkbox" class="rounded"
+                                           value="{{ $credencial['campo'] }}"
+                                           wire:model.live="seleccion.{{ $solicitud->id }}">
                                 </td>
-                                <td class="p-3 font-semibold">Identificación</td>
-                                <td class="p-3">—</td>
-                                <td class="p-3 font-bold text-gray-900">
-                                    {{ $solicitud->ine_frente ? 'Frente' : '' }}
-                                    {{ $solicitud->ine_reverso ? ' y reverso' : '' }}
-                                    subidos por el cliente
+                                <td class="p-3 align-top font-semibold">{{ $credencial['titulo'] }}</td>
+                                <td class="p-3 align-top">{{ $credencial['actual'] ? 'Ya tenía una' : '—' }}</td>
+                                <td class="p-3">
+                                    {{-- Hay que verla para poder validarla. --}}
+                                    <a href="{{ route('admin.clientes.solicitud-ine', ['solicitud' => $solicitud->id, 'lado' => $credencial['lado']]) }}"
+                                       target="_blank" rel="noopener"
+                                       title="Abrir la imagen en grande">
+                                        <img src="{{ route('admin.clientes.solicitud-ine', ['solicitud' => $solicitud->id, 'lado' => $credencial['lado']]) }}"
+                                             alt="{{ $credencial['titulo'] }} que subió el cliente"
+                                             loading="lazy"
+                                             class="h-32 w-auto max-w-[240px] rounded-xl border object-contain hover:opacity-90">
+                                    </a>
                                 </td>
                             </tr>
-                        @endif
+                        @endforeach
                     </tbody>
                 </table>
             </div>

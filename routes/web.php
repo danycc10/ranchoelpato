@@ -188,6 +188,10 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
             ->name('clientes.revision-datos')
             ->middleware('permission:clientes.ver');
 
+        Route::get('/clientes/solicitudes/{solicitud}/ine/{lado}', [PrivateFileController::class, 'showSolicitudDatosIne'])
+            ->name('clientes.solicitud-ine')
+            ->middleware('permission:clientes.ver');
+
         Route::get('/configuracion-propietarios-contables', TipoCobroPropietarioConfigsIndex::class)
             ->name('configuracion-propietarios-contables.index');
 

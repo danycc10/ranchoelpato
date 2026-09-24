@@ -111,12 +111,23 @@ class RevisionDatos extends Component
 
     public function render()
     {
+        $solicitudes = SolicitudDatosCliente::query()
+            ->with('cliente')
+            ->porRevisar()
+            ->latest('capturada_en')
+            ->paginate(10);
+
+        // La selección tiene que existir de verdad, no solo verse palomeada:
+        // wire:model manda sobre el atributo checked del HTML, así que si el
+        // arreglo estuviera vacío se aplicaría algo distinto de lo que se ve.
+        foreach ($solicitudes as $solicitud) {
+            if (! array_key_exists($solicitud->id, $this->seleccion)) {
+                $this->seleccion[$solicitud->id] = $this->camposPorDefecto($solicitud);
+            }
+        }
+
         return view('livewire.admin.clientes.revision-datos', [
-            'solicitudes' => SolicitudDatosCliente::query()
-                ->with('cliente')
-                ->porRevisar()
-                ->latest('capturada_en')
-                ->paginate(10),
+            'solicitudes' => $solicitudes,
         ])->layout('layouts.app');
     }
 }

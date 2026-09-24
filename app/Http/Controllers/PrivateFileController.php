@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Contrato;
 use App\Models\Recibo;
 use App\Models\ReciboPago;
+use App\Models\SolicitudDatosCliente;
 use App\Services\Contratos\ContratoWordService;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Request;
@@ -82,6 +83,30 @@ class PrivateFileController extends Controller
                 'Pragma' => 'no-cache',
                 'Expires' => '0',
             ]
+        );
+    }
+
+    /**
+     * La identificación que subió el cliente con su liga, para poder revisarla.
+     *
+     * Vive en el disco privado: se sirve desde aquí, con sesión y permiso, y
+     * nunca por una URL directa al archivo.
+     */
+    public function showSolicitudDatosIne(SolicitudDatosCliente $solicitud, string $lado)
+    {
+        abort_unless(auth()->check(), 403);
+        abort_unless(auth()->user()?->can('clientes.ver'), 403);
+
+        abort_unless(in_array($lado, ['frente', 'reverso'], true), 404);
+
+        $relativePath = $lado === 'frente' ? $solicitud->ine_frente : $solicitud->ine_reverso;
+
+        abort_unless($relativePath, 404);
+        abort_unless(Storage::disk('private')->exists($relativePath), 404);
+
+        return response()->file(
+            Storage::disk('private')->path($relativePath),
+            ['Cache-Control' => 'private, max-age=0, no-store']
         );
     }
 
