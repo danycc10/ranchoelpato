@@ -79,14 +79,39 @@ class RecargoDiarioLuzTest extends TestCase
     }
 
     #[Test]
-    public function el_alta_de_luz_propone_los_cien_por_dia(): void
+    public function el_alta_de_luz_deja_listas_las_condiciones_del_recargo(): void
     {
         $this->actingAs(User::factory()->create());
 
+        // Lo pactado en la luz: $100 desde el primer día, sin gracia.
         Livewire::test(Create::class)
             ->assertSet('valor_recargo', 0.0)
+            ->set('dias_gracia', 7)
             ->set('servicio_tipo', 'electricidad')
-            ->assertSet('valor_recargo', 100.0);
+            ->assertSet('valor_recargo', 100.0)
+            ->assertSet('dias_gracia', 0);
+    }
+
+    #[Test]
+    public function un_servicio_de_luz_nace_sin_gracia_y_con_recargo_diario(): void
+    {
+        $base = $this->contratoDeTerrenoBase();
+
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(Create::class)
+            ->set('contrato_base_id', $base->id)
+            ->set('servicio_tipo', 'electricidad')
+            ->set('precio_total', 15000)
+            ->set('enganche', 0)
+            ->set('monto_pago', 250)
+            ->call('guardar');
+
+        $servicio = Contrato::where('tipo', 'servicio')->latest('id')->first();
+
+        $this->assertSame(0, (int) $servicio->dias_gracia);
+        $this->assertSame(1, (int) $servicio->frecuencia_recargo_dias);
+        $this->assertSame(100.0, (float) $servicio->valor_recargo);
     }
 
     #[Test]

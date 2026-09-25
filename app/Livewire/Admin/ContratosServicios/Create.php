@@ -180,9 +180,15 @@ class Create extends Component
 
     public function updatedServicioTipo(): void
     {
-        // Solo se sugiere mientras nadie haya capturado un recargo propio.
-        if ((float) $this->valor_recargo <= 0) {
-            $this->valor_recargo = $this->recargoSugerido();
+        if ($this->servicio_tipo === 'electricidad') {
+            // Lo pactado en la luz: $100 desde el primer día de atraso. Sin
+            // gracia, porque cualquier día de gracia corre el primer recargo.
+            $this->dias_gracia = 0;
+
+            // El monto solo se propone: si alguien pactó otro, se respeta.
+            if ((float) $this->valor_recargo <= 0) {
+                $this->valor_recargo = $this->recargoSugerido();
+            }
         }
 
         $this->recalcular();
