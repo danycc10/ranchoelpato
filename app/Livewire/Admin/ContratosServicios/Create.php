@@ -167,6 +167,28 @@ class Create extends Component
         $this->refreshPreview();
     }
 
+    /**
+     * Recargo que le toca al servicio.
+     *
+     * La instalación eléctrica cobra $100 por cada día de atraso; el agua no
+     * tiene una tarifa fija, así que se deja en cero para capturarla a mano.
+     */
+    public function recargoSugerido(): float
+    {
+        return $this->servicio_tipo === 'electricidad' ? 100.0 : 0.0;
+    }
+
+    public function updatedServicioTipo(): void
+    {
+        // Solo se sugiere mientras nadie haya capturado un recargo propio.
+        if ((float) $this->valor_recargo <= 0) {
+            $this->valor_recargo = $this->recargoSugerido();
+        }
+
+        $this->recalcular();
+        $this->refreshPreview();
+    }
+
     public function updated($key): void
     {
         if (in_array($key, [
@@ -476,6 +498,10 @@ class Create extends Component
                 'tipo_recargo' => $data['tipo_recargo'],
                 'valor_recargo' => $data['valor_recargo'],
                 'dias_gracia' => $data['dias_gracia'],
+                // El recargo de un servicio corre por día, no por semana.
+                // Se deja escrito y no a merced del valor por omisión de la
+                // columna, que puede cambiar sin que nadie lo note aquí.
+                'frecuencia_recargo_dias' => 1,
                 'estatus' => 'activo',
 
                 'tipo' => 'servicio',
