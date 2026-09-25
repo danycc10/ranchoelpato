@@ -90,6 +90,35 @@ class RecargoDiarioLuzTest extends TestCase
     }
 
     #[Test]
+    public function el_servicio_cobra_por_dia_aunque_se_capturen_dias_de_gracia(): void
+    {
+        // En los contratos de terreno los días de gracia deciden cada cuánto
+        // se cobra el recargo: con 7 de gracia, cada 7 días. En un servicio esa
+        // regla dejaría el recargo semanal, que no es lo pactado.
+        $this->assertSame(7, Contrato::frecuenciaRecargoDiasPorGracia(7));
+
+        $base = $this->contratoDeTerrenoBase();
+
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(Create::class)
+            ->set('contrato_base_id', $base->id)
+            ->set('servicio_tipo', 'electricidad')
+            ->set('precio_total', 15000)
+            ->set('enganche', 0)
+            ->set('monto_pago', 250)
+            // La gracia solo retrasa el primer recargo, no lo vuelve semanal.
+            ->set('dias_gracia', 7)
+            ->call('guardar');
+
+        $servicio = Contrato::where('tipo', 'servicio')->latest('id')->first();
+
+        $this->assertSame(1, (int) $servicio->frecuencia_recargo_dias);
+        $this->assertSame(7, (int) $servicio->dias_gracia);
+        $this->assertSame(100.0, (float) $servicio->valor_recargo);
+    }
+
+    #[Test]
     public function la_propuesta_no_pisa_lo_que_ya_capturaron(): void
     {
         $this->actingAs(User::factory()->create());
@@ -98,6 +127,45 @@ class RecargoDiarioLuzTest extends TestCase
             ->set('valor_recargo', 250)
             ->set('servicio_tipo', 'electricidad')
             ->assertSet('valor_recargo', 250.0);
+    }
+
+    /** Un contrato de terreno al que colgarle el servicio. */
+    private function contratoDeTerrenoBase(): Contrato
+    {
+        $propietario = Propietario::create(['nombre' => 'El Pato']);
+
+        $fraccionamiento = Fraccionamiento::create([
+            'propietario_id' => $propietario->id,
+            'nombre' => 'Rancho El Pato',
+        ]);
+
+        $lote = Lote::create([
+            'fraccionamiento_id' => $fraccionamiento->id,
+            'manzana' => '1',
+            'lote' => '9',
+            'clave' => 'M1-L9',
+        ]);
+
+        $cliente = Cliente::create(['nombres' => 'Ana', 'apellidos' => 'Base']);
+
+        return Contrato::create([
+            'cliente_id' => $cliente->id,
+            'lote_id' => $lote->id,
+            'folio_contrato' => 'CT-BASE-LUZ',
+            'fecha_inicio' => now()->subMonths(6)->toDateString(),
+            'frecuencia' => 'mensual',
+            'dia_mes' => 1,
+            'precio_total' => 100000,
+            'enganche' => 0,
+            'saldo_inicial' => 100000,
+            'saldo_actual' => 100000,
+            'monto_pago' => 3000,
+            'tipo_recargo' => 'fijo',
+            'valor_recargo' => 100,
+            'dias_gracia' => 7,
+            'estatus' => 'activo',
+            'tipo' => 'terreno',
+        ]);
     }
 
     private function cuotaDeLuzVencida(
