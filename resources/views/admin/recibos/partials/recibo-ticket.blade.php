@@ -82,6 +82,26 @@ $fechaRef = $cuota?->fecha_vencimiento
 $mesPagadoTexto = mb_strtoupper($fechaRef->translatedFormat('F Y'));
 }
 
+// El periodo que se imprime. Un recibo que cubre varios meses se queda sin
+// periodo guardado a propósito, así que aquí se arma el rango con los meses
+// que de verdad cubre: decir uno solo sería mentirle al cliente.
+$mesesCubiertos = collect($recibo->pagos ?? [])
+    ->filter(fn ($pago) => is_null($pago->deleted_at ?? null) && is_null($pago->anulado_at ?? null))
+    ->map(fn ($pago) => $pago->cuota?->fecha_vencimiento)
+    ->filter()
+    ->map(fn ($fecha) => \Carbon\Carbon::parse($fecha))
+    ->sort()
+    ->values();
+
+$periodoTexto = $recibo->periodo?->nombre;
+
+if (!$periodoTexto && $mesesCubiertos->isNotEmpty()) {
+    $primero = mb_strtoupper($mesesCubiertos->first()->translatedFormat('F Y'));
+    $ultimo = mb_strtoupper($mesesCubiertos->last()->translatedFormat('F Y'));
+
+    $periodoTexto = $primero === $ultimo ? $primero : "{$primero} - {$ultimo}";
+}
+
 $conceptoBase = $esRecargo ? 'Recargo' : 'Pago';
 $conceptoPeriodo = null;
 
@@ -302,10 +322,10 @@ $totalPagosDetalle = (float) $pagosDetalle->sum(fn ($p) => (float) ($p->monto ??
         </div>
         @endif
 
-        @if($recibo->periodo)
+        @if($periodoTexto)
         <div class="row">
             <div class="muted">Periodo:</div>
-            <div class="right bold">{{ $recibo->periodo->nombre }}</div>
+            <div class="right bold">{{ $periodoTexto }}</div>
         </div>
         @endif
     </div>

@@ -2043,7 +2043,7 @@ class Crear extends Component
                     'tipos_cobro_id' => $this->tipos_cobro_id,
                     'forma_pago_id' => $pagosPrincipales[0]['forma_pago_id'] ?? $this->forma_pago_id,
                     'cuentas_bancarias_id' => $pagosPrincipales[0]['cuentas_bancarias_id'] ?? $this->cuentas_bancarias_id,
-                    'periodo_id' => $ancla['periodo_id'],
+                    'periodo_id' => $this->periodoDelReciboAgrupado($cuotasConPrincipal),
                     'propietario_contable_id' => $propietarioContablePrincipalId,
 
                     'monto' => $totalPrincipal,
@@ -2148,7 +2148,7 @@ class Crear extends Component
                     'cuentas_bancarias_id' => $this->formaPagoEsEfectivo($this->recargo_forma_pago_id ?: $this->forma_pago_id)
                         ? null
                         : ($this->recargo_cuentas_bancarias_id ?? $this->cuentas_bancarias_id),
-                    'periodo_id' => $anclaRecargo['periodo_id'],
+                    'periodo_id' => $this->periodoDelReciboAgrupado($cuotasConRecargo),
 
                     'propietario_contable_id' => $propietarioContableRecargoId,
 
@@ -2636,24 +2636,38 @@ class Crear extends Component
             return;
         }
 
-        $cuotaId = collect($this->cuotaIds)
+        $ids = collect($this->cuotaIds)
             ->filter()
             ->map(fn ($id) => (int) $id)
-            ->first();
+            ->unique();
 
-        if (! $cuotaId) {
+        if ($ids->isEmpty()) {
             return;
         }
 
-        $cuota = Cuota::query()
-            ->select('id', 'fecha_vencimiento')
-            ->find($cuotaId);
+        $vencimientos = Cuota::query()
+            ->whereIn('id', $ids)
+            ->whereNotNull('fecha_vencimiento')
+            ->pluck('fecha_vencimiento');
 
-        if (! $cuota || ! $cuota->fecha_vencimiento) {
+        if ($vencimientos->isEmpty()) {
             return;
         }
 
-        $this->setPeriodoDesdeCuota($cuota->fecha_vencimiento);
+        $meses = $vencimientos
+            ->map(fn ($fecha) => Carbon::parse($fecha)->format('Y-m'))
+            ->unique();
+
+        // Un recibo que cubre varios meses no pertenece a ninguno: ponerle el
+        // de la primera cuota le cargaría a ese mes lo que se pagó de los
+        // otros. Se deja sin periodo y el reparto sale del desglose por cuota.
+        if ($meses->count() > 1) {
+            $this->periodo_id = null;
+
+            return;
+        }
+
+        $this->setPeriodoDesdeCuota($vencimientos->first());
     }
 
     protected function sincronizarMontoPagosConTotalEsperado(): void
@@ -2713,6 +2727,23 @@ class Crear extends Component
     protected function resolverPeriodoIdDesdeFecha($fechaVencimiento): ?int
     {
         return app(PeriodoResolver::class)->idParaFecha($fechaVencimiento);
+    }
+
+    /**
+     * El periodo que le toca a un recibo que agrupa varias cuotas.
+     *
+     * Si todas caen en el mismo mes, ese es su periodo. Si cubre varios, el
+     * recibo no es de ninguno: quedarse con el de la primera cuota le cargaría
+     * a ese mes lo que se pagó de los demás. Se guarda en blanco y el reparto
+     * sale del desglose por cuota que vive en `pagos`.
+     *
+     * @param  Collection<int, array{cuota: mixed, periodo_id: ?int}>  $items
+     */
+    protected function periodoDelReciboAgrupado($items): ?int
+    {
+        $periodos = collect($items)->pluck('periodo_id')->unique();
+
+        return $periodos->count() === 1 ? $periodos->first() : null;
     }
 
     /**

@@ -16,7 +16,9 @@ trait RegistraFuncionesSqlite
             return;
         }
 
-        DB::connection()->getPdo()->sqliteCreateFunction(
+        $pdo = DB::connection()->getPdo();
+
+        $pdo->sqliteCreateFunction(
             'CONCAT_WS',
             function ($separador, ...$partes) {
                 return implode(
@@ -25,5 +27,17 @@ trait RegistraFuncionesSqlite
                 );
             }
         );
+
+        $pdo->sqliteCreateFunction('YEAR', fn ($fecha) => $this->parteDeFecha($fecha, 'Y'));
+        $pdo->sqliteCreateFunction('MONTH', fn ($fecha) => $this->parteDeFecha($fecha, 'n'));
+    }
+
+    private function parteDeFecha(?string $fecha, string $formato): ?int
+    {
+        if (blank($fecha)) {
+            return null;
+        }
+
+        return (int) date($formato, strtotime($fecha));
     }
 }

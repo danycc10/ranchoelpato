@@ -54,8 +54,10 @@ class ReciboCuotaSplit
      */
     public static function monto(string $montoBase): string
     {
+        // El `* 1.0` fuerza la división decimal: con enteros hay motores que
+        // truncan y la proporción se vuelve 0, es decir, el renglón sin monto.
         return $montoBase.' * COALESCE('
-            .self::ALIAS.'.monto_cuota / NULLIF('.self::ALIAS_TOTAL.'.monto_total, 0)'
+            .'('.self::ALIAS.'.monto_cuota * 1.0) / NULLIF('.self::ALIAS_TOTAL.'.monto_total, 0)'
             .', 1)';
     }
 

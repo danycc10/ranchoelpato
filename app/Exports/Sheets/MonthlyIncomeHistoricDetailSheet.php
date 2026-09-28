@@ -62,12 +62,20 @@ class MonthlyIncomeHistoricDetailSheet implements FromCollection, WithColumnForm
             ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
             ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos.forma_pago_id')
             ->leftJoin('cuentas_bancarias', 'cuentas_bancarias.id', '=', 'recibos.cuentas_bancarias_id')
-            ->leftJoin('periodos', 'periodos.id', '=', 'recibos.periodo_id')
+            // El periodo del renglon sale de SU cuota, no del recibo: uno
+            // agrupado cubre varios meses y guarda el periodo en blanco a
+            // proposito. Se cae al del recibo cuando no hay cuota detras.
+            ->leftJoin('periodos as periodo_recibo', 'periodo_recibo.id', '=', 'recibos.periodo_id')
             ->leftJoin('propietarios', 'propietarios.id', '=', 'recibos.propietario_contable_id')
             ->leftJoin('contratos', 'contratos.id', '=', 'recibos.contrato_id')
             ->leftJoin('clientes as recibo_clientes', 'recibo_clientes.id', '=', 'recibos.cliente_id')
             ->leftJoin('clientes as contrato_clientes', 'contrato_clientes.id', '=', 'contratos.cliente_id')
             ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
+            ->leftJoin('periodos as periodo_cuota', function ($join) {
+                $join->on('periodo_cuota.anio', '=', DB::raw('YEAR(cuotas.fecha_vencimiento)'))
+                    ->on('periodo_cuota.mes', '=', DB::raw('MONTH(cuotas.fecha_vencimiento)'))
+                    ->where('periodo_cuota.tipo', 'mensual');
+            })
             ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
             ->whereNull('recibos.deleted_at')
@@ -109,7 +117,7 @@ class MonthlyIncomeHistoricDetailSheet implements FromCollection, WithColumnForm
                         'SIN CUENTA'
                     ) as cuenta_bancaria
                 "),
-                DB::raw('COALESCE(periodos.nombre, "SIN PERIODO") as periodo'),
+                DB::raw('COALESCE(periodo_cuota.nombre, periodo_recibo.nombre, "SIN PERIODO") as periodo'),
                 DB::raw('COALESCE(propietarios.nombre, "SIN PROPIETARIO") as propietario_contable'),
                 'recibos.monto',
             ]);

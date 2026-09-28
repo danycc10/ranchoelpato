@@ -78,17 +78,12 @@ class RecibosCrearPeriodoPorCuotaTest extends TestCase
             $this->assertSame(200.0, (float) $pagos[$cuotaId]->monto);
         }
 
-        // El periodo del recibo es el de la cuota más antigua que cubre.
-        $this->assertNotNull(
+        // El recibo cubre noviembre, diciembre y enero: no es de ningún mes.
+        // Ponerle el de la primera cuota cargaría a noviembre los $600.
+        $this->assertNull(
             $recibo->periodo_id,
-            "El recibo {$recibo->folio} se guardó sin periodo."
+            "El recibo {$recibo->folio} se quedó con el periodo de una sola de sus cuotas."
         );
-        $this->assertDatabaseHas('periodos', [
-            'id' => $recibo->periodo_id,
-            'tipo' => 'mensual',
-            'anio' => 2026,
-            'mes' => 11,
-        ]);
 
         // Las tres cuotas quedan pagadas y el contrato liquidado.
         $this->assertSame(

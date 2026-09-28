@@ -75,8 +75,16 @@ class MonthlyIncomeDetailSheet implements FromCollection, WithColumnFormatting, 
             ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
             ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos_pagos.forma_pago_id')
             ->leftJoin('cuentas_bancarias', 'cuentas_bancarias.id', '=', 'recibos_pagos.cuenta_bancaria_id')
-            ->leftJoin('periodos', 'periodos.id', '=', 'recibos.periodo_id')
+            // El periodo del renglon sale de SU cuota, no del recibo: uno
+            // agrupado cubre varios meses y guarda el periodo en blanco a
+            // proposito. Se cae al del recibo cuando no hay cuota detras.
+            ->leftJoin('periodos as periodo_recibo', 'periodo_recibo.id', '=', 'recibos.periodo_id')
             ->tap(fn ($query) => ReciboCuotaSplit::aplicar($query))
+            ->leftJoin('periodos as periodo_cuota', function ($join) {
+                $join->on('periodo_cuota.anio', '=', DB::raw('YEAR(cuotas.fecha_vencimiento)'))
+                    ->on('periodo_cuota.mes', '=', DB::raw('MONTH(cuotas.fecha_vencimiento)'))
+                    ->where('periodo_cuota.tipo', 'mensual');
+            })
 
             ->whereNull('recibos_pagos.deleted_at')
             ->whereNull('recibos.deleted_at')
@@ -176,7 +184,7 @@ class MonthlyIncomeDetailSheet implements FromCollection, WithColumnFormatting, 
                     ) as cuenta_bancaria
                 "),
 
-                DB::raw('COALESCE(periodos.nombre, "SIN PERIODO") as periodo'),
+                DB::raw('COALESCE(periodo_cuota.nombre, periodo_recibo.nombre, "SIN PERIODO") as periodo'),
 
                 DB::raw(ReciboCuotaSplit::monto('recibos_pagos.monto').' as monto'),
             ]);
