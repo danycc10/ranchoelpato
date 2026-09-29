@@ -2,6 +2,7 @@
 
 namespace App\Services\Reports;
 
+use App\Exports\Support\ReciboCuotaSplit;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -95,7 +96,7 @@ class MonthlyIncomeReportData
             ->selectRaw('
                 fraccionamientos.id as finca_id,
                 COALESCE(fraccionamientos.nombre, "Sin finca") as finca,
-                COALESCE(SUM(recibos_pagos.monto), 0) as recibido
+                COALESCE(SUM('.ReciboCuotaSplit::monto('recibos_pagos.monto').'), 0) as recibido
             ')
             ->get()
             ->keyBy('finca_id');
@@ -108,7 +109,7 @@ class MonthlyIncomeReportData
                 ->selectRaw('
                     fraccionamientos.id as finca_id,
                     COALESCE(fraccionamientos.nombre, "Sin finca") as finca,
-                    COALESCE(SUM(recibos.monto), 0) as recibido
+                    COALESCE(SUM('.ReciboCuotaSplit::monto('recibos.monto').'), 0) as recibido
                 ')
                 ->get()
                 ->keyBy('finca_id');
@@ -135,7 +136,7 @@ class MonthlyIncomeReportData
             ->selectRaw('
                 fraccionamientos.id as finca_id,
                 COALESCE(fraccionamientos.nombre, "Sin finca") as finca,
-                COALESCE(SUM(recibos_pagos.monto), 0) as adelantado
+                COALESCE(SUM('.ReciboCuotaSplit::monto('recibos_pagos.monto').'), 0) as adelantado
             ')
             ->get()
             ->keyBy('finca_id');
@@ -145,7 +146,7 @@ class MonthlyIncomeReportData
             ->selectRaw('
                 fraccionamientos.id as finca_id,
                 COALESCE(fraccionamientos.nombre, "Sin finca") as finca,
-                COALESCE(SUM(recibos_pagos.monto), 0) as atrasado
+                COALESCE(SUM('.ReciboCuotaSplit::monto('recibos_pagos.monto').'), 0) as atrasado
             ')
             ->get()
             ->keyBy('finca_id');
@@ -155,7 +156,7 @@ class MonthlyIncomeReportData
             ->selectRaw('
                 fraccionamientos.id as finca_id,
                 COALESCE(formas_pago.nombre, "SIN FORMA") as metodo,
-                COALESCE(SUM(recibos_pagos.monto), 0) as total
+                COALESCE(SUM('.ReciboCuotaSplit::monto('recibos_pagos.monto').'), 0) as total
             ')
             ->get();
 
@@ -171,7 +172,7 @@ class MonthlyIncomeReportData
                 ->groupBy('fraccionamientos.id')
                 ->selectRaw('
                     fraccionamientos.id as finca_id,
-                    COALESCE(SUM(recibos.monto), 0) as total
+                    COALESCE(SUM('.ReciboCuotaSplit::monto('recibos.monto').'), 0) as total
                 ')
                 ->get();
 
@@ -241,7 +242,7 @@ class MonthlyIncomeReportData
         $rows = $this->baseJoinRecibos()
             ->whereNotNull('tipos_cobro.nombre')
             ->groupBy('tipos_cobro.nombre')
-            ->selectRaw('tipos_cobro.nombre as concepto, SUM(recibos_pagos.monto) as total')
+            ->selectRaw('tipos_cobro.nombre as concepto, SUM('.ReciboCuotaSplit::monto('recibos_pagos.monto').') as total')
             ->get();
 
         $out = [];
@@ -281,7 +282,7 @@ class MonthlyIncomeReportData
                 fraccionamientos.id as finca_id,
                 COALESCE(fraccionamientos.nombre, "Sin finca") as finca,
                 tipos_cobro.nombre as concepto,
-                COALESCE(SUM(recibos_pagos.monto), 0) as total
+                COALESCE(SUM('.ReciboCuotaSplit::monto('recibos_pagos.monto').'), 0) as total
             ')
             ->get();
 
@@ -409,7 +410,10 @@ class MonthlyIncomeReportData
             ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos_pagos.forma_pago_id')
             ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
             ->leftJoin('contratos', 'contratos.id', '=', 'recibos.contrato_id')
-            ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
+            // Un recibo puede cubrir varias cuotas: se reparte entre ellas para
+            // que cada mes se lleve solo su parte, en vez de cargarle el cobro
+            // entero al mes de la cuota ancla.
+            ->tap(fn ($q) => ReciboCuotaSplit::aplicar($q))
             ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
             ->whereNull('recibos_pagos.deleted_at')
@@ -453,7 +457,10 @@ class MonthlyIncomeReportData
             ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos_pagos.forma_pago_id')
             ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
             ->leftJoin('contratos', 'contratos.id', '=', 'recibos.contrato_id')
-            ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
+            // Un recibo puede cubrir varias cuotas: se reparte entre ellas para
+            // que cada mes se lleve solo su parte, en vez de cargarle el cobro
+            // entero al mes de la cuota ancla.
+            ->tap(fn ($q) => ReciboCuotaSplit::aplicar($q))
             ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
             ->whereNull('recibos_pagos.deleted_at')
@@ -485,7 +492,10 @@ class MonthlyIncomeReportData
         return DB::table('recibos')
             ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
             ->leftJoin('contratos', 'contratos.id', '=', 'recibos.contrato_id')
-            ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
+            // Un recibo puede cubrir varias cuotas: se reparte entre ellas para
+            // que cada mes se lleve solo su parte, en vez de cargarle el cobro
+            // entero al mes de la cuota ancla.
+            ->tap(fn ($q) => ReciboCuotaSplit::aplicar($q))
             ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
             ->whereNull('recibos.deleted_at')
@@ -516,7 +526,10 @@ class MonthlyIncomeReportData
             ->leftJoin('formas_pago', 'formas_pago.id', '=', 'recibos_pagos.forma_pago_id')
             ->leftJoin('tipos_cobro', 'tipos_cobro.id', '=', 'recibos.tipos_cobro_id')
             ->leftJoin('contratos', 'contratos.id', '=', 'recibos.contrato_id')
-            ->leftJoin('cuotas', 'cuotas.id', '=', 'recibos.cuota_id')
+            // Un recibo puede cubrir varias cuotas: se reparte entre ellas para
+            // que cada mes se lleve solo su parte, en vez de cargarle el cobro
+            // entero al mes de la cuota ancla.
+            ->tap(fn ($q) => ReciboCuotaSplit::aplicar($q))
             ->leftJoin('lotes', 'lotes.id', '=', 'contratos.lote_id')
             ->leftJoin('fraccionamientos', 'fraccionamientos.id', '=', 'lotes.fraccionamiento_id')
             ->whereNull('recibos_pagos.deleted_at')

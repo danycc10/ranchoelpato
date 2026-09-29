@@ -15,6 +15,7 @@ use App\Models\Propietario;
 use App\Models\Recibo;
 use App\Models\TipoCobro;
 use App\Models\User;
+use App\Services\Reports\MonthlyIncomeReportData;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -124,6 +125,36 @@ class ReciboAgrupadoVariosMesesTest extends TestCase
             ->sum(fn ($fila) => $fila[13]);
 
         $this->assertSame(4500.0, $total);
+    }
+
+    #[Test]
+    public function la_pantalla_del_resumen_tambien_reparte_por_mes(): void
+    {
+        $this->registrarFuncionesMysqlEnSqlite();
+
+        $datos = $this->contratoConTresMeses();
+
+        $this->cobrar($datos, $datos['cuota_ids'], $this->cajero());
+
+        // Es la pantalla "Resumen de ingresos mensuales": corría por su cuenta
+        // y le cargaba los $4,500 al mes de la cuota ancla.
+        foreach ([7, 8, 9] as $mes) {
+            $fila = collect($this->resumenDelMes($mes))->firstWhere('finca', 'Finca Tres Meses');
+
+            $this->assertNotNull($fila, "La finca no salió en el resumen del mes {$mes}.");
+            $this->assertSame(1500.0, (float) $fila->recibido);
+        }
+    }
+
+    /** Las filas por fraccionamiento del resumen en pantalla. */
+    private function resumenDelMes(int $mes)
+    {
+        return (new MonthlyIncomeReportData(
+            anio: 2026,
+            mes: $mes,
+            propietarioId: null,
+            modoVista: 'como_va_el_mes',
+        ))->filas();
     }
 
     /** Los renglones del detalle de "cómo va el mes". */
