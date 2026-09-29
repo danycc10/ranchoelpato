@@ -66,6 +66,28 @@ class ReciboAgrupadoVariosMesesTest extends TestCase
     }
 
     #[Test]
+    public function un_recibo_sin_periodo_sigue_saliendo_en_el_reporte(): void
+    {
+        $this->registrarFuncionesMysqlEnSqlite();
+
+        $datos = $this->contratoConTresMeses();
+
+        $this->cobrar($datos, $datos['cuota_ids'], $this->cajero());
+
+        // Quitarle el periodo no lo esconde: el reporte filtra por la fecha de
+        // vencimiento de la cuota, y el periodo solo es la etiqueta que imprime.
+        $this->assertNull(Recibo::sole()->periodo_id);
+
+        foreach ([7, 8, 9] as $mes) {
+            $this->assertCount(
+                1,
+                $this->detalleDelMes($mes),
+                "El recibo sin periodo se cayó del reporte del mes {$mes}."
+            );
+        }
+    }
+
+    #[Test]
     public function el_reporte_manda_cada_parte_al_mes_de_su_cuota(): void
     {
         $this->registrarFuncionesMysqlEnSqlite();
