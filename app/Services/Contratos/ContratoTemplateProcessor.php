@@ -22,7 +22,9 @@ class ContratoTemplateProcessor extends TemplateProcessor
         foreach ($anexos as $letra => $anexo) {
             $parte = $letra === 'A' ? 'PARTE CEDENTE' : 'PARTE ADQUIRENTE';
             $parrafos = [
-                $this->parrafo('ANEXO '.$letra.' IDENTIFICACIÓN DE LA '.$parte, true, true),
+                // Reserva espacio bajo el membrete, también al comenzar una página.
+                '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:pageBreakBefore/><w:keepNext/><w:spacing w:before="0" w:after="0" w:line="720" w:lineRule="exact"/></w:pPr><w:r><w:t xml:space="preserve"> </w:t></w:r></w:p>',
+                $this->parrafo('ANEXO '.$letra.' IDENTIFICACIÓN DE LA '.$parte, true),
                 $this->parrafo('Contrato: '.$anexo['folio']),
                 $this->parrafo('Proyecto: '.$anexo['proyecto'].' · Manzana: '.$anexo['manzana'].' · Lote: '.$anexo['lote']),
                 $this->parrafo('Nombre: '.$anexo['nombre']),
@@ -66,10 +68,10 @@ class ContratoTemplateProcessor extends TemplateProcessor
         }
     }
 
-    private function parrafo(string $texto, bool $negrita = false, bool $paginaNueva = false): string
+    private function parrafo(string $texto, bool $negrita = false): string
     {
-        return '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr>'.($paginaNueva ? '<w:pageBreakBefore/>' : '')
-            .'<w:spacing w:after="160"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr>'
+        return '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr>'
+            .'<w:spacing w:after="160"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr>'
             .'<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="20"/>'
             .($negrita ? '<w:b/>' : '').'</w:rPr><w:t xml:space="preserve">'
             .htmlspecialchars($texto, ENT_XML1 | ENT_QUOTES, 'UTF-8').'</w:t></w:r></w:p>';
