@@ -8,9 +8,12 @@ use App\Models\Cuota;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
 use App\Models\Propietario;
+use App\Services\Clientes\SolicitudDatosClienteService;
+use App\Services\Contratos\AnexosIdentificacionService;
 use App\Services\Contratos\CondicionesCesionService;
 use App\Services\Contratos\ContratoWordService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -152,6 +155,135 @@ class ContratoCesionDerechosDocxTest extends TestCase
 
         $this->assertArrayHasKey('archivo_contrato_cesion_docx', $paths);
         $this->assertArrayNotHasKey('archivo_contrato_docx', $paths);
+    }
+
+    #[Test]
+    public function genera_anexos_solo_con_la_identificacion_aprobada_y_conserva_sus_copias(): void
+    {
+        Storage::fake('private');
+        $this->artisan('contratos:plantilla-cesion')->assertSuccessful();
+        $contrato = $this->contratoTerreno();
+        $propietario = $contrato->lote->fraccionamiento->propietario;
+        $this->identificacionPara($propietario, 'cedente');
+        $solicitudes = app(SolicitudDatosClienteService::class);
+        $solicitud = $solicitudes->crear($contrato->cliente)['solicitud'];
+        $this->imagen('captura/frente.jpg');
+        $this->imagen('captura/reverso.jpg');
+        $solicitudes->guardarCaptura($solicitud, [], 'captura/frente.jpg', 'captura/reverso.jpg');
+
+        $servicio = new ContratoWordService;
+        $path = $servicio->generarDocx($contrato->fresh(), 'contrato_cesion_derechos');
+        $texto = $this->textoDocx(Storage::disk('private')->path($path));
+        $this->assertStringContainsString('ANEXO A IDENTIFICACIÓN DE LA PARTE CEDENTE', $texto);
+        $this->assertStringContainsString('ANEXO B IDENTIFICACIÓN DE LA PARTE ADQUIRENTE', $texto);
+        $this->assertStringContainsString('ANEXO PENDIENTE', $texto);
+        $this->assertCount(1, $contrato->fresh()->anexos_identificacion);
+
+        // Incluso vencida la liga, los documentos capturados se pueden revisar y aplicar.
+        $solicitud->update(['expira_en' => now()->subDay()]);
+        $solicitudes->aplicar($solicitud);
+        $path = $servicio->generarDocx($contrato->fresh(), 'contrato_cesion_derechos');
+        $texto = $this->textoDocx(Storage::disk('private')->path($path));
+        $this->assertStringNotContainsString('ANEXO PENDIENTE', $texto);
+        $this->assertStringNotContainsString('${', $texto);
+        $anexos = $contrato->fresh()->anexos_identificacion;
+        $this->assertCount(2, $anexos);
+        $zip = new ZipArchive;
+        $zip->open(Storage::disk('private')->path($path));
+        $xml = $zip->getFromName('word/document.xml');
+        $this->assertSame(4, substr_count($xml, '<w:pict>'));
+        $this->assertSame(2, substr_count($xml, '<w:pageBreakBefore/>'));
+        $this->assertTrue((new \DOMDocument)->loadXML($xml));
+        $zip->close();
+
+        // Cambiar o borrar los originales no cambia los anexos ya generados.
+        Storage::disk('private')->delete(['captura/frente.jpg', 'captura/reverso.jpg', 'cedente/frente.jpg', 'cedente/reverso.jpg']);
+        $contrato->cliente->update(['ine_frente' => null, 'ine_reverso' => null]);
+        $servicio->generarDocx($contrato->fresh(), 'contrato_cesion_derechos');
+        $this->assertSame($anexos, $contrato->fresh()->anexos_identificacion);
+        $this->assertTrue(app(AnexosIdentificacionService::class)->completos($contrato->fresh()));
+        foreach ($anexos as $anexo) {
+            foreach ($anexo['imagenes'] as $imagen) {
+                $this->assertSame('private', $imagen['disk']);
+                Storage::disk('private')->assertExists($imagen['path']);
+            }
+        }
+    }
+
+    #[Test]
+    public function una_imagen_faltante_o_danada_no_se_conserva_como_anexo_completo(): void
+    {
+        Storage::fake('private');
+        $this->artisan('contratos:plantilla-cesion')->assertSuccessful();
+        $contrato = $this->contratoTerreno();
+        $this->identificacionPara($contrato->cliente, 'cliente');
+        Storage::disk('private')->put('cliente/reverso.jpg', 'archivo dañado');
+        (new ContratoWordService)->generarDocx($contrato, 'contrato_cesion_derechos');
+        $estado = app(AnexosIdentificacionService::class)->estado($contrato->fresh());
+        $this->assertSame(['reverso'], $estado['B']['faltantes']);
+        $this->assertEmpty($contrato->fresh()->anexos_identificacion);
+        $this->imagen('cliente/reverso.jpg');
+        (new ContratoWordService)->generarDocx($contrato->fresh(), 'contrato_cesion_derechos');
+        $this->assertCount(1, $contrato->fresh()->anexos_identificacion);
+    }
+
+    #[Test]
+    public function un_cliente_nuevo_no_hereda_el_anexo_del_anterior(): void
+    {
+        Storage::fake('private');
+        $this->artisan('contratos:plantilla-cesion')->assertSuccessful();
+        $contrato = $this->contratoTerreno();
+        $this->identificacionPara($contrato->cliente, 'anterior');
+        (new ContratoWordService)->generarDocx($contrato, 'contrato_cesion_derechos');
+        $anteriores = $contrato->fresh()->anexos_identificacion;
+        $nuevo = Cliente::create(['nombres' => 'Nuevo', 'apellidos' => 'Cliente']);
+        $contrato->update(['cliente_id' => $nuevo->id, 'comprador_nombre_legal' => 'Nuevo Cliente']);
+        $path = (new ContratoWordService)->generarDocx($contrato->fresh(), 'contrato_cesion_derechos');
+        $this->assertStringContainsString('ANEXO PENDIENTE', $this->textoDocx(Storage::disk('private')->path($path)));
+        $this->assertSame($anteriores, $contrato->fresh()->anexos_identificacion);
+        $this->assertFalse(app(AnexosIdentificacionService::class)->estado($contrato->fresh())['B']['conservado']);
+    }
+
+    #[Test]
+    public function un_pasaporte_no_requiere_reverso_y_admite_webp(): void
+    {
+        Storage::fake('private');
+        $this->artisan('contratos:plantilla-cesion')->assertSuccessful();
+        $contrato = $this->contratoTerreno();
+        $this->imagen('pasaporte.webp');
+        $contrato->cliente->update(['ine_frente' => 'pasaporte.webp', 'identificacion_tipo' => 'Pasaporte']);
+        (new ContratoWordService)->generarDocx($contrato->fresh(), 'contrato_cesion_derechos');
+        $anexo = app(AnexosIdentificacionService::class)->estado($contrato->fresh())['B'];
+        $this->assertEmpty($anexo['faltantes']);
+        $this->assertTrue($anexo['conservado']);
+        $this->assertStringEndsWith('.png', $anexo['imagenes']['frente']['path']);
+    }
+
+    #[Test]
+    public function una_captura_aprobada_completa_el_par_sin_mezclarlo_con_el_frente_anterior(): void
+    {
+        Storage::fake('private');
+        $contrato = $this->contratoTerreno();
+        $this->imagen('viejo/frente.jpg');
+        $contrato->update(['comprador_ine_frente' => 'viejo/frente.jpg']);
+        $this->identificacionPara($contrato->cliente, 'aprobada');
+        $estado = app(AnexosIdentificacionService::class)->estado($contrato->fresh());
+        $this->assertSame('aprobada/frente.jpg', $estado['B']['imagenes']['frente']['path']);
+        $this->assertSame('aprobada/reverso.jpg', $estado['B']['imagenes']['reverso']['path']);
+        $this->assertEmpty($estado['B']['faltantes']);
+    }
+
+    private function imagen(string $path): void
+    {
+        $archivo = UploadedFile::fake()->image(basename($path), 900, 550);
+        Storage::disk('private')->put($path, file_get_contents($archivo->getRealPath()));
+    }
+
+    private function identificacionPara($persona, string $carpeta): void
+    {
+        $this->imagen($carpeta.'/frente.jpg');
+        $this->imagen($carpeta.'/reverso.jpg');
+        $persona->update(['ine_frente' => $carpeta.'/frente.jpg', 'ine_reverso' => $carpeta.'/reverso.jpg', 'documentos_disk' => 'private']);
     }
 
     private function contratoTerreno(): Contrato

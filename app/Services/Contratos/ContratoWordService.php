@@ -234,7 +234,7 @@ class ContratoWordService
             'lote.fraccionamiento',
         ]);
 
-        $template = new TemplateProcessor(
+        $template = new ContratoTemplateProcessor(
             $this->resolveTemplatePath($contrato, $documento)
         );
 
@@ -256,6 +256,7 @@ class ContratoWordService
 
         if ($tipo === 'contrato_cesion_derechos') {
             $this->setCesionValues($template, $contrato);
+            $template->agregarAnexosIdentificacion(app(AnexosIdentificacionService::class)->preparar($contrato));
         }
 
         if ($tipo === 'caratula_expediente') {
@@ -631,7 +632,7 @@ class ContratoWordService
         ));
         $template->setValue('expediente_completo', $this->siNo($this->expedienteCompleto($contrato)));
         $template->setValue('identificaciones', $this->siNo(
-            filled($contrato->comprador_ine_frente) && filled($contrato->vendedor_ine_frente)
+            app(AnexosIdentificacionService::class)->completos($contrato)
         ));
         $template->setValue('antecedente_agrario', $this->antecedenteAgrarioTexto($contrato));
 
@@ -646,6 +647,11 @@ class ContratoWordService
      */
     protected function expedienteCompleto(Contrato $contrato): bool
     {
+        if (self::documentTypeFor('contrato_cesion_derechos', $contrato)
+            && ! app(AnexosIdentificacionService::class)->completos($contrato)) {
+            return false;
+        }
+
         $documentos = array_filter(
             self::documentTypesFor($contrato),
             fn (array $documento) => empty($documento['uso_interno'])

@@ -9,6 +9,7 @@ use App\Models\Lote;
 use App\Models\Propietario;
 use App\Services\Contratos\ContratoWordService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -70,8 +71,13 @@ class CaratulaExpedienteDocxTest extends TestCase
         // Con las credenciales de ambas partes, las identificaciones ya están.
         $contrato->update([
             'comprador_ine_frente' => 'contratos/ine-comprador.jpg',
+            'comprador_ine_reverso' => 'contratos/ine-comprador.jpg',
             'vendedor_ine_frente' => 'contratos/ine-vendedor.jpg',
+            'vendedor_ine_reverso' => 'contratos/ine-vendedor.jpg',
         ]);
+        $imagen = UploadedFile::fake()->image('ine.jpg');
+        Storage::disk('private')->put('contratos/ine-comprador.jpg', file_get_contents($imagen->getRealPath()));
+        Storage::disk('private')->put('contratos/ine-vendedor.jpg', file_get_contents($imagen->getRealPath()));
 
         $texto = $this->textoDocx(Storage::disk('private')->path(
             (new ContratoWordService)->generarDocx($contrato->fresh(), 'caratula_expediente')

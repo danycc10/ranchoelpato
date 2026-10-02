@@ -768,6 +768,20 @@
                                     </button>
                                     @endif
 
+                                    @if($tipoDocumento === 'contrato_cesion_derechos')
+                                        <p class="mt-3 text-sm text-gray-600">El Word incluye los anexos A y B. Las identificaciones se conservan al generar cada anexo completo.</p>
+                                        @foreach(app(\App\Services\Contratos\AnexosIdentificacionService::class)->estado($contrato) as $letra => $anexo)
+                                            <p class="mt-1 text-sm {{ $anexo['faltantes'] ? 'text-amber-800' : 'text-gray-600' }}">
+                                                Anexo {{ $letra }}:
+                                                @if($anexo['faltantes'])
+                                                    pendiente de cargar o revisar {{ implode(' y ', $anexo['faltantes']) }}. Expediente incompleto.
+                                                @else
+                                                    {{ $anexo['conservado'] ? 'copia conservada con este contrato.' : 'identificación lista para generar.' }}
+                                                @endif
+                                            </p>
+                                        @endforeach
+                                    @endif
+
                                     <a href="{{ route('admin.private.contratos.documentos.docx.download', ['uuid' => $contrato->uuid, 'tipo' => $tipoDocumento]) }}"
                                         class="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-blue-700 px-4 py-2 font-bold text-white hover:bg-blue-800">
                                         Descargar Word
