@@ -94,6 +94,9 @@
                     </td>
 
                     <td class="p-3 text-right whitespace-nowrap">
+                        @if($it->mapa_clave)
+                        <a href="{{ route('admin.fraccionamientos.mapa', $it) }}" class="px-3 py-1 rounded-lg border text-blue-700 hover:bg-blue-50">Ver mapa</a>
+                        @endif
                         <button wire:click="editar({{ $it->id }})"
                             type="button"
                             class="px-3 py-1 rounded-lg border hover:bg-gray-50">
@@ -167,6 +170,9 @@
 
             {{-- Acciones --}}
             <div class="mt-4 grid grid-cols-1 gap-2">
+                @if($it->mapa_clave)
+                <a href="{{ route('admin.fraccionamientos.mapa', $it) }}" class="w-full px-4 py-2 rounded-xl border text-blue-700 font-semibold text-center hover:bg-blue-50">Ver mapa</a>
+                @endif
                 <button wire:click="editar({{ $it->id }})"
                     type="button"
                     class="w-full px-4 py-2 rounded-xl border font-semibold hover:bg-gray-50">
@@ -204,6 +210,18 @@
 
         <x-slot name="content">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <div class="md:col-span-2">
+                    <x-label for="fraccionamiento-mapa" value="Plano interactivo" />
+                    <select id="fraccionamiento-mapa" wire:model.defer="mapa_clave" class="w-full rounded-xl border-gray-300">
+                        <option value="">Sin plano vinculado</option>
+                        @foreach(\App\Services\MapaLotesService::MAPAS as $claveMapa => $nombreMapa)
+                        <option value="{{ $claveMapa }}">{{ $nombreMapa }}</option>
+                        @endforeach
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Elige únicamente el plano que corresponde a este fraccionamiento. Los lotes se relacionan por su número.</p>
+                    @error('mapa_clave') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
 
                 <div class="md:col-span-2">
                     <x-label value="Propietario" />

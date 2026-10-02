@@ -17,6 +17,7 @@ class Fraccionamiento extends Model
         'ubicacion',
         'logo_path', // ✅ nuevo
         'contrato_base_path',
+        'mapa_clave',
 
         // Contrato de cesión de derechos posesorios.
         'ejido',

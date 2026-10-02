@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\ContratosPdfController;
 | Imports – Admin / Contratos
 |--------------------------------------------------------------------------
 */
+use App\Http\Controllers\Admin\MapaLotesController;
 use App\Http\Controllers\Admin\ReciboFirmaController;
 use App\Http\Controllers\Admin\RecibosPrintController;
 use App\Http\Controllers\PrivateFileController;
@@ -21,35 +22,35 @@ use App\Livewire\Admin\Contratos\Show as ContratosShow;
 use App\Livewire\Admin\ContratosServicios\Create as ContratoServicioCreate;
 use App\Livewire\Admin\ContratosServicios\Edit as ContratosServiciosEdit;
 use App\Livewire\Admin\ContratosServicios\Index as ContratoServicioIndex;
-use App\Livewire\Admin\ContratosServicios\Show as ContratoServicioShow;
 /*
 |--------------------------------------------------------------------------
 | Imports – Reports
 |--------------------------------------------------------------------------
 */
+use App\Livewire\Admin\ContratosServicios\Show as ContratoServicioShow;
 use App\Livewire\Admin\Permisos\Index as PermisosIndex;
 use App\Livewire\Admin\Promociones\Index;
 use App\Livewire\Admin\Recibos\Crear;
 use App\Livewire\Admin\Recibos\Edit;
-use App\Livewire\Admin\Recibos\Index as RecibosIndex;
 /*
 |--------------------------------------------------------------------------
 | Imports – Dashboard
 |--------------------------------------------------------------------------
 */
-use App\Livewire\Admin\Sistema\Impresion;
+use App\Livewire\Admin\Recibos\Index as RecibosIndex;
 /*
 |--------------------------------------------------------------------------
 | Imports – Admin / Clientes Excelentes
 |--------------------------------------------------------------------------
 */
+use App\Livewire\Admin\Sistema\Impresion;
 use App\Livewire\Admin\Sistema\Index as SistemaIndex;
-use App\Livewire\Admin\TipoCobroPropietarioConfigs\Index as TipoCobroPropietarioConfigsIndex;
 /*
 |--------------------------------------------------------------------------
 | Imports – Admin / Sistema
 |--------------------------------------------------------------------------
 */
+use App\Livewire\Admin\TipoCobroPropietarioConfigs\Index as TipoCobroPropietarioConfigsIndex;
 use App\Livewire\Dashboard\CobranzaDashboard;
 use App\Livewire\Publico\CapturaDatosCliente;
 use App\Livewire\Reports\BankMovementsReport;
@@ -170,6 +171,14 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
 
         Route::get('/fraccionamientos', App\Livewire\Admin\Fraccionamientos\Index::class)
             ->name('fraccionamientos')
+            ->middleware('permission:catalogos.ver');
+
+        Route::get('/fraccionamientos/{fraccionamiento}/mapa', [MapaLotesController::class, 'show'])
+            ->name('fraccionamientos.mapa')
+            ->middleware('permission:catalogos.ver');
+
+        Route::get('/fraccionamientos/{fraccionamiento}/mapa/datos', [MapaLotesController::class, 'datos'])
+            ->name('fraccionamientos.mapa.datos')
             ->middleware('permission:catalogos.ver');
 
         Route::get('/lotes', App\Livewire\Admin\Lotes\Index::class)

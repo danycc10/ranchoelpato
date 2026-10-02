@@ -8,6 +8,11 @@
         </div>
 
         <div class="flex flex-col sm:flex-row gap-2">
+            @foreach($fraccionamientos->whereNotNull('mapa_clave') as $fraccionamientoMapa)
+                @if(!$fraccionamientoFilter || (int) $fraccionamientoFilter === $fraccionamientoMapa->id)
+                <a href="{{ route('admin.fraccionamientos.mapa', $fraccionamientoMapa) }}" class="w-full sm:w-auto px-4 py-2 rounded-xl border font-bold text-blue-700 hover:bg-blue-50">Mapa · {{ $fraccionamientoMapa->nombre }}</a>
+                @endif
+            @endforeach
             <button wire:click="exportarExcel"
                     type="button"
                     class="w-full sm:w-auto px-4 py-2 rounded-xl border font-bold hover:bg-gray-50">

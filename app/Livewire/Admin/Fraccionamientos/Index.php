@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\Fraccionamientos;
 use App\Models\Fraccionamiento;
 use App\Models\Propietario;
 use App\Services\Contratos\DatosContratoCesionService;
+use App\Services\MapaLotesService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -37,6 +38,8 @@ class Index extends Component
     public string $nombre = '';
 
     public ?string $ubicacion = null;
+
+    public ?string $mapa_clave = null;
 
     // Datos que declara el contrato de cesión de derechos
     public ?string $ejido = null;
@@ -101,6 +104,7 @@ class Index extends Component
         $this->propietario_id = (int) $it->propietario_id;
         $this->nombre = (string) $it->nombre;
         $this->ubicacion = $it->ubicacion;
+        $this->mapa_clave = $it->mapa_clave;
 
         $this->ejido = $it->ejido;
         $this->municipio = $it->municipio;
@@ -123,6 +127,7 @@ class Index extends Component
             'propietario_id' => ['required', 'exists:propietarios,id'],
             'nombre' => ['required', 'string', 'max:255'],
             'ubicacion' => ['nullable', 'string', 'max:255'],
+            'mapa_clave' => ['nullable', Rule::in(array_keys(MapaLotesService::MAPAS))],
 
             // Contrato de cesión
             'ejido' => ['nullable', 'string', 'max:255'],
@@ -141,7 +146,7 @@ class Index extends Component
 
         $data['nombre'] = trim($data['nombre']);
 
-        foreach (['ubicacion', 'ejido', 'municipio', 'antecedente_tipo', 'antecedente_datos'] as $campo) {
+        foreach (['ubicacion', 'mapa_clave', 'ejido', 'municipio', 'antecedente_tipo', 'antecedente_datos'] as $campo) {
             $data[$campo] = is_string($data[$campo] ?? null)
                 ? (trim($data[$campo]) !== '' ? trim($data[$campo]) : null)
                 : null;
@@ -244,6 +249,7 @@ class Index extends Component
 
     protected function resetForm(): void
     {
+        $this->mapa_clave = null;
         $this->propietario_id = null;
         $this->nombre = '';
         $this->ubicacion = null;

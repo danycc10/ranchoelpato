@@ -523,7 +523,7 @@ class Index extends Component
     {
         $fraccionamientos = Fraccionamiento::query()
             ->orderBy('nombre')
-            ->get(['id', 'nombre']);
+            ->get(['id', 'uuid', 'nombre', 'mapa_clave']);
 
         $propietarios = Propietario::query()
             ->orderBy('nombre')
