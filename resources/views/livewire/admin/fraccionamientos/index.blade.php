@@ -219,7 +219,7 @@
                         <option value="{{ $claveMapa }}">{{ $nombreMapa }}</option>
                         @endforeach
                     </select>
-                    <p class="text-xs text-gray-500 mt-1">Elige únicamente el plano que corresponde a este fraccionamiento. Los lotes se relacionan por su número.</p>
+                    <p class="text-xs text-gray-500 mt-1">Los registros que compartan este plano se mostrarán juntos, conservando el propietario de cada lote. Los números repetidos quedarán pendientes de revisión.</p>
                     @error('mapa_clave') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
 

@@ -28,6 +28,12 @@ function initialize(root) {
         }
         for (const [key, count] of Object.entries(counts)) root.querySelector(`[data-count="${key}"]`).textContent = count;
         find('linked').textContent = data.vinculados;
+        find('finca-count').textContent = data.fincas.length;
+        find('fincas').replaceChildren(...data.fincas.map(finca => {
+            const row = document.createElement('li');
+            row.textContent = `${finca.nombre} · ${finca.propietario || 'Propietario sin registrar'}`;
+            return row;
+        }));
         find('updated').textContent = 'Consulta: ' + new Date(data.actualizado).toLocaleTimeString('es-MX');
         find('unmapped').textContent = data.registros_sin_figura ? `${data.registros_sin_figura} registro(s) del catálogo no tienen una figura identificada en el plano.` : '';
     }
@@ -36,6 +42,8 @@ function initialize(root) {
         find('empty').hidden = true;
         find('number').textContent = `Lote ${lot.numero}`;
         find('status').textContent = names[lot.estatus] || 'Estado sin confirmar';
+        find('owner').textContent = lot.propietario || 'Sin identificar';
+        find('finca').textContent = lot.fraccionamiento || 'Sin vincular';
         find('block').textContent = lot.manzana || 'Sin registrar';
         find('area').textContent = lot.area_registrada !== null ? `${number(lot.area_registrada)} m²` : 'Sin registrar';
         find('price').textContent = lot.precio_lista !== null ? Number(lot.precio_lista).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }) : 'Sin registrar';

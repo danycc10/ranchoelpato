@@ -12,6 +12,8 @@ php artisan mapas:vincular UUID_DEL_FRACCIONAMIENTO finca-escondida
 
 El vínculo se establece explícitamente por UUID; nunca se adivina por nombre. Los accesos «Ver mapa» aparecen en Fraccionamientos y Lotes. La vista y la actualización de datos requieren sesión y los permisos `admin.ver` y `catalogos.ver`.
 
-Los colores proceden del estado del lote en el catálogo. Solo se asocia una figura si hay una coincidencia única del número en el fraccionamiento seleccionado; los ceros iniciales se normalizan. Un número ausente o repetido entre manzanas se presenta sin vincular. El mapa no modifica datos ni crea los lotes faltantes. «Actualizar disponibilidad» consulta de nuevo el catálogo y mantiene la selección.
+Los registros de fraccionamiento vinculados a la misma clave de plano se muestran juntos. Cada lote conserva su propietario, estado y registro de origen; su ficha y enlace al catálogo muestran esa procedencia. Entrar desde cualquiera de los registros vinculados abre la misma vista conjunta. Para un predio dividido entre tres propietarios, seleccionar el mismo plano en los tres registros.
+
+Los colores proceden del estado del lote en el catálogo. Solo se asocia una figura si hay una coincidencia única del número entre todos los registros vinculados; los ceros iniciales se normalizan. Un número ausente o repetido entre propietarios o manzanas se presenta sin vincular, con un aviso que identifica los registros en conflicto. No se elige un propietario automáticamente ni se suman los registros repetidos como lotes distintos. El mapa no modifica datos ni crea los lotes faltantes. «Actualizar disponibilidad» consulta de nuevo el catálogo y mantiene la selección.
 
 Para incorporar otro plano, preparar su JSON con la misma estructura, registrarlo en `MapaLotesService::MAPAS` y vincularlo con el comando. El archivo DWG original y las herramientas de conversión no se necesitan en el servidor.

@@ -4,8 +4,9 @@
         <header class="map-heading">
             <div>
                 <a href="{{ route('admin.fraccionamientos') }}">← Fraccionamientos</a>
-                <h1>{{ $fraccionamiento->nombre }}</h1>
+                <h1>{{ $mapa['nombre'] }}</h1>
                 <p><span data-linked>{{ $mapa['vinculados'] }}</span> de {{ count($mapa['lotes']) }} lotes del plano relacionados con el catálogo.</p>
+                <p class="map-small">Vista conjunta de <span data-finca-count>{{ count($mapa['fincas']) }}</span> registro(s) de fraccionamiento.</p>
             </div>
             <div><button type="button" data-refresh>Actualizar disponibilidad</button><p class="map-small" data-updated role="status"></p></div>
         </header>
@@ -15,6 +16,7 @@
                     <button type="button" data-close class="map-close" aria-label="Cerrar ficha">×</button>
                     <p class="map-eyebrow">Lote seleccionado</p><h2 data-number></h2>
                     <p data-status class="map-status"></p>
+                    <p class="map-small">Propietario: <strong data-owner></strong><br>Registro: <span data-finca></span></p>
                     <dl class="map-facts"><div><dt>Manzana</dt><dd data-block></dd></div><div><dt>Superficie registrada</dt><dd data-area></dd></div><div><dt>Precio de lista</dt><dd data-price></dd></div></dl>
                     <p data-plan-area class="map-small"></p><p data-warning class="map-warning"></p>
                     <a data-catalog class="map-link">Ver en catálogo</a>
@@ -30,6 +32,7 @@
                 <p class="map-small">Los colores corresponden al catálogo. Gris significa que falta relacionar el lote; no indica disponibilidad.</p>
                 <p data-unmapped class="map-warning"></p>
                 <p class="map-small">Plano: {{ $mapa['nombre'] }}. Las superficies calculadas del dibujo son de referencia.</p>
+                <p class="map-small">Registros incluidos:</p><ul data-fincas class="map-small"></ul>
             </aside>
             <section class="map-surface" aria-label="Plano interactivo del fraccionamiento">
                 <div class="map-tools"><button type="button" data-zoom-in aria-label="Acercar mapa">+</button><button type="button" data-zoom-out aria-label="Alejar mapa">−</button><button type="button" data-fit>Ver todo</button></div>

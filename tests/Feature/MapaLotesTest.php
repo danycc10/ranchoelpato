@@ -32,7 +32,9 @@ class MapaLotesTest extends TestCase
     {
         $finca = $this->fraccionamiento();
         $lote = $this->lote($finca, '069', 'vendido');
-        $this->lote($this->fraccionamiento(), '70', 'disponible');
+        $otra = $this->fraccionamiento();
+        $otra->update(['mapa_clave' => null]);
+        $this->lote($otra, '70', 'disponible');
         $servicio = app(MapaLotesService::class);
         $datos = $servicio->datos($finca);
         $this->assertSame('vendido', $datos['lotes'][68]['estatus']);
@@ -43,6 +45,30 @@ class MapaLotesTest extends TestCase
         $lote->update(['estatus' => 'apartado']);
         $this->assertSame('apartado', $servicio->datos($finca)['lotes'][68]['estatus']);
         $this->assertSame('20.00', $lote->fresh()->area_m2);
+    }
+
+    public function test_combina_tres_propietarios_y_el_enlace_abre_el_catalogo_correcto(): void
+    {
+        $fincas = [$this->fraccionamiento(), $this->fraccionamiento(), $this->fraccionamiento()];
+        foreach ($fincas as $index => $finca) {
+            $finca->propietario->update(['nombre' => 'Propietario '.($index + 1)]);
+            $this->lote($finca, (string) ($index + 1), ['disponible', 'apartado', 'vendido'][$index]);
+        }
+        $servicio = app(MapaLotesService::class);
+        $datos = $servicio->datos($fincas[0]);
+        $this->assertCount(3, $datos['fincas']);
+        $this->assertSame(3, $datos['vinculados']);
+        $this->assertSame('Propietario 3', $datos['lotes'][2]['propietario']);
+        $this->assertSame('vendido', $datos['lotes'][2]['estatus']);
+        $this->assertStringContainsString('fraccionamientoFilter='.$fincas[2]->id, $datos['lotes'][2]['catalogo_url']);
+        $this->assertSame($datos['lotes'], $servicio->datos($fincas[2])['lotes']);
+
+        $this->lote($fincas[1], '03', 'disponible');
+        $duplicados = $servicio->datos($fincas[0]);
+        $this->assertSame('sin_vincular', $duplicados['lotes'][2]['estatus']);
+        $this->assertNull($duplicados['lotes'][2]['propietario']);
+        $this->assertNull($duplicados['lotes'][2]['catalogo_url']);
+        $this->assertStringContainsString('Número repetido', $duplicados['lotes'][2]['aviso']);
     }
 
     public function test_no_asigna_disponibilidad_si_un_numero_se_repite_en_varias_manzanas(): void
