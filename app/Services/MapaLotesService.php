@@ -14,6 +14,7 @@ class MapaLotesService
         'finca-espinoza' => 'Finca Espinoza',
         'finca-del-norte' => 'Finca del Norte',
         'finca-miranda' => 'Finca Miranda',
+        'reyes' => 'Reyes',
     ];
 
     public function datos(Fraccionamiento $fraccionamiento): array

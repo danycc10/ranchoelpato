@@ -88,6 +88,7 @@ function initialize(root) {
     }
     for (const street of data.calles) {
         const label = element('text', { x: street.punto[0], y: street.punto[1], transform: `rotate(${street.angulo} ${street.punto.join(' ')})`, class: 'map-street' });
+        if (street.tamano) label.style.fontSize = `${street.tamano}px`;
         label.textContent = street.texto; svg.appendChild(label);
     }
     function zoom(factor) {

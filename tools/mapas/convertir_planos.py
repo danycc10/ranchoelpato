@@ -22,6 +22,7 @@ CONFIG = {
     'finca-espinoza': ('Finca Espinoza', 'Finca Espinoza.dwg', 'plano', 0),
     'finca-del-norte': ('Finca del Norte', 'Finca del norte.dwg', 'lotes norte', .05),
     'finca-miranda': ('Finca Miranda', 'FINCA MIRANDA 2026.dwg', None, .05),
+    'reyes': ('Reyes', 'Reyes Geo.dwg', 'lotificacion', .000001),
 }
 
 
@@ -110,6 +111,12 @@ def convert(source, output, key, config):
             lines.append(points)
     labels = [t for t in texts if re.fullmatch(r'\d+[A-Za-z]?', t['text']) and not
               any(s in t['layer'].upper() for s in ('PUNTO', 'CUADCON_TIT', 'PT_PROY'))]
+    if key == 'reyes':
+        # In this block the survey-number layer is reused for parcel labels.
+        # ModelSpace survey markers and its coordinate table are excluded above.
+        labels = [t for t in texts if t['layer'] == 'CVL_PUNTO_NUM' and re.fullmatch(r'\d+', t['text'])]
+    if not labels:
+        raise ValueError(f'{key}: no parcel labels found in the selected entities')
     # Miranda contains one distant dimension annotation, outside the site.
     if key == 'finca-miranda':
         labels = [t for t in labels if t['point'][0] < 500000]
@@ -137,7 +144,7 @@ def convert(source, output, key, config):
         raise ValueError(f'{key}: unresolved labels: {pending}')
     if any(p.interiors for p, _ in accepted):
         raise ValueError(f'{key}: a parcel contains interior rings requiring review')
-    expected = {'ballesteros': 48, 'finca-del-rio': 255, 'finca-del-norte': 340}
+    expected = {'ballesteros': 48, 'finca-del-rio': 255, 'finca-del-norte': 340, 'reyes': 68}
     if key in expected and collections.Counter(t['text'] for _, t in accepted) != collections.Counter(map(str, range(1, expected[key] + 1))):
         raise ValueError(f'{key}: missing or repeated lot numbers')
     # The explicitly labelled M1/M2/M3 markers identify connected parcel blocks.
@@ -174,7 +181,11 @@ def convert(source, output, key, config):
         parts = [clipped] if clipped.geom_type == 'LineString' else getattr(clipped, 'geoms', [])
         base_lines.extend([[point(v) for v in part.coords] for part in parts if part.geom_type == 'LineString' and not part.is_empty])
     streets = [{'texto': t['text'], 'punto': point(t['point']), 'angulo': t['angle']} for t in texts
-               if viewport.covers(Point(t['point'])) and re.search(r'CALLE|AVENIDA|ACCESO|PRIVADA|^M[123]$', t['text'], re.I)]
+               if viewport.covers(Point(t['point'])) and (re.search(r'CALLE|AVENIDA|ACCESO|PRIVADA|^M[123]$', t['text'], re.I)
+                   or (key == 'reyes' and t['text'] in ('CANAL', 'LINEAS ELECTRICAS')))]
+    if key == 'reyes':
+        for label in streets:
+            label['tamano'] = 2
     report = {'poligonos': len(lots), 'etiquetas': len(labels), 'extension_maxima': extension,
               'numeros_repetidos': {n: c for n, c in collections.Counter(l['numero'] for l in lots).items() if c > 1},
               'manzanas': dict(collections.Counter(l.get('manzana_plano', '') for l in lots)),

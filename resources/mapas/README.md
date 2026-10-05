@@ -27,6 +27,7 @@ Para incorporar otro plano, preparar su JSON con la misma estructura, registrarl
 | `finca-espinoza` | 49 | Bloque `plano`; 22 figuras en M1, 8 en M2 y 19 en M3. |
 | `finca-del-norte` | 340 | Bloque `lotes norte`; cierre de pequeños huecos con extensiones de hasta 0.05 unidades por extremo. |
 | `finca-miranda` | 200 | Modelo y bloques insertados `fisico` y `lotees`, respetando traslación y rotación; extensiones máximas de 0.05 unidades. |
+| `reyes` | 68 | Bloque `lotificacion` de `Reyes Geo.dwg`; cierre de diferencias de precisión con extensiones máximas de 0.000001 unidades. |
 
 Las extensiones siguen la dirección de los segmentos originales. No se trazan divisiones a partir de la posición de las etiquetas. La conversión exige una sola etiqueta por polígono, que todas las etiquetas candidatas tengan figura, geometrías válidas y ausencia de solapamientos después de serializar las coordenadas. Las cifras anteriores son figuras numeradas, no un conteo catastral de toda superficie sin etiqueta. Los DWG originales permanecen intactos. Las unidades declaradas por algunos archivos son inconsistentes con sus cotas; las superficies del dibujo siguen siendo orientativas y no sustituyen al catálogo.
 
@@ -45,4 +46,6 @@ python tools/mapas/convertir_planos.py DIRECTORIO resources/mapas
 php artisan test --filter=MapaLotesTest
 ```
 
-`revision_geometria` registra los conteos, la tolerancia de extensión y el SHA-256 del JSON CAD de entrada. El script contiene la selección explícita de bloques/capas de estos cinco archivos; debe revisarse al recibir otra versión del plano.
+`revision_geometria` registra los conteos, la tolerancia de extensión y el SHA-256 del JSON CAD de entrada. El script contiene la selección explícita de bloques/capas de estos seis archivos; debe revisarse al recibir otra versión del plano.
+
+En Reyes, los números 1–68 están en la capa `CVL_PUNTO_NUM` del bloque `lotificacion`, que se muestra en sus coordenadas locales. Esa capa se acepta únicamente en este bloque; no se incorporan los puntos de levantamiento ni la tabla de coordenadas del espacio modelo. Se conservan los rótulos `CANAL` y `LINEAS ELECTRICAS`. Para habilitarlo, seleccionar **Reyes** en el catálogo o ejecutar `php artisan mapas:vincular UUID_DEL_FRACCIONAMIENTO reyes`. No requiere migración adicional ni crea registros de fraccionamiento, propietarios o lotes.

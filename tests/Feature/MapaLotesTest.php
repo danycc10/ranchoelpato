@@ -83,9 +83,9 @@ class MapaLotesTest extends TestCase
         $this->assertSame(2, $datos['registros_sin_figura']);
     }
 
-    public function test_los_cinco_planos_nuevos_tienen_contornos_cerrados_e_identificadores_unicos(): void
+    public function test_los_seis_planos_nuevos_tienen_contornos_cerrados_e_identificadores_unicos(): void
     {
-        foreach (['ballesteros' => 48, 'finca-del-rio' => 255, 'finca-espinoza' => 49, 'finca-del-norte' => 340, 'finca-miranda' => 200] as $clave => $cantidad) {
+        foreach (['ballesteros' => 48, 'finca-del-rio' => 255, 'finca-espinoza' => 49, 'finca-del-norte' => 340, 'finca-miranda' => 200, 'reyes' => 68] as $clave => $cantidad) {
             $plano = json_decode(file_get_contents(resource_path('mapas/'.$clave.'.json')), true, 512, JSON_THROW_ON_ERROR);
             $this->assertArrayHasKey($clave, MapaLotesService::MAPAS);
             $this->assertCount($cantidad, $plano['lotes']);
@@ -94,10 +94,25 @@ class MapaLotesTest extends TestCase
                 $this->assertEquals($figura['puntos'][0], end($figura['puntos']));
                 $this->assertGreaterThan(25, $figura['area_plano']);
             }
-            if (in_array($clave, ['ballesteros', 'finca-del-rio', 'finca-del-norte'])) {
+            if (in_array($clave, ['ballesteros', 'finca-del-rio', 'finca-del-norte', 'reyes'])) {
                 $this->assertSame(array_map('strval', range(1, $cantidad)), array_column($plano['lotes'], 'numero'));
             }
         }
+    }
+
+    public function test_reyes_se_puede_asignar_y_conserva_referencias_y_disponibilidad(): void
+    {
+        $finca = $this->fraccionamiento();
+        $finca->update(['mapa_clave' => null]);
+        $this->lote($finca, '068', 'apartado');
+        $this->artisan('mapas:vincular', ['fraccionamiento' => $finca->uuid, 'mapa' => 'reyes'])->assertSuccessful();
+        $datos = app(MapaLotesService::class)->datos($finca->fresh());
+        $this->assertCount(68, $datos['lotes']);
+        $this->assertSame(1, $datos['vinculados']);
+        $this->assertSame('apartado', $datos['lotes'][67]['estatus']);
+        $this->assertContains('CANAL', array_column($datos['calles'], 'texto'));
+        $this->assertContains('LINEAS ELECTRICAS', array_column($datos['calles'], 'texto'));
+        $this->assertDatabaseCount('lotes', 1);
     }
 
     public function test_espinoza_distingue_manzanas_y_normaliza_sufijos_del_catalogo(): void
