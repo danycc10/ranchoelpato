@@ -270,8 +270,21 @@ class MapaLotesTest extends TestCase
             ->assertHasNoErrors()
             ->assertSee('Ver mapa');
         $this->assertSame('finca-escondida', $finca->fresh()->mapa_clave);
+    }
+
+    public function test_el_catalogo_de_lotes_ya_no_lleva_un_boton_por_cada_plano(): void
+    {
+        $finca = $this->fraccionamiento();
+        $usuario = User::factory()->create();
+        foreach (['admin.ver', 'catalogos.ver'] as $permiso) {
+            $usuario->givePermissionTo(Permission::findOrCreate($permiso, 'web'));
+        }
+
+        // Era un boton por fraccionamiento con plano: con una docena de fincas
+        // el encabezado se desbordaba. El acceso vive en Fraccionamientos.
         Livewire::actingAs($usuario)->test(\App\Livewire\Admin\Lotes\Index::class)
-            ->assertSee(route('admin.fraccionamientos.mapa', $finca), false);
+            ->assertDontSee(route('admin.fraccionamientos.mapa', $finca), false)
+            ->assertDontSee('Mapa · '.$finca->nombre);
     }
 
     private function fraccionamiento(): Fraccionamiento
