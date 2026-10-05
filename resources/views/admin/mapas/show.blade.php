@@ -18,13 +18,13 @@
                     <p data-status class="map-status"></p>
                     <p class="map-small">Propietario: <strong data-owner></strong><br>Registro: <span data-finca></span></p>
                     <dl class="map-facts"><div><dt>Manzana</dt><dd data-block></dd></div><div><dt>Superficie registrada</dt><dd data-area></dd></div><div><dt>Precio de lista</dt><dd data-price></dd></div></dl>
-                    <p data-plan-area class="map-small"></p><p data-warning class="map-warning"></p>
-                    <div class="map-measures"><h3>Medidas de los lados</h3><dl data-sides class="map-facts"></dl><p class="map-small">Metros aproximados según el plano. Las referencias L1, L2… aparecen sobre el lote seleccionado.</p></div>
+                    <p data-warning class="map-warning"></p>
+                    <div class="map-measures"><h3>Medidas y colindancias capturadas</h3><dl data-sides class="map-facts"></dl><p class="map-small">Información registrada en el catálogo del lote.</p></div>
                     <a data-catalog class="map-link">Ver en catálogo</a>
                 </section>
                 <p data-empty class="map-help">Selecciona un lote para consultar su disponibilidad y datos.</p>
                 @if(count($mapa['fincas']) === 0)
-                    <p class="map-warning">Este mapa aún no tiene fraccionamientos vinculados. Puedes explorar los lotes y sus medidas; la disponibilidad no está confirmada.</p>
+                    <p class="map-warning">Este mapa aún no tiene fraccionamientos vinculados. Puedes explorar los lotes; sus datos capturados estarán disponibles al vincularlos.</p>
                     <a class="map-link" href="{{ route('admin.fraccionamientos') }}">Vincular desde fraccionamientos</a>
                 @endif
                 <form data-search class="map-search"><label for="map-lot-search">Buscar lote</label><div><input id="map-lot-search" name="numero" required placeholder="Ej. 24 o 17A"><button>Buscar</button></div></form>
@@ -37,7 +37,7 @@
                 </div>
                 <p class="map-small">Los colores corresponden al catálogo. Gris significa que falta relacionar el lote; no indica disponibilidad.</p>
                 <p data-unmapped class="map-warning"></p>
-                <p class="map-small">Plano: {{ $mapa['nombre'] }}. Las superficies calculadas del dibujo son de referencia.</p>
+                <p class="map-small">Plano: {{ $mapa['nombre'] }}. La ficha muestra los datos capturados en el catálogo.</p>
                 <p class="map-small">Registros incluidos:</p><ul data-fincas class="map-small"></ul>
             </aside>
             <section class="map-surface" aria-label="Plano interactivo del fraccionamiento">

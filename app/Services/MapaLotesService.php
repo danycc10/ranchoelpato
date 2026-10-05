@@ -52,11 +52,9 @@ class MapaLotesService
         $todos = Lote::with('fraccionamiento.propietario')->whereIn('fraccionamiento_id', $fincas->modelKeys())->get();
         $registrados = $todos->groupBy(fn (Lote $lote) => $this->numero($lote->lote));
         $figurasPorClave = collect($plano['lotes'])->countBy(fn (array $figura) => $this->claveFigura($figura));
-        $medidas = app(MedidasLoteService::class);
         $vinculados = [];
         foreach ($plano['lotes'] as &$figura) {
             $figura['id'] ??= $figura['numero'];
-            $figura['lados'] = $medidas->calcular($figura['puntos']);
             $candidatos = $registrados->get($this->numero($figura['numero']), collect());
             if (isset($figura['manzana_plano'])) {
                 $candidatos = $candidatos->filter(fn (Lote $candidato) => $this->numero($candidato->manzana) === $this->numero($figura['manzana_plano']));
@@ -72,6 +70,14 @@ class MapaLotesService
             $figura['area_registrada'] = $lote?->area_m2;
             $figura['precio_lista'] = $lote?->precio_lista;
             $figura['vinculado'] = (bool) $lote;
+            $figura['medidas_capturadas'] = [];
+            foreach (['norte' => 'Norte', 'sur' => 'Sur', 'este' => 'Este', 'oeste' => 'Oeste'] as $campo => $orientacion) {
+                $figura['medidas_capturadas'][] = [
+                    'orientacion' => $orientacion,
+                    'medida' => $lote?->getAttribute('medida_'.$campo),
+                    'colindancia' => $lote?->getAttribute('colindancia_'.$campo),
+                ];
+            }
             $figura['aviso'] = $candidatos->count() > 1
                 ? 'Número repetido entre los registros del mapa: '.$candidatos->map(fn (Lote $candidato) => $candidato->fraccionamiento->nombre.' (manzana '.$candidato->manzana.')')->implode(', ').'. Revisar la vinculación.'
                 : ($lote ? null : 'Este lote del plano no tiene registro en las fincas vinculadas. Su disponibilidad no está confirmada.');

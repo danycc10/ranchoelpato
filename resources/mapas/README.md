@@ -2,7 +2,7 @@
 
 La galería **Administración → Mapas** (`/admin/mapas`) muestra todos los planos registrados, con una miniatura y los fraccionamientos vinculados. También se accede desde **Fraccionamientos → Todos los mapas**. Los planos sin vínculos se pueden explorar sin crear registros: sus lotes permanecen sin disponibilidad confirmada. La galería, el visor por clave y su endpoint de actualización requieren los mismos permisos de catálogo que el visor por fraccionamiento.
 
-La ficha de cada lote incluye longitudes aproximadas en metros, calculadas a partir de los vértices del plano. Las referencias L1, L2… señalan cada lado sobre la figura seleccionada; no representan frente/fondo ni orientación catastral. `MedidasLoteService` elimina vértices consecutivos repetidos y une segmentos rectos con tolerancia de 0.0001 unidades. No modifica las figuras ni las medidas registradas. Las coordenadas de los mapas conservan la escala del dibujo; las longitudes, como las superficies, son orientativas.
+La ficha muestra las medidas y colindancias capturadas en el catálogo por norte, sur, este y oeste, conservando su contenido. No calcula longitudes desde el DWG ni completa campos vacíos con la geometría: muestra «Sin capturar». Un lote sin vinculación única no recibe datos de otro registro. La actualización vuelve a consultar estos campos del catálogo. Las referencias geométricas L1, L2… ya no se muestran, porque no establecen correspondencia con los puntos cardinales capturados.
 
 `finca-escondida.json` contiene 150 polígonos numerados y las etiquetas Calle 1 a Calle 5 y Acceso, extraídos del bloque `lotes` de `Finca Escondida Levantamiento Fisico.dwg`.
 

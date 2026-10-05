@@ -16,7 +16,6 @@ function initialize(root) {
         return el;
     };
     const drawView = () => svg.setAttribute('viewBox', view.join(' '));
-    const sidesOverlay = element('g', { class: 'map-side-labels', 'aria-hidden': 'true' });
     function paint() {
         const counts = Object.fromEntries(Object.keys(names).map(key => [key, 0]));
         for (const lot of data.lotes) {
@@ -48,19 +47,20 @@ function initialize(root) {
         find('block').textContent = lot.manzana || 'Sin registrar';
         find('area').textContent = lot.area_registrada !== null ? `${number(lot.area_registrada)} m²` : 'Sin registrar';
         find('price').textContent = lot.precio_lista !== null ? Number(lot.precio_lista).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }) : 'Sin registrar';
-        find('plan-area').textContent = `Superficie del dibujo: ${number(lot.area_plano)} m² aprox.`;
         find('sides').replaceChildren();
-        sidesOverlay.replaceChildren();
-        for (const side of lot.lados) {
+        const captured = value => value === null || value === undefined || String(value).trim() === '' ? 'Sin capturar' : String(value);
+        for (const side of lot.medidas_capturadas) {
             const row = document.createElement('div'), term = document.createElement('dt'), value = document.createElement('dd');
-            term.textContent = `Lado ${side.numero}`;
-            value.textContent = `${number(side.metros)} m`;
+            term.textContent = side.orientacion;
+            const measure = captured(side.medida);
+            const length = document.createElement('span'), boundary = document.createElement('span');
+            length.textContent = /^\d+(?:[.,]\d+)?$/.test(measure.trim()) ? `${measure} m` : measure;
+            boundary.className = 'map-boundary';
+            boundary.textContent = `Colinda con: ${captured(side.colindancia)}`;
+            value.append(length, boundary);
             row.append(term, value); find('sides').appendChild(row);
-            const label = element('text', { x: (side.inicio[0] + side.fin[0]) / 2, y: (side.inicio[1] + side.fin[1]) / 2 });
-            label.textContent = `L${side.numero}`; sidesOverlay.appendChild(label);
         }
-        const mismatch = lot.area_registrada !== null && Math.abs(Number(lot.area_registrada) - lot.area_plano) > 0.5;
-        find('warning').textContent = lot.aviso || (mismatch ? 'La superficie del catálogo difiere del plano. Revisar antes de usarla en documentos.' : '');
+        find('warning').textContent = lot.aviso || '';
         find('catalog').hidden = !lot.catalogo_url;
         if (lot.catalogo_url) find('catalog').href = lot.catalogo_url;
         if (follow) {
@@ -102,7 +102,6 @@ function initialize(root) {
         if (street.tamano) label.style.fontSize = `${street.tamano}px`;
         label.textContent = street.texto; svg.appendChild(label);
     }
-    svg.appendChild(sidesOverlay);
     function zoom(factor) {
         const w = Math.min(data.viewBox[2] * 1.5, Math.max(data.viewBox[2] / 12, view[2] * factor)), h = w * data.viewBox[3] / data.viewBox[2];
         view = [view[0] + (view[2] - w) / 2, view[1] + (view[3] - h) / 2, w, h]; drawView();
@@ -110,7 +109,7 @@ function initialize(root) {
     find('zoom-in').onclick = () => zoom(.75);
     find('zoom-out').onclick = () => zoom(1.3);
     find('fit').onclick = () => { view = [...data.viewBox]; drawView(); };
-    find('close').onclick = () => { const previous = selected; selected = null; sidesOverlay.replaceChildren(); find('detail').hidden = true; find('empty').hidden = false; paint(); nodes.get(previous)?.focus({ preventScroll: true }); };
+    find('close').onclick = () => { const previous = selected; selected = null; find('detail').hidden = true; find('empty').hidden = false; paint(); nodes.get(previous)?.focus({ preventScroll: true }); };
     root.addEventListener('keydown', event => { if (event.key === 'Escape' && selected) find('close').click(); });
     find('search').onsubmit = event => {
         event.preventDefault();

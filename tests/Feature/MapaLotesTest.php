@@ -40,11 +40,35 @@ class MapaLotesTest extends TestCase
         foreach (MapaLotesService::MAPAS as $clave => $nombre) {
             $respuesta->assertSee($nombre)->assertSee(route('admin.mapas.show', $clave), false);
         }
-        $this->get($rutas[1])->assertOk()->assertSee('Medidas de los lados')->assertSee('aún no tiene fraccionamientos');
+        $this->get($rutas[1])->assertOk()->assertSee('Medidas y colindancias capturadas')->assertSee('aún no tiene fraccionamientos');
         $this->getJson($rutas[2])->assertOk()->assertJsonCount(68, 'lotes')->assertJsonCount(0, 'fincas')
-            ->assertJsonPath('vinculados', 0)->assertJsonStructure(['lotes' => [['lados' => [['numero', 'metros', 'inicio', 'fin']]]]]);
+            ->assertJsonPath('vinculados', 0)->assertJsonStructure(['lotes' => [['medidas_capturadas' => [['orientacion', 'medida', 'colindancia']]]]]);
         $this->get(route('admin.mapas.show', 'inexistente'))->assertNotFound();
         $this->getJson(route('admin.mapas.datos', 'inexistente'))->assertNotFound();
+    }
+
+    public function test_la_ficha_usa_medidas_capturadas_sin_completar_vacios_desde_el_plano(): void
+    {
+        $finca = $this->fraccionamiento();
+        $lote = $this->lote($finca, '1', 'disponible');
+        $lote->update(['medida_norte' => '12.50 m', 'colindancia_norte' => 'Calle principal', 'medida_sur' => '10 + 2 m', 'medida_este' => '0', 'medida_oeste' => null]);
+        $servicio = app(MapaLotesService::class);
+        $datos = $servicio->datos($finca);
+        $medidas = $datos['lotes'][0]['medidas_capturadas'];
+        $this->assertSame(['Norte', 'Sur', 'Este', 'Oeste'], array_column($medidas, 'orientacion'));
+        $this->assertSame('12.50 m', $medidas[0]['medida']);
+        $this->assertSame('Calle principal', $medidas[0]['colindancia']);
+        $this->assertSame('10 + 2 m', $medidas[1]['medida']);
+        $this->assertSame('0', (string) $medidas[2]['medida']);
+        $this->assertNull($medidas[3]['medida']);
+        $this->assertArrayNotHasKey('lados', $datos['lotes'][0]);
+        $this->assertSame([null, null, null, null], array_column($datos['lotes'][1]['medidas_capturadas'], 'medida'));
+        $lote->update(['medida_norte' => '14 m']);
+        $this->assertSame('14 m', $servicio->datos($finca)['lotes'][0]['medidas_capturadas'][0]['medida']);
+        $this->lote($finca, '01', 'vendido', '2');
+        $ambiguo = $servicio->datos($finca)['lotes'][0];
+        $this->assertFalse($ambiguo['vinculado']);
+        $this->assertSame([null, null, null, null], array_column($ambiguo['medidas_capturadas'], 'medida'));
     }
 
     public function test_el_plano_conserva_los_150_numeros_y_las_cinco_calles(): void

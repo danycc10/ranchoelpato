@@ -19,7 +19,7 @@
                         @if(count($plano['fincas']))
                             <p class="map-small">{{ count($plano['fincas']) }} registro(s) vinculados</p><ul class="map-card-fincas">@foreach($plano['fincas'] as $nombre)<li>{{ $nombre }}</li>@endforeach</ul>
                         @else
-                            <p class="map-warning">Sin fraccionamientos vinculados</p><p class="map-small">Disponible para explorar y consultar medidas.</p>
+                            <p class="map-warning">Sin fraccionamientos vinculados</p><p class="map-small">Disponible para explorar el plano.</p>
                         @endif
                     </div>
                 </article>
