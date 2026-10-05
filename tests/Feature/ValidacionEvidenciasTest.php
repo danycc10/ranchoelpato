@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\Admin\Recibos\ValidacionEvidencias;
 use App\Models\Cliente;
+use App\Models\CuentaBancaria;
 use App\Models\FormaPago;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
@@ -197,6 +198,65 @@ class ValidacionEvidenciasTest extends TestCase
         $this->assertSame(2, ValidacionEvidencias::conteoPendientes());
     }
 
+    #[Test]
+    public function el_filtro_acota_por_la_tarjeta_o_cuenta_que_recibio_el_dinero(): void
+    {
+        $tarjeta = $this->cuenta('BBVA-TARJETA-0298 OSVALDO');
+        $clabe = $this->cuenta('SPIN-CLABE-3034 DIANA');
+
+        $this->pago('R-TARJETA', 'TRANSFERENCIA', evidencia: true, cuenta: $tarjeta);
+        $this->pago('R-CLABE', 'TRANSFERENCIA', evidencia: true, cuenta: $clabe);
+
+        Livewire::actingAs($this->validador())
+            ->test(ValidacionEvidencias::class)
+            ->set('cuenta_bancaria_id', $tarjeta->id)
+            ->assertSee('R-TARJETA')
+            ->assertDontSee('R-CLABE');
+    }
+
+    #[Test]
+    public function el_selector_solo_ofrece_cuentas_que_salen_en_la_bandeja(): void
+    {
+        $usada = $this->cuenta('BBVA-TARJETA-0298 OSVALDO');
+        $sinMovimientos = $this->cuenta('SPIN-CLABE-9999 NADIE');
+
+        $this->pago('R-001', 'TRANSFERENCIA', evidencia: true, cuenta: $usada);
+
+        $ofrecidas = Livewire::actingAs($this->validador())
+            ->test(ValidacionEvidencias::class)
+            ->instance()
+            ->cuentas
+            ->pluck('id');
+
+        // Si no, el selector se llena de opciones que no devuelven nada.
+        $this->assertTrue($ofrecidas->contains($usada->id));
+        $this->assertFalse($ofrecidas->contains($sinMovimientos->id));
+    }
+
+    #[Test]
+    public function cambiar_la_cuenta_suelta_lo_palomeado(): void
+    {
+        $tarjeta = $this->cuenta('BBVA-TARJETA-0298 OSVALDO');
+        $pago = $this->pago('R-001', 'TRANSFERENCIA', evidencia: true, cuenta: $tarjeta);
+
+        Livewire::actingAs($this->validador())
+            ->test(ValidacionEvidencias::class)
+            ->set('seleccion', [$pago->id])
+            ->set('cuenta_bancaria_id', $tarjeta->id)
+            ->assertSet('seleccion', []);
+    }
+
+    private function cuenta(string $alias): CuentaBancaria
+    {
+        return CuentaBancaria::create([
+            'propietario_id' => Propietario::firstOrCreate(['nombre' => 'El Pato'])->id,
+            'alias' => $alias,
+            'banco' => explode('-', $alias)[0],
+            'numero' => '0000',
+            'activa' => true,
+        ]);
+    }
+
     private function validador(): User
     {
         return $this->usuario(['admin.ver', 'recibos.validar']);
@@ -224,6 +284,7 @@ class ValidacionEvidenciasTest extends TestCase
         bool $evidencia,
         bool $validado = false,
         ?string $referencia = null,
+        ?CuentaBancaria $cuenta = null,
     ): ReciboPago {
         $propietario = Propietario::firstOrCreate(['nombre' => 'El Pato']);
 
@@ -262,6 +323,7 @@ class ValidacionEvidenciasTest extends TestCase
         return ReciboPago::create([
             'recibo_id' => $recibo->id,
             'forma_pago_id' => $forma->id,
+            'cuenta_bancaria_id' => $cuenta?->id,
             'monto' => 1500,
             'fecha_efectiva' => '2026-09-20',
             'referencia' => $referencia,

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Recibos;
 
+use App\Models\CuentaBancaria;
 use App\Models\FormaPago;
 use App\Models\ReciboPago;
 use Illuminate\Support\Collection;
@@ -29,6 +30,10 @@ class ValidacionEvidencias extends Component
     #[Url(except: null)]
     public ?int $forma_pago_id = null;
 
+    /** La cuenta o tarjeta a la que entro el dinero. */
+    #[Url(except: null)]
+    public ?int $cuenta_bancaria_id = null;
+
     #[Url(except: null)]
     public ?string $desde = null;
 
@@ -49,7 +54,7 @@ class ValidacionEvidencias extends Component
     public function updated($property): void
     {
         // Al cambiar un filtro la lista es otra: lo palomeado ya no aplica.
-        if (in_array($property, ['q', 'forma_pago_id', 'desde', 'hasta', 'estado'], true)) {
+        if (in_array($property, ['q', 'forma_pago_id', 'cuenta_bancaria_id', 'desde', 'hasta', 'estado'], true)) {
             $this->seleccion = [];
             $this->resetPage();
         }
@@ -59,6 +64,7 @@ class ValidacionEvidencias extends Component
     {
         $this->q = '';
         $this->forma_pago_id = null;
+        $this->cuenta_bancaria_id = null;
         $this->desde = null;
         $this->hasta = null;
         $this->estado = 'sin_validar';
@@ -124,6 +130,23 @@ class ValidacionEvidencias extends Component
             ->get(['id', 'nombre']);
     }
 
+    /**
+     * Las cuentas que de verdad aparecen en la bandeja. Listarlas todas
+     * llenaria el selector de opciones que no devuelven nada.
+     */
+    public function getCuentasProperty(): Collection
+    {
+        $usadas = self::baseQuery()
+            ->whereNotNull('recibos_pagos.cuenta_bancaria_id')
+            ->distinct()
+            ->pluck('recibos_pagos.cuenta_bancaria_id');
+
+        return CuentaBancaria::query()
+            ->whereIn('id', $usadas)
+            ->orderBy('alias')
+            ->get(['id', 'alias', 'banco', 'numero']);
+    }
+
     public function getPendientesProperty(): int
     {
         return self::conteoPendientes();
@@ -171,6 +194,7 @@ class ValidacionEvidencias extends Component
             ->when($this->estado === 'sin_validar', fn ($q) => $q->whereNull('recibos_pagos.validado_at'))
             ->when($this->estado === 'validados', fn ($q) => $q->whereNotNull('recibos_pagos.validado_at'))
             ->when($this->forma_pago_id, fn ($q) => $q->where('recibos_pagos.forma_pago_id', $this->forma_pago_id))
+            ->when($this->cuenta_bancaria_id, fn ($q) => $q->where('recibos_pagos.cuenta_bancaria_id', $this->cuenta_bancaria_id))
             ->when($this->desde, fn ($q) => $q->whereDate('recibos_pagos.fecha_efectiva', '>=', $this->desde))
             ->when($this->hasta, fn ($q) => $q->whereDate('recibos_pagos.fecha_efectiva', '<=', $this->hasta))
             ->when($this->buscado(), function ($q, string $termino) {

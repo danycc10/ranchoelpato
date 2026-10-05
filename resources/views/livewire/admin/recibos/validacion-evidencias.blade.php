@@ -21,7 +21,7 @@
 
     {{-- FILTROS --}}
     <div class="bg-white border rounded-2xl p-5 shadow-sm">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
 
             <div class="lg:col-span-2">
                 <label class="text-xs text-gray-500 font-semibold">Buscar</label>
@@ -47,6 +47,18 @@
                     <option value="">Todas</option>
                     @foreach($this->formasPago as $forma)
                     <option value="{{ $forma->id }}">{{ $forma->nombre }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">Cuenta / tarjeta</label>
+                <select wire:model.live="cuenta_bancaria_id" class="mt-1 w-full border rounded-xl px-3 py-3 text-sm">
+                    <option value="">Todas</option>
+                    @foreach($this->cuentas as $cuenta)
+                    <option value="{{ $cuenta->id }}">
+                        {{ $cuenta->alias ?: trim(($cuenta->banco ?? '').' '.($cuenta->numero ?? '')) }}
+                    </option>
                     @endforeach
                 </select>
             </div>
