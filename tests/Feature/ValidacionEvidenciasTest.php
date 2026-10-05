@@ -306,6 +306,29 @@ class ValidacionEvidenciasTest extends TestCase
         $componente->assertSee('Quitar validación a 2');
     }
 
+    #[Test]
+    public function al_cambiar_el_filtro_la_palomita_de_la_cabecera_se_apaga(): void
+    {
+        $this->pago('R-001', 'TRANSFERENCIA', evidencia: true);
+        $this->pago('R-002', 'TRANSFERENCIA', evidencia: true);
+
+        $componente = Livewire::actingAs($this->validador())
+            ->test(ValidacionEvidencias::class)
+            ->call('alternarPagina');
+
+        $this->assertTrue($componente->instance()->paginaCompleta());
+        $componente->assertSee('check-pagina-1-on', false);
+
+        // Al cambiar de filtro la selección se suelta, y la cabecera tiene que
+        // reflejarlo: la key cambia para que Livewire recree el <input> en vez
+        // de reusar uno que se quedó palomeado en el DOM.
+        $componente->set('estado', 'validados');
+
+        $this->assertFalse($componente->instance()->paginaCompleta());
+        $componente->assertSee('check-pagina-1-off', false);
+        $componente->assertDontSee('check-pagina-1-on', false);
+    }
+
     private function cuenta(string $alias): CuentaBancaria
     {
         return CuentaBancaria::create([

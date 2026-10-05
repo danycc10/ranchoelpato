@@ -145,7 +145,12 @@
                 <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
                     <tr>
                         <th class="px-4 py-3 w-10">
+                            {{-- La wire:key lleva el estado a propósito: sin ella Livewire
+                                 reusa el mismo <input> y la palomita se queda prendida en el
+                                 DOM aunque el atributo `checked` ya no venga. Al cambiar la
+                                 key, el elemento se recrea con el estado correcto. --}}
                             <input type="checkbox"
+                                wire:key="check-pagina-{{ $pagos->currentPage() }}-{{ $this->paginaCompleta() ? 'on' : 'off' }}"
                                 wire:click="alternarPagina"
                                 @checked($this->paginaCompleta())
                                 title="Seleccionar todo lo de esta página"
