@@ -38,6 +38,7 @@ use App\Livewire\Admin\Recibos\Edit;
 |--------------------------------------------------------------------------
 */
 use App\Livewire\Admin\Recibos\Index as RecibosIndex;
+use App\Livewire\Admin\Recibos\ValidacionEvidencias;
 /*
 |--------------------------------------------------------------------------
 | Imports – Admin / Clientes Excelentes
@@ -288,6 +289,10 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
         Route::get('/recibos', RecibosIndex::class)
             ->name('recibos.index')
             ->middleware('permission:recibos.crear');
+
+        Route::get('/recibos/validacion', ValidacionEvidencias::class)
+            ->name('recibos.validacion')
+            ->middleware('permission:recibos.validar');
 
         Route::get('/recibos/{uuid}/editar', Edit::class)
             ->name('recibos.edit');

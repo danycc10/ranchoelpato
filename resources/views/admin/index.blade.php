@@ -18,9 +18,16 @@
                 ? \App\Models\ComprobantePago::where('estatus', 'por_validar')->count()
                 : 0;
 
+            // No consulta la bandeja si el usuario no puede entrar a validar.
+            $puedeValidar = auth()->user()?->can('recibos.validar') ?? false;
+            $evidenciasPorValidar = $puedeValidar
+                ? \App\Livewire\Admin\Recibos\ValidacionEvidencias::conteoPendientes()
+                : 0;
+
             $items = [
             ['title'=>'Cuotas','desc'=>'Calendario y control de pagos.','route'=>'admin.cuotas','icon'=>'clipboard'],
             ['title'=>'Recibos','desc'=>'Consulta y registro de recibos.','route'=>'admin.recibos.index','icon'=>'receipt'],
+            ['title'=>'Validar evidencias','desc'=>'Revisa los comprobantes de transferencia, OXXO y tarjeta.','route'=>'admin.recibos.validacion','icon'=>'check','badge'=>$evidenciasPorValidar,'permission'=>'recibos.validar'],
             ['title'=>'Comprobantes WhatsApp','desc'=>'Valida los pagos que mandan los clientes por WhatsApp.','route'=>'admin.comprobantes.index','icon'=>'chat','badge'=>$comprobantesPorValidar,'disabled'=>!$comprobantesWhatsappHabilitados],
             ['title'=>'Clientes','desc'=>'Altas, bajas y edición.','route'=>'admin.clientes','icon'=>'users'],
             ['title'=>'Contratos','desc'=>'Crear y administrar contratos.','route'=>'admin.contratos.index','icon'=>'document'],
@@ -56,6 +63,8 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M3 6.75A2.25 2.25 0 0 1 5.25 4.5h13.5A2.25 2.25 0 0 1 21 6.75v10.5A2.25 2.25 0 0 1 18.75 19.5H5.25A2.25 2.25 0 0 1 3 17.25V6.75ZM6 15h3" />',
             'user' => '
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.118a7.5 7.5 0 0 1 15 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.5-1.632Z" />',
+            'check' => '
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />',
             'calendar' => '
             <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v1.5M17.25 3v1.5M3 7.5h18M4.5 6A2.25 2.25 0 0 1 6.75 3.75h10.5A2.25 2.25 0 0 1 19.5 6v13.5A2.25 2.25 0 0 1 17.25 21.75H6.75A2.25 2.25 0 0 1 4.5 19.5V6Z" />',
             'receipt' => '
@@ -75,6 +84,7 @@
 
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-6">
                 @foreach($items as $it)
+                @continue(isset($it['permission']) && ! auth()->user()?->can($it['permission']))
                 @php
                     $pendientes = (int) ($it['badge'] ?? 0);
                     $deshabilitado = (bool) ($it['disabled'] ?? false);

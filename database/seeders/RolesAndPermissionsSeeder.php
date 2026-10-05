@@ -55,6 +55,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'recibos.crear',
             'recibos.imprimir',
             'recibos.eliminar',
+            'recibos.validar',
 
             // Clientes excelentes
             'clientes_excelentes.ver',
@@ -163,6 +164,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'recibos.crear',
             'recibos.imprimir',
             'recibos.eliminar',
+            'recibos.validar',
 
             'clientes_excelentes.ver',
             'clientes_excelentes.condonar',
