@@ -226,33 +226,38 @@ class ValidacionEvidencias extends Component
 
     private function marcar(bool $validado): void
     {
-        $ids = collect($this->seleccion)->filter()->map(fn ($id) => (int) $id)->unique();
-
-        if ($ids->isEmpty()) {
+        if ($this->seleccion === []) {
             $this->dispatch('toast', type: 'warning', message: 'No has seleccionado ningún pago.');
 
             return;
         }
 
-        // Se reconsulta contra la base: así nadie valida un pago que ya se
-        // anuló o que no admite validación por su forma de pago.
-        $validables = self::baseQuery()->whereIn('recibos_pagos.id', $ids)->pluck('recibos_pagos.id');
+        // Solo los que de verdad cambian. Volver a validar uno ya validado le
+        // borraría la fecha y el nombre de quien lo revisó la primera vez, que
+        // es justo el rastro que sirve para auditar.
+        $porCambiar = $this->seleccionadosQueCambian($validado);
 
-        if ($validables->isEmpty()) {
-            $this->dispatch('toast', type: 'error', message: 'Los pagos seleccionados ya no se pueden validar.');
+        if ($porCambiar->isEmpty()) {
+            $this->dispatch(
+                'toast',
+                type: 'warning',
+                message: $validado
+                    ? 'Lo que seleccionaste ya estaba validado.'
+                    : 'Lo que seleccionaste no estaba validado.'
+            );
             $this->seleccion = [];
 
             return;
         }
 
-        ReciboPago::whereIn('id', $validables)->update([
+        ReciboPago::whereIn('id', $porCambiar)->update([
             'validado_at' => $validado ? now() : null,
             'validado_por_user_id' => $validado ? auth()->id() : null,
         ]);
 
         $this->seleccion = [];
 
-        $cuantos = $validables->count();
+        $cuantos = $porCambiar->count();
         $plural = $cuantos === 1 ? 'pago' : 'pagos';
 
         $this->dispatch(
@@ -262,5 +267,40 @@ class ValidacionEvidencias extends Component
                 ? "{$cuantos} {$plural} marcados como validados."
                 : "Se quitó la validación a {$cuantos} {$plural}."
         );
+    }
+
+    /**
+     * De lo seleccionado, lo que cambiaría de estado con esta acción.
+     *
+     * Se reconsulta contra la base: así nadie toca un pago que se anuló
+     * mientras tenía la pantalla abierta, ni revalida lo ya validado.
+     *
+     * @return Collection<int, int>
+     */
+    private function seleccionadosQueCambian(bool $validado): Collection
+    {
+        $ids = collect($this->seleccion)->filter()->map(fn ($id) => (int) $id)->unique();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        return self::baseQuery()
+            ->whereIn('recibos_pagos.id', $ids)
+            ->when($validado, fn ($q) => $q->whereNull('recibos_pagos.validado_at'))
+            ->when(! $validado, fn ($q) => $q->whereNotNull('recibos_pagos.validado_at'))
+            ->pluck('recibos_pagos.id');
+    }
+
+    /** Cuántos de los seleccionados están por validar. */
+    public function getSeleccionPorValidarProperty(): int
+    {
+        return $this->seleccionadosQueCambian(validado: true)->count();
+    }
+
+    /** Cuántos de los seleccionados ya están validados. */
+    public function getSeleccionValidadosProperty(): int
+    {
+        return $this->seleccionadosQueCambian(validado: false)->count();
     }
 }

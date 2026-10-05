@@ -87,24 +87,48 @@
 
     {{-- BARRA DE ACCIONES: aparece solo cuando hay algo palomeado --}}
     @if(count($seleccion) > 0)
+    @php
+    // Cada boton sale solo si hay algo a lo que aplicarle: ofrecer "validar"
+    // sobre pagos ya validados es prometer algo que no va a pasar.
+    $porValidar = $this->seleccionPorValidar;
+    $yaValidados = $this->seleccionValidados;
+    @endphp
+
     <div class="sticky top-4 z-20 bg-black text-white rounded-2xl px-5 py-4 shadow-lg flex flex-wrap items-center justify-between gap-3">
-        <div class="font-bold text-sm">
-            {{ count($seleccion) }} {{ count($seleccion) === 1 ? 'pago seleccionado' : 'pagos seleccionados' }}
+        <div class="text-sm">
+            <span class="font-bold">
+                {{ count($seleccion) }} {{ count($seleccion) === 1 ? 'pago seleccionado' : 'pagos seleccionados' }}
+            </span>
+
+            @if($porValidar > 0 && $yaValidados > 0)
+            <span class="text-white/60">
+                · {{ $porValidar }} por validar, {{ $yaValidados }} ya {{ $yaValidados === 1 ? 'validado' : 'validados' }}
+            </span>
+            @endif
         </div>
 
         <div class="flex flex-wrap gap-2">
+            @if($porValidar > 0)
             <button type="button" wire:click="validarSeleccionados"
                 wire:loading.attr="disabled" wire:target="validarSeleccionados"
                 class="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-xl font-bold text-sm disabled:opacity-50">
-                <span wire:loading.remove wire:target="validarSeleccionados">Marcar como validado</span>
+                <span wire:loading.remove wire:target="validarSeleccionados">
+                    Marcar {{ $porValidar }} como {{ $porValidar === 1 ? 'validado' : 'validados' }}
+                </span>
                 <span wire:loading wire:target="validarSeleccionados">Validando…</span>
             </button>
+            @endif
 
+            @if($yaValidados > 0)
             <button type="button" wire:click="quitarValidacionSeleccionados"
                 wire:loading.attr="disabled" wire:target="quitarValidacionSeleccionados"
                 class="px-4 py-2 border border-white/40 hover:bg-white/10 rounded-xl font-bold text-sm disabled:opacity-50">
-                Quitar validación
+                <span wire:loading.remove wire:target="quitarValidacionSeleccionados">
+                    Quitar validación a {{ $yaValidados }}
+                </span>
+                <span wire:loading wire:target="quitarValidacionSeleccionados">Quitando…</span>
             </button>
+            @endif
 
             <button type="button" wire:click="$set('seleccion', [])"
                 class="px-4 py-2 text-white/70 hover:text-white font-semibold text-sm">

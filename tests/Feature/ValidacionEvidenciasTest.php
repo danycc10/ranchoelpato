@@ -246,6 +246,66 @@ class ValidacionEvidenciasTest extends TestCase
             ->assertSet('seleccion', []);
     }
 
+    #[Test]
+    public function revalidar_no_le_borra_el_rastro_a_lo_ya_validado(): void
+    {
+        $yaValidado = $this->pago('R-VIEJO', 'TRANSFERENCIA', evidencia: true, validado: true);
+        $pendiente = $this->pago('R-NUEVO', 'TRANSFERENCIA', evidencia: true);
+
+        $sello = $yaValidado->validado_at;
+        $revisorOriginal = (int) $yaValidado->validado_por_user_id;
+
+        Livewire::actingAs($this->validador())
+            ->test(ValidacionEvidencias::class)
+            ->set('estado', 'todos')
+            ->set('seleccion', [$yaValidado->id, $pendiente->id])
+            ->call('validarSeleccionados');
+
+        // El pendiente se valida...
+        $this->assertNotNull($pendiente->refresh()->validado_at);
+
+        // ...y al que ya estaba no se le toca quien ni cuando lo reviso.
+        $yaValidado->refresh();
+        $this->assertEquals($sello, $yaValidado->validado_at);
+        $this->assertSame($revisorOriginal, (int) $yaValidado->validado_por_user_id);
+    }
+
+    #[Test]
+    public function la_barra_cuenta_por_separado_lo_pendiente_y_lo_validado(): void
+    {
+        $validado = $this->pago('R-001', 'TRANSFERENCIA', evidencia: true, validado: true);
+        $pendienteUno = $this->pago('R-002', 'TRANSFERENCIA', evidencia: true);
+        $pendienteDos = $this->pago('R-003', 'TRANSFERENCIA', evidencia: true);
+
+        $componente = Livewire::actingAs($this->validador())
+            ->test(ValidacionEvidencias::class)
+            ->set('estado', 'todos')
+            ->set('seleccion', [$validado->id, $pendienteUno->id, $pendienteDos->id]);
+
+        // De esto sale cuál botón se muestra.
+        $this->assertSame(2, $componente->instance()->seleccionPorValidar);
+        $this->assertSame(1, $componente->instance()->seleccionValidados);
+    }
+
+    #[Test]
+    public function si_todo_lo_seleccionado_ya_esta_validado_no_ofrece_validar(): void
+    {
+        $uno = $this->pago('R-001', 'TRANSFERENCIA', evidencia: true, validado: true);
+        $dos = $this->pago('R-002', 'TRANSFERENCIA', evidencia: true, validado: true);
+
+        $componente = Livewire::actingAs($this->validador())
+            ->test(ValidacionEvidencias::class)
+            ->set('estado', 'validados')
+            ->set('seleccion', [$uno->id, $dos->id]);
+
+        $this->assertSame(0, $componente->instance()->seleccionPorValidar);
+        $this->assertSame(2, $componente->instance()->seleccionValidados);
+
+        // Y el botón de validar no aparece en la barra.
+        $componente->assertDontSee('Marcar 0 como');
+        $componente->assertSee('Quitar validación a 2');
+    }
+
     private function cuenta(string $alias): CuentaBancaria
     {
         return CuentaBancaria::create([
