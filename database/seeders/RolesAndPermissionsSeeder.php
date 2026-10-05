@@ -9,6 +9,79 @@ use Spatie\Permission\PermissionRegistrar;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
+    /**
+     * El catalogo completo de permisos.
+     *
+     * Vive aqui para que `app:permisos-sincronizar` pueda dar de alta en el
+     * servidor los que se agregan en el codigo, sin volver a correr el seeder
+     * (que con syncPermissions le borraria a jefa y secretaria lo que se les
+     * haya ajustado a mano desde la pantalla de roles).
+     *
+     * @var array<int, string>
+     */
+    public const PERMISOS = [
+
+        // Dashboard
+        'dashboard.ver',
+        'admin.ver',
+
+        // Reportes
+        'reportes.ver',
+        'reportes.diario_recibos',
+        'reportes.cliente_pagos',
+        'reportes.ingresos_mensuales',
+        'reportes.movimientos_bancarios',
+
+        // Catálogos
+        'catalogos.ver',
+        'catalogos.editar',
+
+        // Clientes
+        'clientes.ver',
+        'clientes.editar',
+
+        // Contratos terreno
+        'contratos.ver',
+        'contratos.editar',
+        'contratos.ver_detalle',
+
+        // Contratos servicios
+        'contratos_servicios.ver',
+        'contratos_servicios.editar',
+        'contratos_servicios.ver_detalle',
+
+        // Cobranza
+        'cuotas.ver',
+        'recibos.crear',
+        'recibos.imprimir',
+        'recibos.eliminar',
+        'recibos.validar',
+
+        // Clientes excelentes
+        'clientes_excelentes.ver',
+        'clientes_excelentes.condonar',
+
+        // SISTEMA
+        'sistema.ver',
+
+        // Usuarios
+        'usuarios.ver',
+        'usuarios.crear',
+        'usuarios.editar',
+        'usuarios.eliminar',
+
+        // Roles
+        'roles.ver',
+        'roles.crear',
+        'roles.editar',
+        'roles.eliminar',
+
+        // Logs
+        'logs.ver',
+        'logs.detalle',
+        'logs.eliminar',
+    ];
+
     public function run(): void
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -19,68 +92,7 @@ class RolesAndPermissionsSeeder extends Seeder
         |--------------------------------------------------------------------------
         */
 
-        $perms = [
-
-            // Dashboard
-            'dashboard.ver',
-            'admin.ver',
-
-            // Reportes
-            'reportes.ver',
-            'reportes.diario_recibos',
-            'reportes.cliente_pagos',
-            'reportes.ingresos_mensuales',
-            'reportes.movimientos_bancarios',
-
-            // Catálogos
-            'catalogos.ver',
-            'catalogos.editar',
-
-            // Clientes
-            'clientes.ver',
-            'clientes.editar',
-
-            // Contratos terreno
-            'contratos.ver',
-            'contratos.editar',
-            'contratos.ver_detalle',
-
-            // Contratos servicios
-            'contratos_servicios.ver',
-            'contratos_servicios.editar',
-            'contratos_servicios.ver_detalle',
-
-            // Cobranza
-            'cuotas.ver',
-            'recibos.crear',
-            'recibos.imprimir',
-            'recibos.eliminar',
-            'recibos.validar',
-
-            // Clientes excelentes
-            'clientes_excelentes.ver',
-            'clientes_excelentes.condonar',
-
-            // SISTEMA
-            'sistema.ver',
-
-            // Usuarios
-            'usuarios.ver',
-            'usuarios.crear',
-            'usuarios.editar',
-            'usuarios.eliminar',
-
-            // Roles
-            'roles.ver',
-            'roles.crear',
-            'roles.editar',
-            'roles.eliminar',
-
-            // Logs
-            'logs.ver',
-            'logs.detalle',
-            'logs.eliminar',
-        ];
+        $perms = self::PERMISOS;
 
         foreach ($perms as $perm) {
             Permission::firstOrCreate([
