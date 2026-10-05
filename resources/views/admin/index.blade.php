@@ -35,6 +35,7 @@
             ['title'=>'Promociones','desc'=>'Diferidos y cuotas especiales.','route'=>'admin.promociones','icon'=>'tag'],
             ['title'=>'Lotes','desc'=>'Disponibles, vendidos y datos.','route'=>'admin.lotes','icon'=>'map'],
             ['title'=>'Fraccionamientos','desc'=>'Catálogo de fraccionamientos.','route'=>'admin.fraccionamientos','icon'=>'building'],
+            ['title'=>'Mapas','desc'=>'Planos, disponibilidad y medidas de los lotes.','route'=>'admin.mapas.index','icon'=>'map','permission'=>'catalogos.ver'],
             ['title'=>'Cuentas bancarias','desc'=>'Bancos y cuentas destino.','route'=>'admin.cuentas-bancarias','icon'=>'bank'],
             ['title'=>'Tipos de cobro','desc'=>'Catálogo de conceptos.','route'=>'admin.tipos-cobro','icon'=>'tag'],
             ['title'=>'Formas de pago','desc'=>'Efectivo, transferencia, etc.','route'=>'admin.formas-pago','icon'=>'creditcard'],

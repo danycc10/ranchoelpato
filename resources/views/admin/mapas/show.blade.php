@@ -1,9 +1,9 @@
 <x-app-layout>
-    <div class="lotes-map" data-lotes-map data-refresh-url="{{ route('admin.fraccionamientos.mapa.datos', $fraccionamiento) }}">
+    <div class="lotes-map" data-lotes-map data-refresh-url="{{ route('admin.mapas.datos', $mapa['clave_mapa']) }}">
         <script type="application/json" data-map-data>{!! \Illuminate\Support\Js::encode($mapa) !!}</script>
         <header class="map-heading">
             <div>
-                <a href="{{ route('admin.fraccionamientos') }}">← Fraccionamientos</a>
+                <a href="{{ route('admin.mapas.index') }}">← Todos los mapas</a>
                 <h1>{{ $mapa['nombre'] }}</h1>
                 <p><span data-linked>{{ $mapa['vinculados'] }}</span> de {{ count($mapa['lotes']) }} lotes del plano relacionados con el catálogo.</p>
                 <p class="map-small">Vista conjunta de <span data-finca-count>{{ count($mapa['fincas']) }}</span> registro(s) de fraccionamiento.</p>
@@ -19,9 +19,14 @@
                     <p class="map-small">Propietario: <strong data-owner></strong><br>Registro: <span data-finca></span></p>
                     <dl class="map-facts"><div><dt>Manzana</dt><dd data-block></dd></div><div><dt>Superficie registrada</dt><dd data-area></dd></div><div><dt>Precio de lista</dt><dd data-price></dd></div></dl>
                     <p data-plan-area class="map-small"></p><p data-warning class="map-warning"></p>
+                    <div class="map-measures"><h3>Medidas de los lados</h3><dl data-sides class="map-facts"></dl><p class="map-small">Metros aproximados según el plano. Las referencias L1, L2… aparecen sobre el lote seleccionado.</p></div>
                     <a data-catalog class="map-link">Ver en catálogo</a>
                 </section>
                 <p data-empty class="map-help">Selecciona un lote para consultar su disponibilidad y datos.</p>
+                @if(count($mapa['fincas']) === 0)
+                    <p class="map-warning">Este mapa aún no tiene fraccionamientos vinculados. Puedes explorar los lotes y sus medidas; la disponibilidad no está confirmada.</p>
+                    <a class="map-link" href="{{ route('admin.fraccionamientos') }}">Vincular desde fraccionamientos</a>
+                @endif
                 <form data-search class="map-search"><label for="map-lot-search">Buscar lote</label><div><input id="map-lot-search" name="numero" required placeholder="Ej. 24 o 17A"><button>Buscar</button></div></form>
                 <p data-message role="status" class="map-warning"></p>
                 <div data-results class="map-results" aria-label="Coincidencias de búsqueda"></div>

@@ -17,6 +17,36 @@ class MapaLotesTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_la_galeria_muestra_todos_los_planos_incluso_sin_registros_y_protege_sus_rutas(): void
+    {
+        $rutas = [route('admin.mapas.index'), route('admin.mapas.show', 'reyes'), route('admin.mapas.datos', 'reyes')];
+        foreach ($rutas as $ruta) {
+            $this->get($ruta)->assertRedirect(route('login'));
+        }
+        $usuario = User::factory()->create();
+        $this->actingAs($usuario);
+        foreach ($rutas as $ruta) {
+            $this->get($ruta)->assertForbidden();
+        }
+        foreach (['admin.ver', 'catalogos.ver'] as $permiso) {
+            $usuario->givePermissionTo(Permission::findOrCreate($permiso, 'web'));
+        }
+        $this->fraccionamiento();
+        $this->fraccionamiento();
+        $lista = app(MapaLotesService::class)->listado();
+        $this->assertCount(count(MapaLotesService::MAPAS), $lista);
+        $this->assertCount(2, $lista[0]['fincas']);
+        $respuesta = $this->get($rutas[0])->assertOk();
+        foreach (MapaLotesService::MAPAS as $clave => $nombre) {
+            $respuesta->assertSee($nombre)->assertSee(route('admin.mapas.show', $clave), false);
+        }
+        $this->get($rutas[1])->assertOk()->assertSee('Medidas de los lados')->assertSee('aún no tiene fraccionamientos');
+        $this->getJson($rutas[2])->assertOk()->assertJsonCount(68, 'lotes')->assertJsonCount(0, 'fincas')
+            ->assertJsonPath('vinculados', 0)->assertJsonStructure(['lotes' => [['lados' => [['numero', 'metros', 'inicio', 'fin']]]]]);
+        $this->get(route('admin.mapas.show', 'inexistente'))->assertNotFound();
+        $this->getJson(route('admin.mapas.datos', 'inexistente'))->assertNotFound();
+    }
+
     public function test_el_plano_conserva_los_150_numeros_y_las_cinco_calles(): void
     {
         $datos = app(MapaLotesService::class)->datos($this->fraccionamiento());

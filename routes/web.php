@@ -178,6 +178,10 @@ Route::middleware(['auth', 'verified', 'permission:admin.ver'])
             ->name('fraccionamientos.mapa')
             ->middleware('permission:catalogos.ver');
 
+        Route::get('/mapas', [MapaLotesController::class, 'index'])->name('mapas.index')->middleware('permission:catalogos.ver');
+        Route::get('/mapas/{mapa}', [MapaLotesController::class, 'plano'])->name('mapas.show')->middleware('permission:catalogos.ver');
+        Route::get('/mapas/{mapa}/datos', [MapaLotesController::class, 'datosPlano'])->name('mapas.datos')->middleware('permission:catalogos.ver');
+
         Route::get('/fraccionamientos/{fraccionamiento}/mapa/datos', [MapaLotesController::class, 'datos'])
             ->name('fraccionamientos.mapa.datos')
             ->middleware('permission:catalogos.ver');

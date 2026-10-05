@@ -7,6 +7,7 @@
             <p class="text-gray-500 text-sm">Mantenimiento del catálogo.</p>
         </div>
 
+        <a href="{{ route('admin.mapas.index') }}" class="w-full sm:w-auto px-4 py-2 rounded-xl border font-bold text-blue-700 text-center hover:bg-blue-50">Todos los mapas</a>
         <button wire:click="crear"
             type="button"
             class="w-full sm:w-auto px-4 py-2 rounded-xl bg-black text-white font-bold">

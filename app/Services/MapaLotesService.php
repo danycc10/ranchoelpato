@@ -20,15 +20,43 @@ class MapaLotesService
     public function datos(Fraccionamiento $fraccionamiento): array
     {
         abort_unless(isset(self::MAPAS[$fraccionamiento->mapa_clave]), 404);
-        $plano = json_decode(file_get_contents(resource_path('mapas/'.$fraccionamiento->mapa_clave.'.json')), true, 512, JSON_THROW_ON_ERROR);
+
+        return $this->datosPorClave($fraccionamiento->mapa_clave, $fraccionamiento->nombre);
+    }
+
+    private function plano(string $clave): array
+    {
+        abort_unless(isset(self::MAPAS[$clave]), 404);
+
+        return json_decode(file_get_contents(resource_path('mapas/'.$clave.'.json')), true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    public function listado(): array
+    {
+        $fincas = Fraccionamiento::whereIn('mapa_clave', array_keys(self::MAPAS))->orderBy('nombre')->get()->groupBy('mapa_clave');
+        $mapas = [];
+        foreach (self::MAPAS as $clave => $nombre) {
+            $plano = $this->plano($clave);
+            $mapas[] = ['clave' => $clave, 'nombre' => $nombre, 'viewBox' => $plano['viewBox'],
+                'lotes' => $plano['lotes'], 'fincas' => $fincas->get($clave, collect())->pluck('nombre')->all()];
+        }
+
+        return $mapas;
+    }
+
+    public function datosPorClave(string $clave, ?string $nombre = null): array
+    {
+        $plano = $this->plano($clave);
         // Cada registro conserva su propietario; compartir plano combina únicamente la vista.
-        $fincas = Fraccionamiento::with('propietario')->where('mapa_clave', $fraccionamiento->mapa_clave)->orderBy('nombre')->get();
+        $fincas = Fraccionamiento::with('propietario')->where('mapa_clave', $clave)->orderBy('nombre')->get();
         $todos = Lote::with('fraccionamiento.propietario')->whereIn('fraccionamiento_id', $fincas->modelKeys())->get();
         $registrados = $todos->groupBy(fn (Lote $lote) => $this->numero($lote->lote));
         $figurasPorClave = collect($plano['lotes'])->countBy(fn (array $figura) => $this->claveFigura($figura));
+        $medidas = app(MedidasLoteService::class);
         $vinculados = [];
         foreach ($plano['lotes'] as &$figura) {
             $figura['id'] ??= $figura['numero'];
+            $figura['lados'] = $medidas->calcular($figura['puntos']);
             $candidatos = $registrados->get($this->numero($figura['numero']), collect());
             if (isset($figura['manzana_plano'])) {
                 $candidatos = $candidatos->filter(fn (Lote $candidato) => $this->numero($candidato->manzana) === $this->numero($figura['manzana_plano']));
@@ -62,7 +90,8 @@ class MapaLotesService
         unset($figura);
 
         return $plano + [
-            'fraccionamiento' => $fraccionamiento->nombre,
+            'fraccionamiento' => $nombre ?? $plano['nombre'],
+            'clave_mapa' => $clave,
             'fincas' => $fincas->map(fn (Fraccionamiento $finca) => [
                 'nombre' => $finca->nombre,
                 'propietario' => $finca->propietario?->nombre,
