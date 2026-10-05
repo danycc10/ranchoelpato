@@ -43,7 +43,7 @@
             <section class="map-surface" aria-label="Plano interactivo del fraccionamiento">
                 <div class="map-tools"><button type="button" data-zoom-in aria-label="Acercar mapa">+</button><button type="button" data-zoom-out aria-label="Alejar mapa">−</button><button type="button" data-fit>Ver todo</button></div>
                 <svg data-svg xmlns="http://www.w3.org/2000/svg" aria-label="Plano de lotes y calles"></svg>
-                <p class="map-caption">Selecciona un lote · Acerca y arrastra para explorar</p>
+                <p class="map-caption">Toca un lote · Arrastra para mover · Usa dos dedos para acercar o alejar</p>
             </section>
         </div>
         <div class="map-sr-only" data-announcement aria-live="polite"></div>

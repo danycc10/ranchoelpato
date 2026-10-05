@@ -8,7 +8,8 @@ function initialize(root) {
     const svg = find('svg'), ns = 'http://www.w3.org/2000/svg';
     const names = { disponible: 'Disponible', apartado: 'Apartado', vendido: 'Vendido', donacion: 'Donación', cancelado: 'Cancelado', sin_vincular: 'Sin vincular' };
     const nodes = new Map();
-    let selected = null, view = [...data.viewBox], drag = null, moved = false;
+    let selected = null, view = [...data.viewBox], drag = null, pinch = null, moved = false;
+    const pointers = new Map();
     const number = value => Number(value).toLocaleString('es-MX', { maximumFractionDigits: 2 });
     const element = (tag, attrs) => {
         const el = document.createElementNS(ns, tag);
@@ -102,9 +103,19 @@ function initialize(root) {
         if (street.tamano) label.style.fontSize = `${street.tamano}px`;
         label.textContent = street.texto; svg.appendChild(label);
     }
-    function zoom(factor) {
-        const w = Math.min(data.viewBox[2] * 1.5, Math.max(data.viewBox[2] / 12, view[2] * factor)), h = w * data.viewBox[3] / data.viewBox[2];
-        view = [view[0] + (view[2] - w) / 2, view[1] + (view[3] - h) / 2, w, h]; drawView();
+    const limitWidth = width => Math.min(data.viewBox[2] * 1.5, Math.max(data.viewBox[2] / 12, width));
+    function mapPoint(point, box = view) {
+        const rect = svg.getBoundingClientRect(), scale = Math.min(rect.width / box[2], rect.height / box[3]);
+        return [box[0] + (point.x - rect.left - (rect.width - box[2] * scale) / 2) / scale,
+            box[1] + (point.y - rect.top - (rect.height - box[3] * scale) / 2) / scale];
+    }
+    function zoom(factor, point = null) {
+        const w = limitWidth(view[2] * factor), h = w * data.viewBox[3] / data.viewBox[2];
+        if (point) {
+            const anchor = mapPoint(point), offset = mapPoint(point, [0, 0, w, h]);
+            view = [anchor[0] - offset[0], anchor[1] - offset[1], w, h];
+        } else view = [view[0] + (view[2] - w) / 2, view[1] + (view[3] - h) / 2, w, h];
+        drawView();
     }
     find('zoom-in').onclick = () => zoom(.75);
     find('zoom-out').onclick = () => zoom(1.3);
@@ -138,9 +149,38 @@ function initialize(root) {
         } catch (error) { find('message').textContent = error.message; }
         finally { find('refresh').disabled = false; }
     };
-    svg.addEventListener('wheel', event => { event.preventDefault(); zoom(event.deltaY < 0 ? .9 : 1.1); }, { passive: false });
-    svg.addEventListener('pointerdown', event => { moved = false; drag = { x: event.clientX, y: event.clientY, view: [...view] }; });
+    svg.addEventListener('wheel', event => {
+        event.preventDefault();
+        zoom(event.ctrlKey ? Math.exp(Math.max(-1, Math.min(1, event.deltaY * .01))) : (event.deltaY < 0 ? .9 : 1.1), { x: event.clientX, y: event.clientY });
+    }, { passive: false });
+    const midpoint = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    function beginGesture() {
+        const points = [...pointers.values()];
+        drag = null; pinch = null;
+        if (points.length >= 2) {
+            const [a, b] = points;
+            pinch = { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), anchor: mapPoint(midpoint(a, b)), view: [...view] };
+            moved = true;
+        } else if (points.length === 1) drag = { ...points[0], view: [...view] };
+    }
+    svg.addEventListener('pointerdown', event => {
+        if (event.button !== 0) return;
+        if (!pointers.size) moved = false;
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        beginGesture();
+        if (pinch) for (const id of pointers.keys()) svg.setPointerCapture(id);
+    });
     svg.addEventListener('pointermove', event => {
+        if (!pointers.has(event.pointerId)) return;
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (pinch) {
+            const [a, b] = [...pointers.values()];
+            const distance = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+            const w = limitWidth(pinch.view[2] * pinch.distance / distance), h = w * data.viewBox[3] / data.viewBox[2];
+            const offset = mapPoint(midpoint(a, b), [0, 0, w, h]);
+            view = [pinch.anchor[0] - offset[0], pinch.anchor[1] - offset[1], w, h];
+            drawView(); return;
+        }
         if (!drag) return;
         const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
         if (Math.hypot(dx, dy) > 4) {
@@ -149,7 +189,15 @@ function initialize(root) {
             view = [drag.view[0] - dx / scale, drag.view[1] - dy / scale, drag.view[2], drag.view[3]]; drawView();
         }
     });
-    for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) svg.addEventListener(name, () => drag = null);
+    function endPointer(event) {
+        if (event.type === 'lostpointercapture' && event.target !== svg) return;
+        if (!pointers.delete(event.pointerId)) return;
+        if (event.type !== 'pointerup') moved = true;
+        beginGesture();
+    }
+    for (const name of ['pointerup', 'pointercancel']) window.addEventListener(name, endPointer);
+    svg.addEventListener('lostpointercapture', endPointer);
+    window.addEventListener('blur', () => { pointers.clear(); drag = null; pinch = null; moved = true; });
     paint(); drawView();
 }
 
