@@ -83,6 +83,75 @@ class MapaLotesTest extends TestCase
         $this->assertSame(2, $datos['registros_sin_figura']);
     }
 
+    public function test_los_cinco_planos_nuevos_tienen_contornos_cerrados_e_identificadores_unicos(): void
+    {
+        foreach (['ballesteros' => 48, 'finca-del-rio' => 255, 'finca-espinoza' => 49, 'finca-del-norte' => 340, 'finca-miranda' => 200] as $clave => $cantidad) {
+            $plano = json_decode(file_get_contents(resource_path('mapas/'.$clave.'.json')), true, 512, JSON_THROW_ON_ERROR);
+            $this->assertArrayHasKey($clave, MapaLotesService::MAPAS);
+            $this->assertCount($cantidad, $plano['lotes']);
+            $this->assertCount($cantidad, array_unique(array_column($plano['lotes'], 'id')));
+            foreach ($plano['lotes'] as $figura) {
+                $this->assertEquals($figura['puntos'][0], end($figura['puntos']));
+                $this->assertGreaterThan(25, $figura['area_plano']);
+            }
+            if (in_array($clave, ['ballesteros', 'finca-del-rio', 'finca-del-norte'])) {
+                $this->assertSame(array_map('strval', range(1, $cantidad)), array_column($plano['lotes'], 'numero'));
+            }
+        }
+    }
+
+    public function test_espinoza_distingue_manzanas_y_normaliza_sufijos_del_catalogo(): void
+    {
+        $finca = $this->fraccionamiento();
+        $finca->update(['mapa_clave' => 'finca-espinoza']);
+        $this->lote($finca, '001', 'disponible', '01');
+        $this->lote($finca, '1', 'vendido', '2');
+        $this->lote($finca, '17 A', 'apartado', '3');
+        $datos = app(MapaLotesService::class)->datos($finca);
+        $figuras = collect($datos['lotes']);
+        $this->assertSame(3, $datos['vinculados']);
+        $this->assertSame('disponible', $figuras->first(fn ($l) => $l['manzana_plano'] === '1' && $l['numero'] === '1')['estatus']);
+        $this->assertSame('vendido', $figuras->first(fn ($l) => $l['manzana_plano'] === '2' && $l['numero'] === '1')['estatus']);
+        $this->assertSame('apartado', $figuras->first(fn ($l) => $l['manzana_plano'] === '3' && $l['numero'] === '17A')['estatus']);
+        $this->assertFalse($figuras->first(fn ($l) => $l['manzana_plano'] === '1' && $l['numero'] === '17A')['vinculado']);
+    }
+
+    public function test_miranda_no_colorea_dos_figuras_con_un_solo_registro(): void
+    {
+        $finca = $this->fraccionamiento();
+        $finca->update(['mapa_clave' => 'finca-miranda']);
+        $this->lote($finca, '106', 'vendido');
+        $datos = app(MapaLotesService::class)->datos($finca);
+        $repetidas = collect($datos['lotes'])->where('numero', '106');
+        $this->assertCount(2, $repetidas);
+        foreach ($repetidas as $figura) {
+            $this->assertFalse($figura['vinculado']);
+            $this->assertNull($figura['catalogo_url']);
+            $this->assertStringContainsString('varias figuras', $figura['aviso']);
+        }
+        $this->assertSame(0, $datos['vinculados']);
+        $this->assertSame(1, $datos['registros_sin_figura']);
+    }
+
+    public function test_del_rio_combina_registros_y_mantiene_los_duplicados_sin_vincular(): void
+    {
+        $primera = $this->fraccionamiento();
+        $segunda = $this->fraccionamiento();
+        $primera->update(['mapa_clave' => 'finca-del-rio']);
+        $segunda->update(['mapa_clave' => 'finca-del-rio']);
+        $this->lote($primera, '101', 'apartado');
+        $this->lote($segunda, '128', 'vendido');
+        $datos = app(MapaLotesService::class)->datos($segunda);
+        $this->assertCount(2, $datos['fincas']);
+        $this->assertSame(2, $datos['vinculados']);
+        $this->assertSame('apartado', $datos['lotes'][100]['estatus']);
+        $this->assertSame('vendido', $datos['lotes'][127]['estatus']);
+        $this->lote($segunda, '101', 'disponible');
+        $datos = app(MapaLotesService::class)->datos($primera);
+        $this->assertFalse($datos['lotes'][100]['vinculado']);
+        $this->assertSame(1, $datos['vinculados']);
+    }
+
     public function test_mapa_y_datos_requieren_sesion_y_permiso_de_catalogos(): void
     {
         $finca = $this->fraccionamiento();

@@ -17,3 +17,32 @@ Los registros de fraccionamiento vinculados a la misma clave de plano se muestra
 Los colores proceden del estado del lote en el catálogo. Solo se asocia una figura si hay una coincidencia única del número entre todos los registros vinculados; los ceros iniciales se normalizan. Un número ausente o repetido entre propietarios o manzanas se presenta sin vincular, con un aviso que identifica los registros en conflicto. No se elige un propietario automáticamente ni se suman los registros repetidos como lotes distintos. El mapa no modifica datos ni crea los lotes faltantes. «Actualizar disponibilidad» consulta de nuevo el catálogo y mantiene la selección.
 
 Para incorporar otro plano, preparar su JSON con la misma estructura, registrarlo en `MapaLotesService::MAPAS` y vincularlo con el comando. El archivo DWG original y las herramientas de conversión no se necesitan en el servidor.
+
+## Planos incorporados en octubre de 2026
+
+| Clave | Figuras numeradas | Tratamiento |
+| --- | ---: | --- |
+| `ballesteros` | 48 | Cierre del lote 24 con extensión máxima de 0.0001 unidades por extremo. |
+| `finca-del-rio` | 255 | Contornos originales; ubicación de MTEXT por su centro real, alineación y orientación. |
+| `finca-espinoza` | 49 | Bloque `plano`; 22 figuras en M1, 8 en M2 y 19 en M3. |
+| `finca-del-norte` | 340 | Bloque `lotes norte`; cierre de pequeños huecos con extensiones de hasta 0.05 unidades por extremo. |
+| `finca-miranda` | 200 | Modelo y bloques insertados `fisico` y `lotees`, respetando traslación y rotación; extensiones máximas de 0.05 unidades. |
+
+Las extensiones siguen la dirección de los segmentos originales. No se trazan divisiones a partir de la posición de las etiquetas. La conversión exige una sola etiqueta por polígono, que todas las etiquetas candidatas tengan figura, geometrías válidas y ausencia de solapamientos después de serializar las coordenadas. Las cifras anteriores son figuras numeradas, no un conteo catastral de toda superficie sin etiqueta. Los DWG originales permanecen intactos. Las unidades declaradas por algunos archivos son inconsistentes con sus cotas; las superficies del dibujo siguen siendo orientativas y no sustituyen al catálogo.
+
+Cada figura nueva tiene un `id` estable basado en el identificador CAD. Espinoza incorpora `manzana_plano`, asignada por los rótulos M1/M2/M3 dentro de cada conjunto conectado de parcelas. El servicio relaciona manzana y número en ese plano; normaliza espacios, mayúsculas y ceros iniciales (`17 A` equivale a `17A`). La búsqueda ofrece todas las coincidencias y la selección/actualización conserva la figura individual.
+
+En Miranda hay números repetidos en posiciones distintas. No basta que exista un registro único en el catálogo: si el plano contiene varias figuras con la misma clave, todas quedan sin vincular hasta identificar su procedencia. Tampoco se elige automáticamente entre registros duplicados del catálogo. Compartir un mapa combina los registros; no fusiona ni elimina lotes.
+
+Para Del Río y Miranda, asignar respectivamente `finca-del-rio` y `finca-miranda` a **cada** registro que comparta el dibujo mediante el selector del catálogo o `mapas:vincular UUID CLAVE`. La asignación se guarda en la base de datos del entorno; desplegar el código no la replica en producción. Revisar los registros incluidos y los avisos de duplicados después de vincular.
+
+### Reproducir la conversión
+
+Se necesita Python con Shapely 2 y LibreDWG 0.14. Convertir cada DWG con `dwgread -O JSON -o DIRECTORIO/CLAVE/plano.json ARCHIVO.dwg` y ejecutar:
+
+```sh
+python tools/mapas/convertir_planos.py DIRECTORIO resources/mapas
+php artisan test --filter=MapaLotesTest
+```
+
+`revision_geometria` registra los conteos, la tolerancia de extensión y el SHA-256 del JSON CAD de entrada. El script contiene la selección explícita de bloques/capas de estos cinco archivos; debe revisarse al recibir otra versión del plano.

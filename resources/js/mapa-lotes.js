@@ -21,10 +21,10 @@ function initialize(root) {
         for (const lot of data.lotes) {
             const state = names[lot.estatus] ? lot.estatus : 'sin_vincular';
             counts[state]++;
-            const node = nodes.get(lot.numero);
-            node.setAttribute('class', `map-parcel ${state}${selected === lot.numero ? ' selected' : ''}`);
-            node.setAttribute('aria-label', `Lote ${lot.numero}, ${names[state]}`);
-            node.setAttribute('aria-pressed', String(selected === lot.numero));
+            const node = nodes.get(lot.id);
+            node.setAttribute('class', `map-parcel ${state}${selected === lot.id ? ' selected' : ''}`);
+            node.setAttribute('aria-label', `Lote ${lot.numero}${lot.manzana_plano ? ', manzana ' + lot.manzana_plano : ''}, ${names[state]}`);
+            node.setAttribute('aria-pressed', String(selected === lot.id));
         }
         for (const [key, count] of Object.entries(counts)) root.querySelector(`[data-count="${key}"]`).textContent = count;
         find('linked').textContent = data.vinculados;
@@ -63,9 +63,9 @@ function initialize(root) {
         }
     }
     function select(value, focusMap = false) {
-        const lot = data.lotes.find(lot => lot.numero === String(value).trim().replace(/^0+(?=\d)/, ''));
+        const lot = data.lotes.find(lot => lot.id === value);
         if (!lot) { find('message').textContent = 'Ese número no aparece en el plano.'; return; }
-        selected = lot.numero;
+        selected = lot.id;
         find('message').textContent = '';
         showDetails(lot, true);
         paint();
@@ -75,11 +75,11 @@ function initialize(root) {
         }
     }
     for (const lot of data.lotes) {
-        const parcel = element('polygon', { points: lot.puntos.map(p => p.join(',')).join(' '), tabindex: 0, role: 'button', 'data-lote': lot.numero });
-        const title = element('title', {}); title.textContent = `Lote ${lot.numero}`; parcel.appendChild(title);
-        parcel.addEventListener('click', () => { if (!moved) select(lot.numero); });
-        parcel.addEventListener('keydown', event => { if (['Enter', ' '].includes(event.key)) { event.preventDefault(); select(lot.numero); } });
-        svg.appendChild(parcel); nodes.set(lot.numero, parcel);
+        const parcel = element('polygon', { points: lot.puntos.map(p => p.join(',')).join(' '), tabindex: 0, role: 'button', 'data-lote': lot.numero, 'data-figura': lot.id });
+        const title = element('title', {}); title.textContent = `Lote ${lot.numero}${lot.manzana_plano ? ' · Manzana ' + lot.manzana_plano : ''}`; parcel.appendChild(title);
+        parcel.addEventListener('click', () => { if (!moved) select(lot.id); });
+        parcel.addEventListener('keydown', event => { if (['Enter', ' '].includes(event.key)) { event.preventDefault(); select(lot.id); } });
+        svg.appendChild(parcel); nodes.set(lot.id, parcel);
     }
     for (const line of data.lineas) svg.appendChild(element('polyline', { points: line.map(p => p.join(',')).join(' '), class: 'map-base' }));
     for (const lot of data.lotes) {
@@ -99,14 +99,29 @@ function initialize(root) {
     find('fit').onclick = () => { view = [...data.viewBox]; drawView(); };
     find('close').onclick = () => { const previous = selected; selected = null; find('detail').hidden = true; find('empty').hidden = false; paint(); nodes.get(previous)?.focus({ preventScroll: true }); };
     root.addEventListener('keydown', event => { if (event.key === 'Escape' && selected) find('close').click(); });
-    find('search').onsubmit = event => { event.preventDefault(); select(new FormData(event.target).get('numero'), true); };
+    find('search').onsubmit = event => {
+        event.preventDefault();
+        const normalize = value => value.toUpperCase().replace(/\s+/g, '').replace(/^0+(?=\d)/, '');
+        const query = normalize(new FormData(event.target).get('numero'));
+        const matches = data.lotes.filter(lot => normalize(lot.numero) === query);
+        find('results').replaceChildren();
+        if (matches.length === 1) { select(matches[0].id, true); return; }
+        find('message').textContent = matches.length ? 'Ese número aparece varias veces. Selecciona la figura que deseas revisar.' : 'Ese número no aparece en el plano.';
+        matches.forEach((lot, index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = `Lote ${lot.numero} · ${lot.manzana_plano ? 'Manzana ' + lot.manzana_plano : 'Figura ' + (index + 1)}`;
+            button.onclick = () => select(lot.id, true);
+            find('results').appendChild(button);
+        });
+    };
     find('refresh').onclick = async () => {
         find('refresh').disabled = true;
         try {
             const response = await fetch(root.dataset.refreshUrl, { headers: { Accept: 'application/json' }, cache: 'no-store' });
             if (!response.ok) throw new Error('No se pudo actualizar. Revisa tu sesión e inténtalo de nuevo.');
             data = await response.json(); paint();
-            if (selected) showDetails(data.lotes.find(lot => lot.numero === selected), false);
+            if (selected) showDetails(data.lotes.find(lot => lot.id === selected), false);
             find('message').textContent = '';
         } catch (error) { find('message').textContent = error.message; }
         finally { find('refresh').disabled = false; }

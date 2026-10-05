@@ -22,8 +22,9 @@
                     <a data-catalog class="map-link">Ver en catálogo</a>
                 </section>
                 <p data-empty class="map-help">Selecciona un lote para consultar su disponibilidad y datos.</p>
-                <form data-search class="map-search"><label for="map-lot-search">Buscar lote</label><div><input id="map-lot-search" name="numero" inputmode="numeric" required placeholder="Número del plano"><button>Buscar</button></div></form>
+                <form data-search class="map-search"><label for="map-lot-search">Buscar lote</label><div><input id="map-lot-search" name="numero" required placeholder="Ej. 24 o 17A"><button>Buscar</button></div></form>
                 <p data-message role="status" class="map-warning"></p>
+                <div data-results class="map-results" aria-label="Coincidencias de búsqueda"></div>
                 <div class="map-legend" aria-label="Estados de los lotes">
                     @foreach(['disponible' => 'Disponible', 'apartado' => 'Apartado', 'vendido' => 'Vendido', 'donacion' => 'Donación', 'cancelado' => 'Cancelado', 'sin_vincular' => 'Sin vincular'] as $estado => $etiqueta)
                     <div><span class="map-dot {{ $estado }}"></span><span>{{ $etiqueta }}</span><b data-count="{{ $estado }}">0</b></div>
