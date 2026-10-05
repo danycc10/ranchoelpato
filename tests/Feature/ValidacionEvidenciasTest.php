@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Admin\Recibos\Index as RecibosIndex;
 use App\Livewire\Admin\Recibos\ValidacionEvidencias;
 use App\Models\Cliente;
 use App\Models\CuentaBancaria;
@@ -327,6 +328,28 @@ class ValidacionEvidenciasTest extends TestCase
         $this->assertFalse($componente->instance()->paginaCompleta());
         $componente->assertSee('check-pagina-1-off', false);
         $componente->assertDontSee('check-pagina-1-on', false);
+    }
+
+    #[Test]
+    public function el_modal_del_indice_tambien_pide_el_permiso(): void
+    {
+        $pago = $this->pago('R-001', 'TRANSFERENCIA', evidencia: true);
+
+        // El permiso no sirve de nada si se puede validar por el camino viejo.
+        Livewire::actingAs($this->usuario(['admin.ver', 'recibos.crear']))
+            ->test(RecibosIndex::class)
+            ->set('reciboPagoEvidenciaId', $pago->id)
+            ->call('validarPago')
+            ->assertForbidden();
+
+        $this->assertNull($pago->refresh()->validado_at);
+
+        Livewire::actingAs($this->validador())
+            ->test(RecibosIndex::class)
+            ->set('reciboPagoEvidenciaId', $pago->id)
+            ->call('validarPago');
+
+        $this->assertNotNull($pago->refresh()->validado_at);
     }
 
     private function cuenta(string $alias): CuentaBancaria

@@ -633,6 +633,7 @@
                         <p class="text-xs text-amber-600">Pendiente de cotejar con movimientos bancarios</p>
                         @endif
                     </div>
+                    @can('recibos.validar')
                     @if($reciboEvidenciaValidado)
                     <button
                         type="button"
@@ -652,6 +653,7 @@
                         Marcar validado
                     </button>
                     @endif
+                    @endcan
                 </div>
                 @endif
 

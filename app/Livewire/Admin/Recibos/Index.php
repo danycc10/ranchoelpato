@@ -11,6 +11,7 @@ use App\Models\ReciboPago;
 use App\Models\TipoCobro;
 use App\Services\ImageUploadService;
 use Carbon\Carbon;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -22,7 +23,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class Index extends Component
 {
-    use WithFileUploads, WithPagination;
+    use AuthorizesRequests, WithFileUploads, WithPagination;
 
     protected string $paginationTheme = 'tailwind';
 
@@ -274,6 +275,10 @@ class Index extends Component
 
     public function validarPago(): void
     {
+        // Validar va aparte de capturar: quien hace el recibo no deberia ser
+        // quien lo da por bueno. Mismo permiso que la bandeja de validacion.
+        $this->authorize('recibos.validar');
+
         if (! $this->reciboPagoEvidenciaId) {
             return;
         }
@@ -294,6 +299,8 @@ class Index extends Component
 
     public function desvalidarPago(): void
     {
+        $this->authorize('recibos.validar');
+
         if (! $this->reciboPagoEvidenciaId) {
             return;
         }
