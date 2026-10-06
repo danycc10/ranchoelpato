@@ -21,7 +21,7 @@
 
     {{-- FILTROS --}}
     <div class="bg-white border rounded-2xl p-5 shadow-sm">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
 
             <div class="lg:col-span-2">
                 <label class="text-xs text-gray-500 font-semibold">Buscar</label>
@@ -51,18 +51,6 @@
                 </select>
             </div>
 
-            <div>
-                <label class="text-xs text-gray-500 font-semibold">Cuenta / tarjeta</label>
-                <select wire:model.live="cuenta_bancaria_id" class="mt-1 w-full border rounded-xl px-3 py-3 text-sm">
-                    <option value="">Todas</option>
-                    @foreach($this->cuentas as $cuenta)
-                    <option value="{{ $cuenta->id }}">
-                        {{ $cuenta->alias ?: trim(($cuenta->banco ?? '').' '.($cuenta->numero ?? '')) }}
-                    </option>
-                    @endforeach
-                </select>
-            </div>
-
             <div class="grid grid-cols-2 gap-2">
                 <div>
                     <label class="text-xs text-gray-500 font-semibold">Desde</label>
@@ -76,6 +64,48 @@
                 </div>
             </div>
         </div>
+
+        {{-- Cuentas: van aparte porque se eligen varias a la vez, que es como
+             se cotejan los cortes cuando el dinero entro a mas de una. --}}
+        @if($this->cuentas->isNotEmpty())
+        <div class="mt-4 pt-4 border-t">
+            <div class="flex items-center justify-between mb-2">
+                <label class="text-xs text-gray-500 font-semibold">
+                    Cuenta / tarjeta
+                    @if(count($cuentas_ids) > 0)
+                    <span class="text-gray-400 font-normal">
+                        · {{ count($cuentas_ids) }} {{ count($cuentas_ids) === 1 ? 'elegida' : 'elegidas' }}
+                    </span>
+                    @else
+                    <span class="text-gray-400 font-normal">· todas</span>
+                    @endif
+                </label>
+
+                @if(count($cuentas_ids) > 0)
+                <button type="button" wire:click="limpiarCuentas"
+                    class="text-xs text-gray-500 hover:text-black font-semibold">
+                    Quitar selección
+                </button>
+                @endif
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                @foreach($this->cuentas as $cuenta)
+                @php $elegida = in_array($cuenta->id, $cuentas_ids); @endphp
+
+                <label wire:key="cuenta-{{ $cuenta->id }}"
+                    class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm cursor-pointer transition
+                        {{ $elegida ? 'bg-black text-white border-black font-semibold' : 'hover:bg-gray-50' }}">
+                    <input type="checkbox"
+                        value="{{ $cuenta->id }}"
+                        wire:model.live="cuentas_ids"
+                        class="rounded border-gray-300">
+                    {{ $cuenta->alias ?: trim(($cuenta->banco ?? '').' '.($cuenta->numero ?? '')) }}
+                </label>
+                @endforeach
+            </div>
+        </div>
+        @endif
 
         <div class="mt-4 flex justify-end">
             <button type="button" wire:click="limpiarFiltros"

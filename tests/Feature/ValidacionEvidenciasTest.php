@@ -210,9 +210,80 @@ class ValidacionEvidenciasTest extends TestCase
 
         Livewire::actingAs($this->validador())
             ->test(ValidacionEvidencias::class)
-            ->set('cuenta_bancaria_id', $tarjeta->id)
+            ->set('cuentas_ids', [$tarjeta->id])
             ->assertSee('R-TARJETA')
             ->assertDontSee('R-CLABE');
+    }
+
+    #[Test]
+    public function se_pueden_cotejar_varias_tarjetas_a_la_vez(): void
+    {
+        $tarjeta = $this->cuenta('BBVA-TARJETA-0298 OSVALDO');
+        $clabe = $this->cuenta('SPIN-CLABE-3034 DIANA');
+        $tercera = $this->cuenta('MP-CLABE-7617 OSVALDO');
+
+        $this->pago('R-TARJETA', 'TRANSFERENCIA', evidencia: true, cuenta: $tarjeta);
+        $this->pago('R-CLABE', 'TRANSFERENCIA', evidencia: true, cuenta: $clabe);
+        $this->pago('R-TERCERA', 'TRANSFERENCIA', evidencia: true, cuenta: $tercera);
+
+        Livewire::actingAs($this->validador())
+            ->test(ValidacionEvidencias::class)
+            ->set('cuentas_ids', [$tarjeta->id, $clabe->id])
+            ->assertSee('R-TARJETA')
+            ->assertSee('R-CLABE')
+            ->assertDontSee('R-TERCERA');
+    }
+
+    #[Test]
+    public function sin_cuentas_elegidas_salen_todas(): void
+    {
+        $tarjeta = $this->cuenta('BBVA-TARJETA-0298 OSVALDO');
+        $clabe = $this->cuenta('SPIN-CLABE-3034 DIANA');
+
+        $this->pago('R-TARJETA', 'TRANSFERENCIA', evidencia: true, cuenta: $tarjeta);
+        $this->pago('R-CLABE', 'TRANSFERENCIA', evidencia: true, cuenta: $clabe);
+
+        // Vacío es "todas", no "ninguna".
+        Livewire::actingAs($this->validador())
+            ->test(ValidacionEvidencias::class)
+            ->assertSet('cuentas_ids', [])
+            ->assertSee('R-TARJETA')
+            ->assertSee('R-CLABE');
+    }
+
+    #[Test]
+    public function palomear_una_cuenta_suelta_la_seleccion_aunque_llegue_con_indice(): void
+    {
+        $tarjeta = $this->cuenta('BBVA-TARJETA-0298 OSVALDO');
+        $pago = $this->pago('R-001', 'TRANSFERENCIA', evidencia: true, cuenta: $tarjeta);
+
+        // Al palomear una ficha, Livewire puede avisar del cambio como
+        // "cuentas_ids.0" en vez de "cuentas_ids".
+        $componente = Livewire::actingAs($this->validador())
+            ->test(ValidacionEvidencias::class)
+            ->set('seleccion', [$pago->id]);
+
+        $componente->instance()->updated('cuentas_ids.0');
+
+        $this->assertSame([], $componente->instance()->seleccion);
+    }
+
+    #[Test]
+    public function quitar_la_seleccion_de_cuentas_devuelve_todo(): void
+    {
+        $tarjeta = $this->cuenta('BBVA-TARJETA-0298 OSVALDO');
+        $clabe = $this->cuenta('SPIN-CLABE-3034 DIANA');
+
+        $this->pago('R-TARJETA', 'TRANSFERENCIA', evidencia: true, cuenta: $tarjeta);
+        $this->pago('R-CLABE', 'TRANSFERENCIA', evidencia: true, cuenta: $clabe);
+
+        Livewire::actingAs($this->validador())
+            ->test(ValidacionEvidencias::class)
+            ->set('cuentas_ids', [$tarjeta->id])
+            ->assertDontSee('R-CLABE')
+            ->call('limpiarCuentas')
+            ->assertSet('cuentas_ids', [])
+            ->assertSee('R-CLABE');
     }
 
     #[Test]
@@ -243,7 +314,7 @@ class ValidacionEvidenciasTest extends TestCase
         Livewire::actingAs($this->validador())
             ->test(ValidacionEvidencias::class)
             ->set('seleccion', [$pago->id])
-            ->set('cuenta_bancaria_id', $tarjeta->id)
+            ->set('cuentas_ids', [$tarjeta->id])
             ->assertSet('seleccion', []);
     }
 

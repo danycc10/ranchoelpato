@@ -30,9 +30,14 @@ class ValidacionEvidencias extends Component
     #[Url(except: null)]
     public ?int $forma_pago_id = null;
 
-    /** La cuenta o tarjeta a la que entro el dinero. */
-    #[Url(except: null)]
-    public ?int $cuenta_bancaria_id = null;
+    /**
+     * Las cuentas o tarjetas a las que entro el dinero. Vacio es "todas":
+     * se cotejan varias a la vez cuando el corte abarca mas de una.
+     *
+     * @var array<int, int>
+     */
+    #[Url(except: [])]
+    public array $cuentas_ids = [];
 
     #[Url(except: null)]
     public ?string $desde = null;
@@ -54,7 +59,14 @@ class ValidacionEvidencias extends Component
     public function updated($property): void
     {
         // Al cambiar un filtro la lista es otra: lo palomeado ya no aplica.
-        if (in_array($property, ['q', 'forma_pago_id', 'cuenta_bancaria_id', 'desde', 'hasta', 'estado'], true)) {
+        // `cuentas_ids` llega como "cuentas_ids.0" por ser arreglo.
+        $filtros = ['q', 'forma_pago_id', 'cuentas_ids', 'desde', 'hasta', 'estado'];
+
+        $esFiltro = collect($filtros)->contains(
+            fn (string $filtro) => $property === $filtro || str_starts_with($property, $filtro.'.')
+        );
+
+        if ($esFiltro) {
             $this->seleccion = [];
             $this->resetPage();
         }
@@ -64,7 +76,7 @@ class ValidacionEvidencias extends Component
     {
         $this->q = '';
         $this->forma_pago_id = null;
-        $this->cuenta_bancaria_id = null;
+        $this->cuentas_ids = [];
         $this->desde = null;
         $this->hasta = null;
         $this->estado = 'sin_validar';
@@ -147,6 +159,13 @@ class ValidacionEvidencias extends Component
             ->get(['id', 'alias', 'banco', 'numero']);
     }
 
+    public function limpiarCuentas(): void
+    {
+        $this->cuentas_ids = [];
+        $this->seleccion = [];
+        $this->resetPage();
+    }
+
     public function getPendientesProperty(): int
     {
         return self::conteoPendientes();
@@ -194,7 +213,7 @@ class ValidacionEvidencias extends Component
             ->when($this->estado === 'sin_validar', fn ($q) => $q->whereNull('recibos_pagos.validado_at'))
             ->when($this->estado === 'validados', fn ($q) => $q->whereNotNull('recibos_pagos.validado_at'))
             ->when($this->forma_pago_id, fn ($q) => $q->where('recibos_pagos.forma_pago_id', $this->forma_pago_id))
-            ->when($this->cuenta_bancaria_id, fn ($q) => $q->where('recibos_pagos.cuenta_bancaria_id', $this->cuenta_bancaria_id))
+            ->when($this->cuentas_ids !== [], fn ($q) => $q->whereIn('recibos_pagos.cuenta_bancaria_id', $this->cuentas_ids))
             ->when($this->desde, fn ($q) => $q->whereDate('recibos_pagos.fecha_efectiva', '>=', $this->desde))
             ->when($this->hasta, fn ($q) => $q->whereDate('recibos_pagos.fecha_efectiva', '<=', $this->hasta))
             ->when($this->buscado(), function ($q, string $termino) {
