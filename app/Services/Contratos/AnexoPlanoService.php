@@ -90,7 +90,7 @@ class AnexoPlanoService
             $ys = array_column($seleccion['puntos'], 1);
             $ancho = max($xs) - min($xs);
             $alto = max($ys) - min($ys);
-            $margen = max($ancho, $alto) * .4 + 3;
+            $margen = max($ancho, $alto) * .85 + 3;
             $detalle = [min($xs) - $margen, min($ys) - $margen, $ancho + 2 * $margen, $alto + 2 * $margen];
             foreach ([[$mapa['viewBox'], [30, 70, 1080, 1090], 'VISTA GENERAL'], [$detalle, [1140, 70, 630, 1090], 'DETALLE DEL LOTE']] as [$vista, $panel, $titulo]) {
                 [$x, $y, $w, $h] = $panel;
@@ -121,11 +121,16 @@ class AnexoPlanoService
                 imagesetthickness($lienzo, 1);
                 foreach ($mapa['lotes'] as $figura) {
                     $elegido = $figura['id'] === $seleccion['id'];
-                    if (! $elegido && $figura['area_plano'] * $escala * $escala < 1100) {
+                    // The overview locates the selected lot; numbering belongs in the detail.
+                    if (! $elegido && ($titulo === 'VISTA GENERAL' || $figura['area_plano'] * $escala * $escala < 1100)) {
                         continue;
                     }
                     [$cx, $cy] = $punto($figura['centro']);
                     $texto = (string) $figura['numero'];
+                    $mitadRotulo = strlen($texto) * imagefontwidth(5);
+                    if (! $elegido && ($cx < $mitadRotulo + 6 || $cx > $w - $mitadRotulo - 6 || $cy < 22 || $cy > $h - 22)) {
+                        continue;
+                    }
                     if ($elegido && $titulo === 'VISTA GENERAL') {
                         imageline($lienzo, $cx, $cy, $cx - 50, $cy - 25, $tinta);
                         $this->rotulo($lienzo, $texto, $cx - 65, $cy - 42, $tinta, 2);
