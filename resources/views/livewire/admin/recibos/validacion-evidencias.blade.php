@@ -21,7 +21,7 @@
 
     {{-- FILTROS --}}
     <div class="bg-white border rounded-2xl p-5 shadow-sm">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
 
             <div class="lg:col-span-2">
                 <label class="text-xs text-gray-500 font-semibold">Buscar</label>
@@ -51,6 +51,66 @@
                 </select>
             </div>
 
+            {{-- Mismo selector de cuentas que en Movimientos bancarios. --}}
+            <div x-data="{ abierto: false }" @click.away="abierto = false">
+                <label class="text-xs text-gray-500 font-semibold">Cuenta / tarjeta</label>
+
+                <button type="button" @click="abierto = !abierto"
+                    class="mt-1 w-full border rounded-xl px-3 py-3 text-sm text-left bg-white flex items-center justify-between gap-2">
+                    <span class="truncate">
+                        @if(count($cuentas_ids) === 0)
+                            Todas
+                        @elseif(count($cuentas_ids) === 1)
+                            1 cuenta
+                        @else
+                            {{ count($cuentas_ids) }} cuentas
+                        @endif
+                    </span>
+
+                    <svg class="w-4 h-4 text-gray-500 shrink-0 transition-transform" :class="{ 'rotate-180': abierto }"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+
+                <div x-show="abierto" x-transition class="relative z-30" style="display: none;">
+                    <div class="absolute mt-2 w-full min-w-[16rem] rounded-2xl border bg-white shadow-xl overflow-hidden">
+                        <div class="px-3 py-2 border-b bg-gray-50 flex items-center justify-between gap-2">
+                            <div class="text-sm font-semibold text-gray-700">Una o varias</div>
+
+                            @if(count($cuentas_ids))
+                            <button type="button" wire:click="limpiarCuentas"
+                                class="text-xs font-semibold text-red-600 hover:text-red-700">
+                                Limpiar
+                            </button>
+                            @endif
+                        </div>
+
+                        <div class="max-h-72 overflow-y-auto p-2 space-y-1">
+                            @forelse($this->cuentas as $cuenta)
+                            <label wire:key="cuenta-{{ $cuenta->id }}"
+                                class="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                <input type="checkbox"
+                                    wire:model.live="cuentas_ids"
+                                    value="{{ $cuenta->id }}"
+                                    class="mt-1 rounded border-gray-300 text-black focus:ring-black">
+
+                                <div class="min-w-0">
+                                    <div class="font-semibold text-sm text-gray-900 truncate">
+                                        {{ $cuenta->alias ?: trim(($cuenta->banco ?? '').' '.($cuenta->numero ?? '')) }}
+                                    </div>
+                                </div>
+                            </label>
+                            @empty
+                            <div class="px-3 py-6 text-sm text-gray-500 text-center">
+                                Ninguna cuenta tiene comprobantes por aquí.
+                            </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-2 gap-2">
                 <div>
                     <label class="text-xs text-gray-500 font-semibold">Desde</label>
@@ -64,48 +124,6 @@
                 </div>
             </div>
         </div>
-
-        {{-- Cuentas: van aparte porque se eligen varias a la vez, que es como
-             se cotejan los cortes cuando el dinero entro a mas de una. --}}
-        @if($this->cuentas->isNotEmpty())
-        <div class="mt-4 pt-4 border-t">
-            <div class="flex items-center justify-between mb-2">
-                <label class="text-xs text-gray-500 font-semibold">
-                    Cuenta / tarjeta
-                    @if(count($cuentas_ids) > 0)
-                    <span class="text-gray-400 font-normal">
-                        · {{ count($cuentas_ids) }} {{ count($cuentas_ids) === 1 ? 'elegida' : 'elegidas' }}
-                    </span>
-                    @else
-                    <span class="text-gray-400 font-normal">· todas</span>
-                    @endif
-                </label>
-
-                @if(count($cuentas_ids) > 0)
-                <button type="button" wire:click="limpiarCuentas"
-                    class="text-xs text-gray-500 hover:text-black font-semibold">
-                    Quitar selección
-                </button>
-                @endif
-            </div>
-
-            <div class="flex flex-wrap gap-2">
-                @foreach($this->cuentas as $cuenta)
-                @php $elegida = in_array($cuenta->id, $cuentas_ids); @endphp
-
-                <label wire:key="cuenta-{{ $cuenta->id }}"
-                    class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm cursor-pointer transition
-                        {{ $elegida ? 'bg-black text-white border-black font-semibold' : 'hover:bg-gray-50' }}">
-                    <input type="checkbox"
-                        value="{{ $cuenta->id }}"
-                        wire:model.live="cuentas_ids"
-                        class="rounded border-gray-300">
-                    {{ $cuenta->alias ?: trim(($cuenta->banco ?? '').' '.($cuenta->numero ?? '')) }}
-                </label>
-                @endforeach
-            </div>
-        </div>
-        @endif
 
         <div class="mt-4 flex justify-end">
             <button type="button" wire:click="limpiarFiltros"
