@@ -61,6 +61,47 @@ class ContratoCesionDerechosDocxTest extends TestCase
     }
 
     #[Test]
+    public function actualiza_el_diseno_anterior_al_generar_word_sin_cambiar_datos_y_guarda_respaldo(): void
+    {
+        Storage::fake('private');
+        $this->artisan('contratos:plantilla-cesion')->assertSuccessful();
+        $contrato = $this->contratoTerreno();
+        $contrato->lote->fraccionamiento->update(['mapa_clave' => 'reyes']);
+        $anterior = app(AnexoPlanoService::class)->preparar($contrato);
+        unset($anterior['version_diseno']);
+        $anterior['imagen'] = 'contratos/anexo-anterior.png';
+        $archivo = UploadedFile::fake()->image('anterior.png');
+        $png = file_get_contents($archivo->getRealPath());
+        Storage::disk('private')->put($anterior['imagen'], $png);
+        $anterior['sha256'] = hash('sha256', $png);
+        $contrato->forceFill(['anexo_plano' => $anterior])->save();
+        $contrato->lote->update(['medida_norte' => '99 m']);
+        $contrato->lote->fraccionamiento->update(['mapa_clave' => null]);
+
+        $word = new ContratoWordService;
+        $path = $word->generarDocx($contrato->fresh(), 'contrato_cesion_derechos');
+        $nuevo = $contrato->fresh()->anexo_plano;
+        $this->assertSame(2, $nuevo['version_diseno']);
+        $this->assertSame($anterior['medidas'], $nuevo['medidas']);
+        $this->assertSame($anterior['figura_id'], $nuevo['figura_id']);
+        $this->assertSame($anterior['imagen'], $nuevo['versiones_anteriores'][0]['imagen']);
+        $this->assertSame($png, Storage::disk('private')->get($anterior['imagen']));
+        $this->assertNotSame($anterior['sha256'], $nuevo['sha256']);
+        $zip = new ZipArchive;
+        $zip->open(Storage::disk('private')->path($path));
+        $incluida = false;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            if (str_starts_with($zip->getNameIndex($i), 'word/media/')) {
+                $incluida = $incluida || hash('sha256', $zip->getFromIndex($i)) === $nuevo['sha256'];
+            }
+        }
+        $zip->close();
+        $this->assertTrue($incluida);
+        $word->generarDocx($contrato->fresh(), 'contrato_cesion_derechos');
+        $this->assertSame($nuevo, $contrato->fresh()->anexo_plano);
+    }
+
+    #[Test]
     public function no_inventa_el_plano_si_falta_la_vinculacion_o_hay_duplicados(): void
     {
         Storage::fake('private');

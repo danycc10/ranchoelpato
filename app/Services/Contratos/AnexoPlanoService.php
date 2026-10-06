@@ -10,6 +10,8 @@ use RuntimeException;
 
 class AnexoPlanoService
 {
+    private const VERSION_DISENO = 2;
+
     public function preparar(Contrato $contrato): array
     {
         return DB::transaction(function () use ($contrato) {
@@ -23,6 +25,31 @@ class AnexoPlanoService
                 }
                 if (hash_file('sha256', Storage::disk('private')->path($guardado['imagen'])) !== $guardado['sha256']) {
                     throw new RuntimeException('La copia conservada del plano fue modificada. Revise el archivo antes de regenerar el documento.');
+                }
+
+                if (($guardado['version_diseno'] ?? 1) < self::VERSION_DISENO) {
+                    $mapa = app(MapaLotesService::class)->datosPorClave($guardado['mapa_clave']);
+                    $figuras = array_values(array_filter($mapa['lotes'], fn (array $figura) => (string) $figura['id'] === (string) $guardado['figura_id']));
+                    if (count($figuras) !== 1) {
+                        throw new RuntimeException('No se encuentra la figura conservada del plano para actualizar su diseño.');
+                    }
+                    $png = $this->dibujar($mapa, $figuras[0]);
+                    $sha = hash('sha256', $png);
+                    $path = 'contratos/'.$actual->uuid.'/anexos/plano/'.$sha.'.png';
+                    if (! Storage::disk('private')->put($path, $png)) {
+                        throw new RuntimeException('No se pudo conservar el plano actualizado del contrato.');
+                    }
+                    $guardado['versiones_anteriores'][] = [
+                        'imagen' => $guardado['imagen'],
+                        'sha256' => $guardado['sha256'],
+                        'version_diseno' => $guardado['version_diseno'] ?? 1,
+                    ];
+                    $guardado['imagen'] = $path;
+                    $guardado['sha256'] = $sha;
+                    $guardado['version_diseno'] = self::VERSION_DISENO;
+                    $guardado['diseno_actualizado_en'] = now()->toIso8601String();
+                    $actual->forceFill(['anexo_plano' => $guardado])->save();
+                    $contrato->setAttribute('anexo_plano', $guardado);
                 }
 
                 return $guardado;
@@ -68,6 +95,7 @@ class AnexoPlanoService
             $anexo['figura_id'] = $figura['id'];
             $anexo['generado_en'] = now()->toIso8601String();
             $anexo['sha256'] = hash('sha256', $png);
+            $anexo['version_diseno'] = self::VERSION_DISENO;
             $actual->forceFill(['anexo_plano' => $anexo])->save();
             $contrato->setAttribute('anexo_plano', $anexo);
 
