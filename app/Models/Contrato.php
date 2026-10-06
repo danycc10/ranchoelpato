@@ -108,6 +108,7 @@ class Contrato extends Model
 
     protected $casts = [
         'anexos_identificacion' => 'array',
+        'anexo_plano' => 'array',
         'fecha_inicio' => 'date',
         'precio_total' => 'decimal:2',
         'enganche' => 'decimal:2',

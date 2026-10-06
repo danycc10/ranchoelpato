@@ -769,7 +769,7 @@
                                     @endif
 
                                     @if($tipoDocumento === 'contrato_cesion_derechos')
-                                        <p class="mt-3 text-sm text-gray-600">El Word incluye los anexos A y B. Las identificaciones se conservan al generar cada anexo completo.</p>
+                                        <p class="mt-3 text-sm text-gray-600">El Word incluye los anexos A y B de identificación y el anexo E del plano. El plano se integra cuando el lote está vinculado de forma única a un mapa. Cada anexo completo conserva su propia copia con el contrato.</p>
                                         @foreach(app(\App\Services\Contratos\AnexosIdentificacionService::class)->estado($contrato) as $letra => $anexo)
                                             <p class="mt-1 text-sm {{ $anexo['faltantes'] ? 'text-amber-800' : 'text-gray-600' }}">
                                                 Anexo {{ $letra }}:

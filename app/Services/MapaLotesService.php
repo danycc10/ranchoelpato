@@ -70,6 +70,7 @@ class MapaLotesService
             $figura['area_registrada'] = $lote?->area_m2;
             $figura['precio_lista'] = $lote?->precio_lista;
             $figura['vinculado'] = (bool) $lote;
+            $figura['lote_id'] = $lote?->id;
             $figura['medidas_capturadas'] = [];
             foreach (['norte' => 'Norte', 'sur' => 'Sur', 'este' => 'Este', 'oeste' => 'Oeste'] as $campo => $orientacion) {
                 $figura['medidas_capturadas'][] = [

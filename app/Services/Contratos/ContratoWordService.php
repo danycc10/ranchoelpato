@@ -257,6 +257,7 @@ class ContratoWordService
         if ($tipo === 'contrato_cesion_derechos') {
             $this->setCesionValues($template, $contrato);
             $template->agregarAnexosIdentificacion(app(AnexosIdentificacionService::class)->preparar($contrato));
+            $template->agregarAnexoPlano(app(AnexoPlanoService::class)->preparar($contrato));
         }
 
         if ($tipo === 'caratula_expediente') {

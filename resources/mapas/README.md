@@ -1,5 +1,15 @@
 # Planos de fraccionamientos
 
+## Anexo del contrato de cesión
+
+Al generar o descargar `contrato_cesion_derechos`, el Word incorpora el **ANEXO E**, conforme a la numeración de la plantilla: vista general del fraccionamiento y acercamiento al lote, con sombreado y borde oscuro. No muestra disponibilidad de otros lotes ni calcula medidas para el contrato. Las medidas/colindancias y superficie proceden primero de las capturas conservadas del contrato y, cuando faltan, del catálogo del lote.
+
+Solo se integra una figura vinculada inequívocamente al ID del lote. Si no hay mapa, no existe el número o hay duplicados, aparece una página **PLANO PENDIENTE** con el motivo. Se puede completar al corregir la vinculación y volver a descargar el Word. Los contratos eléctricos y los demás formatos permanecen sin este anexo automático.
+
+La primera generación completa conserva los metadatos en `contratos.anexo_plano` y el PNG en `storage/app/private/contratos/UUID/anexos/plano/`. Las siguientes generaciones reutilizan esa copia, incluso si cambia el mapa o el catálogo. Se verifica la integridad de la imagen; no se reemplaza silenciosamente si falta o fue modificada. Tampoco se reutiliza para un lote distinto. Respaldar tanto la base de datos como los archivos privados.
+
+Para desplegar esta función se necesita aplicar `2026_10_06_120000_add_anexo_plano_to_contratos_table.php` con `php artisan migrate --force`. El dibujo usa GD (ya utilizado por los anexos de identificación), sin AutoCAD, Python ni Word en el servidor. La plantilla DOCX original no se modifica.
+
 El visor admite arrastre con un dedo y zoom con dos dedos en pantallas táctiles. El zoom mantiene el punto del plano situado entre los dedos y permite desplazarlo durante el gesto. Al levantar un dedo se continúa arrastrando sin saltos; un gesto de navegación no selecciona lotes. Se conservan los botones de zoom, la rueda del ratón y el gesto de zoom del touchpad cuando el navegador lo envía como Ctrl + rueda.
 
 La galería **Administración → Mapas** (`/admin/mapas`) muestra todos los planos registrados, con una miniatura y los fraccionamientos vinculados. También se accede desde **Fraccionamientos → Todos los mapas**. Los planos sin vínculos se pueden explorar sin crear registros: sus lotes permanecen sin disponibilidad confirmada. La galería, el visor por clave y su endpoint de actualización requieren los mismos permisos de catálogo que el visor por fraccionamiento.

@@ -9,6 +9,7 @@ use App\Models\Fraccionamiento;
 use App\Models\Lote;
 use App\Models\Propietario;
 use App\Services\Clientes\SolicitudDatosClienteService;
+use App\Services\Contratos\AnexoPlanoService;
 use App\Services\Contratos\AnexosIdentificacionService;
 use App\Services\Contratos\CondicionesCesionService;
 use App\Services\Contratos\ContratoWordService;
@@ -22,6 +23,73 @@ use ZipArchive;
 class ContratoCesionDerechosDocxTest extends TestCase
 {
     use RefreshDatabase;
+
+    #[Test]
+    public function agrega_el_anexo_e_y_conserva_el_plano_y_los_datos_del_contrato(): void
+    {
+        Storage::fake('private');
+        $this->artisan('contratos:plantilla-cesion')->assertSuccessful();
+        $contrato = $this->contratoTerreno();
+        $contrato->lote->fraccionamiento->update(['mapa_clave' => 'reyes']);
+        $word = new ContratoWordService;
+        $path = $word->generarDocx($contrato->fresh(), 'contrato_cesion_derechos');
+        $guardado = $contrato->fresh()->anexo_plano;
+        $this->assertSame($contrato->lote_id, $guardado['lote_id']);
+        $this->assertSame('reyes', $guardado['mapa_clave']);
+        $this->assertNull($guardado['pendiente']);
+        $this->assertSame('10.00', $guardado['medidas'][0]['medida']);
+        $this->assertSame('Calle Juárez', $guardado['medidas'][0]['colindancia']);
+        $this->assertSame([1800, 1200], array_slice(getimagesize(Storage::disk('private')->path($guardado['imagen'])), 0, 2));
+        $texto = $this->textoDocx(Storage::disk('private')->path($path));
+        $this->assertStringContainsString('ANEXO E PLANO DEL FRACCIONAMIENTO', $texto);
+        $this->assertStringNotContainsString('PLANO PENDIENTE', $texto);
+        $this->assertStringNotContainsString('${anexo_E_plano}', $texto);
+        $zip = new ZipArchive;
+        $zip->open(Storage::disk('private')->path($path));
+        $incluida = false;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            if (str_starts_with($zip->getNameIndex($i), 'word/media/')) {
+                $incluida = $incluida || hash('sha256', $zip->getFromIndex($i)) === $guardado['sha256'];
+            }
+        }
+        $zip->close();
+        $this->assertTrue($incluida);
+        $contrato->lote->update(['medida_norte' => '99 m']);
+        $contrato->lote->fraccionamiento->update(['mapa_clave' => null]);
+        $word->generarDocx($contrato->fresh(), 'contrato_cesion_derechos');
+        $this->assertSame($guardado, $contrato->fresh()->anexo_plano);
+    }
+
+    #[Test]
+    public function no_inventa_el_plano_si_falta_la_vinculacion_o_hay_duplicados(): void
+    {
+        Storage::fake('private');
+        $contrato = $this->contratoTerreno();
+        $servicio = app(AnexoPlanoService::class);
+        $this->assertNotNull($servicio->preparar($contrato)['pendiente']);
+        $this->assertNull($contrato->fresh()->anexo_plano);
+        $contrato->lote->fraccionamiento->update(['mapa_clave' => 'reyes']);
+        $otro = Lote::create(['fraccionamiento_id' => $contrato->lote->fraccionamiento_id, 'manzana' => '2', 'lote' => '12', 'clave' => 'M2-L12']);
+        $this->assertNotNull($servicio->preparar($contrato)['pendiente']);
+        $this->assertNull($contrato->fresh()->anexo_plano);
+        $otro->update(['lote' => '11']);
+        $this->assertNull($servicio->preparar($contrato)['pendiente']);
+        $this->assertNotNull($contrato->fresh()->anexo_plano);
+    }
+
+    #[Test]
+    public function no_sustituye_silenciosamente_una_imagen_conservada_que_falta(): void
+    {
+        Storage::fake('private');
+        $contrato = $this->contratoTerreno();
+        $contrato->lote->fraccionamiento->update(['mapa_clave' => 'reyes']);
+        $servicio = app(AnexoPlanoService::class);
+        $anexo = $servicio->preparar($contrato);
+        Storage::disk('private')->delete($anexo['imagen']);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Falta la copia conservada');
+        $servicio->preparar($contrato->fresh());
+    }
 
     #[Test]
     public function solo_los_contratos_de_terreno_ofrecen_el_contrato_de_cesion(): void
@@ -192,7 +260,7 @@ class ContratoCesionDerechosDocxTest extends TestCase
         $zip->open(Storage::disk('private')->path($path));
         $xml = $zip->getFromName('word/document.xml');
         $this->assertSame(4, substr_count($xml, '<w:pict>'));
-        $this->assertSame(2, substr_count($xml, '<w:pageBreakBefore/>'));
+        $this->assertSame(3, substr_count($xml, '<w:pageBreakBefore/>'));
         $this->assertTrue((new \DOMDocument)->loadXML($xml));
         $zip->close();
 
