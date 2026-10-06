@@ -118,7 +118,8 @@ class ContratoCesionDatosFaltantesTest extends TestCase
             ->test(Show::class, ['uuid' => $contrato->uuid])
             ->call('abrirModalContrato')
             ->call('seleccionarAccionDocumento', 'descargar')
-            ->assertSee('El Word incluye los anexos A y B.')
+            // Sin el punto final: al texto se le fue sumando el anexo E del plano.
+            ->assertSee('El Word incluye los anexos A y B')
             ->assertSee('Expediente incompleto.')
             ->call('completarDatosCesion')
             ->assertSet('completandoDatosCesion', true)
