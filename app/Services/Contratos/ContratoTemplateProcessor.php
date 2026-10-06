@@ -9,6 +9,57 @@ use PhpOffice\PhpWord\TemplateProcessor;
 
 class ContratoTemplateProcessor extends TemplateProcessor
 {
+    private bool $encabezadoProtegido = false;
+
+    public function ajustarPaginacionCesion(): void
+    {
+        $xml = new DOMDocument;
+        $xml->loadXML($this->tempDocumentMainPart);
+        $xpath = new DOMXPath($xml);
+        $ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        $xpath->registerNamespace('w', $ns);
+        // El membrete de esta plantilla flota sobre la página y mide 1.2 pulgadas.
+        // El margen original de 2 cm permite que el cuerpo pase por encima del logo.
+        foreach ($xpath->query('//w:sectPr/w:pgMar') as $margen) {
+            $margen->setAttributeNS($ns, 'w:top', (string) max(1900, (int) $margen->getAttributeNS($ns, 'top')));
+        }
+        foreach ($xpath->query('/w:document/w:body/w:p') as $parrafo) {
+            $texto = '';
+            foreach ($xpath->query('.//w:t', $parrafo) as $nodo) {
+                $texto .= $nodo->textContent;
+            }
+            if (trim($texto) === '') {
+                continue;
+            }
+            $propiedades = $xpath->query('./w:pPr', $parrafo)->item(0);
+            if (! $propiedades) {
+                $propiedades = $xml->createElementNS($ns, 'w:pPr');
+                $parrafo->insertBefore($propiedades, $parrafo->firstChild);
+            }
+            $opciones = ['keepLines', 'widowControl'];
+            if (mb_strtoupper($texto, 'UTF-8') === $texto && preg_match('/\p{L}/u', $texto)) {
+                $opciones[] = 'keepNext';
+            }
+            foreach ($opciones as $opcion) {
+                $nodo = $xpath->query('./w:'.$opcion, $propiedades)->item(0);
+                if (! $nodo) {
+                    $nodo = $xml->createElementNS($ns, 'w:'.$opcion);
+                    $propiedades->insertBefore($nodo, $propiedades->firstChild);
+                }
+                $nodo->setAttributeNS($ns, 'w:val', '1');
+            }
+        }
+        $this->tempDocumentMainPart = $xml->saveXML($xml->documentElement);
+        $this->encabezadoProtegido = true;
+    }
+
+    private function inicioAnexo(): string
+    {
+        $alto = $this->encabezadoProtegido ? 40 : 720;
+
+        return '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:pageBreakBefore/><w:keepNext/><w:spacing w:before="0" w:after="0" w:line="'.$alto.'" w:lineRule="exact"/></w:pPr><w:r><w:t xml:space="preserve"> </w:t></w:r></w:p>';
+    }
+
     public function agregarAnexoPlano(array $anexo): void
     {
         $xml = new DOMDocument;
@@ -18,7 +69,7 @@ class ContratoTemplateProcessor extends TemplateProcessor
         $body = $xpath->query('/w:document/w:body')->item(0);
         $seccion = $xpath->query('./w:sectPr', $body)->item(0);
         $parrafos = [
-            '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:pageBreakBefore/><w:keepNext/><w:spacing w:before="0" w:after="0" w:line="720" w:lineRule="exact"/></w:pPr><w:r><w:t xml:space="preserve"> </w:t></w:r></w:p>',
+            $this->inicioAnexo(),
             $this->parrafo('ANEXO E PLANO DEL FRACCIONAMIENTO', true),
             $this->parrafo('Contrato: '.$anexo['folio']),
             $this->parrafo('Proyecto: '.$anexo['proyecto'].' · Manzana: '.$anexo['manzana'].' · Lote: '.$anexo['lote']),
@@ -64,7 +115,7 @@ class ContratoTemplateProcessor extends TemplateProcessor
             $parte = $letra === 'A' ? 'PARTE CEDENTE' : 'PARTE ADQUIRENTE';
             $parrafos = [
                 // Reserva espacio bajo el membrete, también al comenzar una página.
-                '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:pageBreakBefore/><w:keepNext/><w:spacing w:before="0" w:after="0" w:line="720" w:lineRule="exact"/></w:pPr><w:r><w:t xml:space="preserve"> </w:t></w:r></w:p>',
+                $this->inicioAnexo(),
                 $this->parrafo('ANEXO '.$letra.' IDENTIFICACIÓN DE LA '.$parte, true),
                 $this->parrafo('Contrato: '.$anexo['folio']),
                 $this->parrafo('Proyecto: '.$anexo['proyecto'].' · Manzana: '.$anexo['manzana'].' · Lote: '.$anexo['lote']),

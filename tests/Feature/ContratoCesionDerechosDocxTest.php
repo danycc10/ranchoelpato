@@ -46,6 +46,12 @@ class ContratoCesionDerechosDocxTest extends TestCase
         $this->assertStringNotContainsString('${anexo_E_plano}', $texto);
         $zip = new ZipArchive;
         $zip->open(Storage::disk('private')->path($path));
+        $xml = new \DOMDocument;
+        $xml->loadXML($zip->getFromName('word/document.xml'));
+        $xpath = new \DOMXPath($xml);
+        $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+        $this->assertGreaterThanOrEqual(1900, (int) $xpath->evaluate('string(//w:sectPr/w:pgMar/@w:top)'));
+        $this->assertGreaterThan(0, $xpath->query('//w:p[w:pPr/w:keepNext and w:pPr/w:keepLines]')->length);
         $incluida = false;
         for ($i = 0; $i < $zip->numFiles; $i++) {
             if (str_starts_with($zip->getNameIndex($i), 'word/media/')) {
