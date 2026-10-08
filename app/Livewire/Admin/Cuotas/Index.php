@@ -39,6 +39,11 @@ class Index extends Component
 
     public ?string $urlImprimirPrincipal = null;
 
+    /** Los ids hacen falta para armar el ticket unico, que va por lote. */
+    public ?int $reciboPrincipalId = null;
+
+    public ?int $reciboRecargoId = null;
+
     public ?string $urlImprimirRecargo = null;
 
     public array $cuotasSeleccionadas = [];
@@ -313,6 +318,8 @@ class Index extends Component
 
         $this->urlImprimirPrincipal = $urlPrincipal;
         $this->urlImprimirRecargo = route('admin.recibos.imprimir', ['recibo' => $recargo->uuid]);
+        $this->reciboPrincipalId = (int) $principal->id;
+        $this->reciboRecargoId = (int) $recargo->id;
         $this->modalImprimir = true;
     }
 
@@ -416,6 +423,8 @@ class Index extends Component
         $this->modalImprimir = false;
         $this->urlImprimirPrincipal = null;
         $this->urlImprimirRecargo = null;
+        $this->reciboPrincipalId = null;
+        $this->reciboRecargoId = null;
     }
 
     public function confirmarImpresion(string $tipo): void
@@ -454,10 +463,13 @@ class Index extends Component
         }
 
         if ($tipo === 'ambos') {
-            $this->dispatch('open-print-tab', url: $principal);
-
-            if ($recargo) {
-                $this->dispatch('open-print-tab', url: $recargo);
+            // Un solo ticket, con el recargo adentro: igual que cuando se cobra
+            // por primera vez. Dos pestanas daban dos tiras de papel para el
+            // mismo pago, y el cliente tenia que juntarlas para cuadrar.
+            if ($recargo && $this->reciboPrincipalId) {
+                $this->abrirTicketUnico($this->reciboPrincipalId, $this->reciboRecargoId);
+            } else {
+                $this->dispatch('open-print-tab', url: $principal);
             }
 
             $this->cerrarModalImprimir();
@@ -466,6 +478,31 @@ class Index extends Component
         }
 
         $this->cerrarModalImprimir();
+    }
+
+    /**
+     * Arma el ticket que lleva el recargo pegado al recibo principal, con el
+     * mismo lote que usa la pantalla de cobro.
+     */
+    protected function abrirTicketUnico(int $reciboId, ?int $adjuntoId): void
+    {
+        $token = Str::uuid()->toString();
+
+        // El adjunto va en las dos listas: `recibo_ids` es lo que se carga y
+        // `adjunto_ids` solo marca cual se pega al ticket del principal.
+        $adjuntos = array_values(array_filter([$adjuntoId]));
+
+        cache()->put(
+            'print_batch:'.$token,
+            [
+                'user_id' => auth()->id(),
+                'recibo_ids' => array_merge([$reciboId], $adjuntos),
+                'adjunto_ids' => $adjuntos,
+            ],
+            now()->addMinutes(15)
+        );
+
+        $this->dispatch('open-print-tab', url: route('admin.recibos.print-lote', ['token' => $token]));
     }
 
     protected function autorizarImpresion(): void

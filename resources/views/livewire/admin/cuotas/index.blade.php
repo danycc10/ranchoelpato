@@ -507,11 +507,14 @@
                     <button class="w-full px-4 py-2 rounded-xl bg-black text-white font-semibold text-left"
                             wire:click="confirmarImpresion('ambos')">
                         ✅ Imprimir AMBOS
+                        <span class="block text-xs font-normal text-white/70 mt-0.5">
+                            Un solo ticket, con el recargo y el total sumado
+                        </span>
                     </button>
                 </div>
 
                 <div class="mt-4 text-xs text-gray-500">
-                    Tip: Si el navegador bloquea popups, permite ventanas emergentes para que se abran ambos.
+                    Tip: Si el navegador bloquea popups, permite ventanas emergentes para que se abra el ticket.
                 </div>
             </div>
         </div>
