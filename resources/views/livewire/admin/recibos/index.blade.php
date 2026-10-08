@@ -848,6 +848,18 @@
 
 </div>
 
+@script
+<script>
+    // Sin este escucha el modal preguntaba y no abria nada: el evento se
+    // despachaba al vacio.
+    Livewire.on('open-print-tab', (payload) => {
+        const url = payload?.url;
+        if (!url) return;
+        window.open(url, '_blank', 'noopener,noreferrer');
+    });
+</script>
+@endscript
+
 @push('scripts')
 <script>
     (() => {

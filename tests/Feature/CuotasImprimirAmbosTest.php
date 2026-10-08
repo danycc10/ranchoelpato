@@ -15,6 +15,8 @@ use App\Models\Recibo;
 use App\Models\TipoCobro;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Permission\Models\Permission;
@@ -188,6 +190,49 @@ class CuotasImprimirAmbosTest extends TestCase
             ->assertDispatched('open-print-tab', function ($evento, $params) use ($principal) {
                 return str_contains($params['url'] ?? '', $principal->uuid);
             });
+    }
+
+    #[Test]
+    public function las_pantallas_que_mandan_abrir_pestana_traen_quien_las_escuche(): void
+    {
+        // El modal preguntaba y no abria nada: el evento se despachaba al
+        // vacio porque la vista de Recibos no tenia el escucha.
+        $revisados = 0;
+
+        foreach (File::allFiles(app_path('Livewire')) as $componente) {
+            if (! str_contains((string) file_get_contents($componente->getPathname()), 'open-print-tab')) {
+                continue;
+            }
+
+            $vista = $this->vistaDe($componente->getPathname());
+
+            $this->assertNotNull($vista, "No encontre la vista de {$componente->getFilename()}.");
+
+            $this->assertStringContainsString(
+                "Livewire.on('open-print-tab'",
+                (string) file_get_contents($vista),
+                "{$componente->getFilename()} manda abrir pestana pero su vista no tiene el escucha."
+            );
+
+            $revisados++;
+        }
+
+        $this->assertGreaterThan(0, $revisados, 'No se encontro ningun componente que abra pestanas.');
+    }
+
+    /** La vista blade que le toca a un componente Livewire. */
+    private function vistaDe(string $componente): ?string
+    {
+        $relativo = str_replace([app_path('Livewire').DIRECTORY_SEPARATOR, '.php'], '', $componente);
+
+        // Windows separa con barra invertida y Linux con diagonal.
+        $ruta = collect(explode('/', str_replace(DIRECTORY_SEPARATOR, '/', $relativo)))
+            ->map(fn (string $parte) => Str::kebab($parte))
+            ->implode('/');
+
+        $vista = resource_path('views/livewire/'.$ruta.'.blade.php');
+
+        return is_file($vista) ? $vista : null;
     }
 
     /**
