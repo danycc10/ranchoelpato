@@ -10,6 +10,7 @@ use App\Models\Recibo;
 use App\Models\ReciboPago;
 use App\Models\TipoCobro;
 use App\Services\ImageUploadService;
+use App\Services\Recibos\TicketConRecargo;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
@@ -48,6 +49,19 @@ class Index extends Component
 
     // '' | 'validado' | 'sin_validar'
     public string $validacion = '';
+
+    // ===== Imprimir: el recibo solo, o junto con su recargo =====
+    public bool $modalImprimir = false;
+
+    public ?int $imprimirPrincipalId = null;
+
+    public ?int $imprimirRecargoId = null;
+
+    public ?string $imprimirPrincipalFolio = null;
+
+    public ?string $imprimirRecargoFolio = null;
+
+    public ?string $imprimirUrlPedido = null;
 
     // ===== Evidencia por recibo_pago =====
     public bool $modalEvidenciaOpen = false;
@@ -271,6 +285,74 @@ class Index extends Component
             'nuevaEvidencia',
             'nuevaEvidenciaPreviewUrl',
         ]);
+    }
+
+    /**
+     * Ver un recibo. Si su cuota tambien genero recargo, se pregunta antes:
+     * dos tiras de papel por el mismo pago obligan a juntarlas para cuadrar,
+     * y el ticket del cobro original los trae en uno solo.
+     */
+    public function verRecibo(string $uuid, TicketConRecargo $tickets): void
+    {
+        abort_unless(auth()->user()?->can('recibos.imprimir'), 403);
+
+        $recibo = Recibo::where('uuid', $uuid)->firstOrFail();
+
+        $url = route('admin.recibos.imprimir', ['recibo' => $recibo->uuid]);
+
+        $par = $tickets->parDe($recibo);
+        $principal = $par['principal'];
+        $recargo = $par['recargo'];
+
+        // Sin pareja no hay nada que preguntar.
+        if (! $principal || ! $recargo) {
+            $this->dispatch('open-print-tab', url: $url);
+
+            return;
+        }
+
+        $this->imprimirPrincipalId = (int) $principal->id;
+        $this->imprimirRecargoId = (int) $recargo->id;
+        $this->imprimirPrincipalFolio = $principal->folio;
+        $this->imprimirRecargoFolio = $recargo->folio;
+        $this->imprimirUrlPedido = $url;
+        $this->modalImprimir = true;
+    }
+
+    public function imprimirSoloEste(): void
+    {
+        abort_unless(auth()->user()?->can('recibos.imprimir'), 403);
+
+        if ($this->imprimirUrlPedido) {
+            $this->dispatch('open-print-tab', url: $this->imprimirUrlPedido);
+        }
+
+        $this->cerrarModalImprimir();
+    }
+
+    public function imprimirAmbos(TicketConRecargo $tickets): void
+    {
+        abort_unless(auth()->user()?->can('recibos.imprimir'), 403);
+
+        if ($this->imprimirPrincipalId) {
+            $this->dispatch('open-print-tab', url: $tickets->urlTicketUnico(
+                $this->imprimirPrincipalId,
+                $this->imprimirRecargoId,
+                (int) auth()->id()
+            ));
+        }
+
+        $this->cerrarModalImprimir();
+    }
+
+    public function cerrarModalImprimir(): void
+    {
+        $this->modalImprimir = false;
+        $this->imprimirPrincipalId = null;
+        $this->imprimirRecargoId = null;
+        $this->imprimirPrincipalFolio = null;
+        $this->imprimirRecargoFolio = null;
+        $this->imprimirUrlPedido = null;
     }
 
     public function validarPago(): void

@@ -8,6 +8,7 @@ use App\Models\Pago;
 use App\Models\Propietario;
 use App\Models\Recibo;
 use App\Models\TipoCobro;
+use App\Services\Recibos\TicketConRecargo;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -480,29 +481,10 @@ class Index extends Component
         $this->cerrarModalImprimir();
     }
 
-    /**
-     * Arma el ticket que lleva el recargo pegado al recibo principal, con el
-     * mismo lote que usa la pantalla de cobro.
-     */
     protected function abrirTicketUnico(int $reciboId, ?int $adjuntoId): void
     {
-        $token = Str::uuid()->toString();
-
-        // El adjunto va en las dos listas: `recibo_ids` es lo que se carga y
-        // `adjunto_ids` solo marca cual se pega al ticket del principal.
-        $adjuntos = array_values(array_filter([$adjuntoId]));
-
-        cache()->put(
-            'print_batch:'.$token,
-            [
-                'user_id' => auth()->id(),
-                'recibo_ids' => array_merge([$reciboId], $adjuntos),
-                'adjunto_ids' => $adjuntos,
-            ],
-            now()->addMinutes(15)
-        );
-
-        $this->dispatch('open-print-tab', url: route('admin.recibos.print-lote', ['token' => $token]));
+        $this->dispatch('open-print-tab', url: app(TicketConRecargo::class)
+            ->urlTicketUnico($reciboId, $adjuntoId, (int) auth()->id()));
     }
 
     protected function autorizarImpresion(): void
@@ -512,85 +494,12 @@ class Index extends Component
 
     protected function buscarReciboPrincipal(int $cuotaId): ?Recibo
     {
-        $recargoTipoCobroId = $this->obtenerTipoCobroRecargoId();
-
-        // 1) Flujo normal por pagos
-        $pago = Pago::query()
-            ->where('cuota_id', $cuotaId)
-            ->where('estatus', 'confirmado')
-            ->whereNotNull('recibo_id')
-            ->with(['recibo:id,uuid,tipos_cobro_id,observaciones,es_historico'])
-            ->whereHas('recibo', function ($r) use ($recargoTipoCobroId) {
-                if ($recargoTipoCobroId) {
-                    $r->where('tipos_cobro_id', '!=', $recargoTipoCobroId);
-                }
-
-                $r->where(function ($x) {
-                    $x->whereNull('observaciones')
-                        ->orWhereRaw('UPPER(observaciones) NOT LIKE ?', ['%RECARGO%']);
-                });
-            })
-            ->latest('id')
-            ->first();
-
-        if ($pago?->recibo) {
-            return $pago->recibo;
-        }
-
-        // 2) Flujo histórico directo por recibos
-        $recibo = Recibo::query()
-            ->where('cuota_id', $cuotaId)
-            ->when($recargoTipoCobroId, fn ($q) => $q->where('tipos_cobro_id', '!=', $recargoTipoCobroId))
-            ->where(function ($x) {
-                $x->whereNull('observaciones')
-                    ->orWhereRaw('UPPER(observaciones) NOT LIKE ?', ['%RECARGO%']);
-            })
-            ->latest('id')
-            ->first(['id', 'uuid']);
-
-        return $recibo;
+        return app(TicketConRecargo::class)->principalDeCuota($cuotaId);
     }
 
     protected function buscarReciboRecargo(int $cuotaId): ?Recibo
     {
-        $recargoTipoCobroId = $this->obtenerTipoCobroRecargoId();
-
-        // 1) Flujo normal por pagos
-        $pago = Pago::query()
-            ->where('cuota_id', $cuotaId)
-            ->where('estatus', 'confirmado')
-            ->whereNotNull('recibo_id')
-            ->with(['recibo:id,uuid,tipos_cobro_id,observaciones'])
-            ->whereHas('recibo', function ($r) use ($recargoTipoCobroId) {
-                $r->where(function ($x) use ($recargoTipoCobroId) {
-                    if ($recargoTipoCobroId) {
-                        $x->where('tipos_cobro_id', $recargoTipoCobroId);
-                    }
-
-                    $x->orWhereRaw('UPPER(observaciones) LIKE ?', ['%RECARGO%']);
-                });
-            })
-            ->latest('id')
-            ->first();
-
-        if ($pago?->recibo) {
-            return $pago->recibo;
-        }
-
-        // 2) Flujo directo por recibos
-        $recibo = Recibo::query()
-            ->where('cuota_id', $cuotaId)
-            ->where(function ($x) use ($recargoTipoCobroId) {
-                if ($recargoTipoCobroId) {
-                    $x->where('tipos_cobro_id', $recargoTipoCobroId);
-                }
-
-                $x->orWhereRaw('UPPER(observaciones) LIKE ?', ['%RECARGO%']);
-            })
-            ->latest('id')
-            ->first(['id', 'uuid']);
-
-        return $recibo;
+        return app(TicketConRecargo::class)->recargoDeCuota($cuotaId);
     }
 
     protected function normalizarIds(array $ids): array
@@ -628,15 +537,6 @@ class Index extends Component
         return array_values(array_intersect($ids, $disponibles));
     }
 
-    protected function obtenerTipoCobroRecargoId(): ?int
-    {
-        $id = TipoCobro::query()
-            ->whereRaw('UPPER(nombre) LIKE ?', ['%RECARGO%'])
-            ->value('id');
-
-        return $id ? (int) $id : null;
-    }
-
     public function limpiarFiltros(): void
     {
         $this->reset([
@@ -664,7 +564,7 @@ class Index extends Component
     public function render()
     {
         $term = trim($this->q);
-        $recargoTipoCobroId = $this->obtenerTipoCobroRecargoId();
+        $recargoTipoCobroId = app(TicketConRecargo::class)->tipoCobroRecargoId();
 
         $tokens = $term !== '' ? preg_split('/\s+/', $term, -1, PREG_SPLIT_NO_EMPTY) : [];
 

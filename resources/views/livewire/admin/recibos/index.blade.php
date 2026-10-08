@@ -451,15 +451,15 @@
                         <td class="p-2.5 text-center align-middle">
                             <div class="flex items-center justify-center gap-2">
                                 @if(!$recibo->trashed())
-                                <a href="{{ route('admin.recibos.imprimir', $recibo->uuid) }}"
-                                    target="_blank"
+                                <button type="button"
+                                    wire:click="verRecibo('{{ $recibo->uuid }}')"
                                     title="Ver recibo"
                                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7Z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Z" />
                                     </svg>
-                                </a>
+                                </button>
 
                                 <a href="{{ route('admin.recibos.edit', $recibo->uuid) }}"
                                     title="Editar recibo"
@@ -800,6 +800,50 @@
             }
         }, 250);
     </script>
+    @endif
+
+
+    {{-- Imprimir: el recibo solo, o junto con su recargo --}}
+    @if($modalImprimir)
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40" wire:click="cerrarModalImprimir"></div>
+
+        <div class="relative w-full max-w-lg bg-white rounded-2xl border shadow-xl p-5">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h3 class="text-lg font-black">Esta cuota tiene RECARGO</h3>
+                    <p class="text-sm text-gray-500 mt-1">¿Qué quieres imprimir?</p>
+                </div>
+
+                <button type="button" class="px-2 py-1 rounded-lg border hover:bg-gray-50"
+                    wire:click="cerrarModalImprimir">&times;</button>
+            </div>
+
+            <div class="mt-4 grid gap-2">
+                <button type="button"
+                    class="w-full px-4 py-2 rounded-xl border hover:bg-gray-50 font-semibold text-left"
+                    wire:click="imprimirSoloEste">
+                    🧾 Solo este recibo
+                    <span class="block text-xs font-normal text-gray-500 mt-0.5">
+                        El que escogiste, en su propia hoja
+                    </span>
+                </button>
+
+                <button type="button"
+                    class="w-full px-4 py-2 rounded-xl bg-black text-white font-semibold text-left"
+                    wire:click="imprimirAmbos">
+                    ✅ Los dos juntos
+                    <span class="block text-xs font-normal text-white/70 mt-0.5">
+                        Un solo ticket, con el recargo y el total sumado
+                    </span>
+                </button>
+            </div>
+
+            <div class="mt-4 text-xs text-gray-500">
+                {{ $imprimirPrincipalFolio }} · recargo {{ $imprimirRecargoFolio }}
+            </div>
+        </div>
+    </div>
     @endif
 
 </div>

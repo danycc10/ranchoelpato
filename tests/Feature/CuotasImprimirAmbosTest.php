@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Admin\Cuotas\Index as CuotasIndex;
+use App\Livewire\Admin\Recibos\Index as RecibosIndex;
 use App\Models\Cliente;
 use App\Models\Contrato;
 use App\Models\Cuota;
@@ -103,6 +104,90 @@ class CuotasImprimirAmbosTest extends TestCase
             ->call('cerrarModalImprimir')
             ->assertSet('reciboPrincipalId', null)
             ->assertSet('reciboRecargoId', null);
+    }
+
+    #[Test]
+    public function en_recibos_al_ver_uno_con_recargo_tambien_pregunta(): void
+    {
+        ['principal' => $principal, 'recargo' => $recargo] = $this->cuotaConRecargoCobrado();
+
+        Livewire::actingAs($this->cajero())
+            ->test(RecibosIndex::class)
+            ->call('verRecibo', $principal->uuid)
+            ->assertSet('modalImprimir', true)
+            ->assertSet('imprimirPrincipalId', $principal->id)
+            ->assertSet('imprimirRecargoId', $recargo->id)
+            // No abre nada hasta que el cajero escoja.
+            ->assertNotDispatched('open-print-tab');
+    }
+
+    #[Test]
+    public function en_recibos_pregunta_aunque_se_pique_el_de_recargo(): void
+    {
+        ['principal' => $principal, 'recargo' => $recargo] = $this->cuotaConRecargoCobrado();
+
+        // Da igual cual de los dos se pidio: el par es el mismo.
+        Livewire::actingAs($this->cajero())
+            ->test(RecibosIndex::class)
+            ->call('verRecibo', $recargo->uuid)
+            ->assertSet('modalImprimir', true)
+            ->assertSet('imprimirPrincipalId', $principal->id)
+            ->assertSet('imprimirRecargoId', $recargo->id);
+    }
+
+    #[Test]
+    public function en_recibos_los_dos_juntos_salen_en_un_ticket_sumado(): void
+    {
+        ['principal' => $principal, 'recargo' => $recargo] = $this->cuotaConRecargoCobrado();
+
+        $url = null;
+        $cajero = $this->cajero();
+
+        Livewire::actingAs($cajero)
+            ->test(RecibosIndex::class)
+            ->call('verRecibo', $principal->uuid)
+            ->call('imprimirAmbos')
+            ->assertSet('modalImprimir', false)
+            ->assertDispatched('open-print-tab', function ($evento, $params) use (&$url) {
+                $url = $params['url'] ?? null;
+
+                return true;
+            });
+
+        $html = $this->actingAs($cajero)->get($url)->assertOk()->getContent();
+
+        $this->assertSame(1, substr_count($html, 'class="ticket"'));
+        $this->assertStringContainsString($principal->folio, $html);
+        $this->assertStringContainsString($recargo->folio, $html);
+        $this->assertStringContainsString('$1,600.00', $html);
+    }
+
+    #[Test]
+    public function en_recibos_solo_este_abre_el_que_se_pico(): void
+    {
+        ['recargo' => $recargo] = $this->cuotaConRecargoCobrado();
+
+        Livewire::actingAs($this->cajero())
+            ->test(RecibosIndex::class)
+            ->call('verRecibo', $recargo->uuid)
+            ->call('imprimirSoloEste')
+            ->assertDispatched('open-print-tab', function ($evento, $params) use ($recargo) {
+                return str_contains($params['url'] ?? '', $recargo->uuid);
+            });
+    }
+
+    #[Test]
+    public function en_recibos_sin_recargo_se_abre_derecho(): void
+    {
+        ['principal' => $principal] = $this->cuotaConRecargoCobrado(conRecargo: false);
+
+        Livewire::actingAs($this->cajero())
+            ->test(RecibosIndex::class)
+            ->call('verRecibo', $principal->uuid)
+            ->assertSet('modalImprimir', false)
+            ->assertDispatched('open-print-tab', function ($evento, $params) use ($principal) {
+                return str_contains($params['url'] ?? '', $principal->uuid);
+            });
     }
 
     /**
