@@ -63,6 +63,9 @@ class Index extends Component
 
     public ?string $imprimirUrlPedido = null;
 
+    /** ver | pdf: el mismo modal sirve para el ojito y para la descarga. */
+    public string $imprimirModo = 'ver';
+
     // ===== Evidencia por recibo_pago =====
     public bool $modalEvidenciaOpen = false;
 
@@ -294,11 +297,24 @@ class Index extends Component
      */
     public function verRecibo(string $uuid, TicketConRecargo $tickets): void
     {
+        $this->pedirRecibo($uuid, 'ver', $tickets);
+    }
+
+    /** Lo mismo para el PDF: un archivo con los dos, o solo el que se pico. */
+    public function descargarPdf(string $uuid, TicketConRecargo $tickets): void
+    {
+        $this->pedirRecibo($uuid, 'pdf', $tickets);
+    }
+
+    private function pedirRecibo(string $uuid, string $modo, TicketConRecargo $tickets): void
+    {
         abort_unless(auth()->user()?->can('recibos.imprimir'), 403);
 
         $recibo = Recibo::where('uuid', $uuid)->firstOrFail();
 
-        $url = route('admin.recibos.imprimir', ['recibo' => $recibo->uuid]);
+        $url = $modo === 'pdf'
+            ? route('admin.recibos.pdf', ['recibo' => $recibo->uuid])
+            : route('admin.recibos.imprimir', ['recibo' => $recibo->uuid]);
 
         $par = $tickets->parDe($recibo);
         $principal = $par['principal'];
@@ -316,6 +332,7 @@ class Index extends Component
         $this->imprimirPrincipalFolio = $principal->folio;
         $this->imprimirRecargoFolio = $recargo->folio;
         $this->imprimirUrlPedido = $url;
+        $this->imprimirModo = $modo;
         $this->modalImprimir = true;
     }
 
@@ -335,11 +352,11 @@ class Index extends Component
         abort_unless(auth()->user()?->can('recibos.imprimir'), 403);
 
         if ($this->imprimirPrincipalId) {
-            $this->dispatch('open-print-tab', url: $tickets->urlTicketUnico(
-                $this->imprimirPrincipalId,
-                $this->imprimirRecargoId,
-                (int) auth()->id()
-            ));
+            $url = $this->imprimirModo === 'pdf'
+                ? $tickets->urlPdfUnico($this->imprimirPrincipalId, $this->imprimirRecargoId, (int) auth()->id())
+                : $tickets->urlTicketUnico($this->imprimirPrincipalId, $this->imprimirRecargoId, (int) auth()->id());
+
+            $this->dispatch('open-print-tab', url: $url);
         }
 
         $this->cerrarModalImprimir();
@@ -353,6 +370,7 @@ class Index extends Component
         $this->imprimirPrincipalFolio = null;
         $this->imprimirRecargoFolio = null;
         $this->imprimirUrlPedido = null;
+        $this->imprimirModo = 'ver';
     }
 
     public function validarPago(): void

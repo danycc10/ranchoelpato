@@ -79,14 +79,31 @@ class TicketConRecargo
         return $cuotaId ? (int) $cuotaId : null;
     }
 
+    /** URL para ver e imprimir los dos en un solo ticket. */
+    public function urlTicketUnico(int $reciboId, ?int $adjuntoId, int $userId): string
+    {
+        return route('admin.recibos.print-lote', [
+            'token' => $this->lote($reciboId, $adjuntoId, $userId),
+        ]);
+    }
+
+    /** URL para descargar los dos en un solo PDF. */
+    public function urlPdfUnico(int $reciboId, ?int $adjuntoId, int $userId): string
+    {
+        return route('admin.recibos.pdf-lote', [
+            'token' => $this->lote($reciboId, $adjuntoId, $userId),
+        ]);
+    }
+
     /**
-     * Guarda el lote que imprime los dos en un ticket y devuelve su URL.
+     * Guarda el lote que junta los dos recibos y devuelve su token. El mismo
+     * sirve para la vista de impresión y para el PDF.
      *
      * El adjunto va en las dos listas a propósito: `recibo_ids` es lo que el
      * controlador carga de la base, y `adjunto_ids` solo marca cuál se pega al
      * ticket del principal en vez de salir en su propia hoja.
      */
-    public function urlTicketUnico(int $reciboId, ?int $adjuntoId, int $userId): string
+    public function lote(int $reciboId, ?int $adjuntoId, int $userId): string
     {
         $token = Str::uuid()->toString();
         $adjuntos = array_values(array_filter([$adjuntoId]));
@@ -101,7 +118,7 @@ class TicketConRecargo
             now()->addMinutes(self::VIGENCIA_LOTE)
         );
 
-        return route('admin.recibos.print-lote', ['token' => $token]);
+        return $token;
     }
 
     public function principalDeCuota(int $cuotaId): ?Recibo

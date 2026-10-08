@@ -469,15 +469,15 @@
                                     </svg>
                                 </a>
 
-                                <a href="{{ route('admin.recibos.pdf', $recibo->uuid) }}"
-                                    target="_blank"
+                                <button type="button"
+                                    wire:click="descargarPdf('{{ $recibo->uuid }}')"
                                     title="Descargar PDF"
                                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-black text-white hover:bg-gray-800">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v2.625A2.625 2.625 0 0 1 16.875 19.5H7.125A2.625 2.625 0 0 1 4.5 16.875V14.25" />
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v10.5m0 0 3.75-3.75M12 13.5 8.25 9.75" />
                                     </svg>
-                                </a>
+                                </button>
                                 @endif
                             </div>
                         </td>
@@ -812,7 +812,9 @@
             <div class="flex items-start justify-between gap-3">
                 <div>
                     <h3 class="text-lg font-black">Esta cuota tiene RECARGO</h3>
-                    <p class="text-sm text-gray-500 mt-1">¿Qué quieres imprimir?</p>
+                    <p class="text-sm text-gray-500 mt-1">
+                        {{ $imprimirModo === 'pdf' ? '¿Qué quieres descargar?' : '¿Qué quieres imprimir?' }}
+                    </p>
                 </div>
 
                 <button type="button" class="px-2 py-1 rounded-lg border hover:bg-gray-50"
@@ -825,7 +827,7 @@
                     wire:click="imprimirSoloEste">
                     🧾 Solo este recibo
                     <span class="block text-xs font-normal text-gray-500 mt-0.5">
-                        El que escogiste, en su propia hoja
+                        {{ $imprimirModo === 'pdf' ? 'El que escogiste, en su propio PDF' : 'El que escogiste, en su propia hoja' }}
                     </span>
                 </button>
 
@@ -834,7 +836,7 @@
                     wire:click="imprimirAmbos">
                     ✅ Los dos juntos
                     <span class="block text-xs font-normal text-white/70 mt-0.5">
-                        Un solo ticket, con el recargo y el total sumado
+                        {{ $imprimirModo === 'pdf' ? 'Un solo PDF' : 'Un solo ticket' }}, con el recargo y el total sumado
                     </span>
                 </button>
             </div>

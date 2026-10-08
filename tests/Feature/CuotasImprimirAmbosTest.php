@@ -193,6 +193,79 @@ class CuotasImprimirAmbosTest extends TestCase
     }
 
     #[Test]
+    public function el_pdf_tambien_pregunta_y_junta_los_dos_en_un_archivo(): void
+    {
+        ['principal' => $principal, 'recargo' => $recargo] = $this->cuotaConRecargoCobrado();
+
+        $url = null;
+        $cajero = $this->cajero();
+
+        Livewire::actingAs($cajero)
+            ->test(RecibosIndex::class)
+            ->call('descargarPdf', $principal->uuid)
+            ->assertSet('modalImprimir', true)
+            ->assertSet('imprimirModo', 'pdf')
+            ->call('imprimirAmbos')
+            ->assertDispatched('open-print-tab', function ($evento, $params) use (&$url) {
+                $url = $params['url'] ?? null;
+
+                return true;
+            });
+
+        // El lote del PDF, no el de la vista de impresion.
+        $this->assertStringContainsString('/imprimir-lote/', $url);
+
+        $respuesta = $this->actingAs($cajero)->get($url)->assertOk();
+
+        $this->assertSame('application/pdf', $respuesta->headers->get('content-type'));
+    }
+
+    #[Test]
+    public function el_pdf_de_uno_solo_sigue_descargando_ese(): void
+    {
+        ['recargo' => $recargo] = $this->cuotaConRecargoCobrado();
+
+        Livewire::actingAs($this->cajero())
+            ->test(RecibosIndex::class)
+            ->call('descargarPdf', $recargo->uuid)
+            ->call('imprimirSoloEste')
+            ->assertDispatched('open-print-tab', function ($evento, $params) use ($recargo) {
+                $url = $params['url'] ?? '';
+
+                return str_contains($url, $recargo->uuid) && str_contains($url, '/pdf');
+            });
+    }
+
+    #[Test]
+    public function el_pdf_sin_recargo_se_descarga_derecho(): void
+    {
+        ['principal' => $principal] = $this->cuotaConRecargoCobrado(conRecargo: false);
+
+        Livewire::actingAs($this->cajero())
+            ->test(RecibosIndex::class)
+            ->call('descargarPdf', $principal->uuid)
+            ->assertSet('modalImprimir', false)
+            ->assertDispatched('open-print-tab', function ($evento, $params) use ($principal) {
+                return str_contains($params['url'] ?? '', $principal->uuid);
+            });
+    }
+
+    #[Test]
+    public function cerrar_el_modal_lo_deja_listo_para_el_siguiente(): void
+    {
+        ['principal' => $principal] = $this->cuotaConRecargoCobrado();
+
+        // Si el modo se queda pegado, el ojito terminaria bajando un PDF.
+        Livewire::actingAs($this->cajero())
+            ->test(RecibosIndex::class)
+            ->call('descargarPdf', $principal->uuid)
+            ->assertSet('imprimirModo', 'pdf')
+            ->call('cerrarModalImprimir')
+            ->assertSet('imprimirModo', 'ver')
+            ->assertSet('modalImprimir', false);
+    }
+
+    #[Test]
     public function las_pantallas_que_mandan_abrir_pestana_traen_quien_las_escuche(): void
     {
         // El modal preguntaba y no abria nada: el evento se despachaba al
