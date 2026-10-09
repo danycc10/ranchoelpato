@@ -121,7 +121,15 @@
                         <div class="text-xs text-gray-500">{{ $it->direccion ?: '—' }}</div>
                     </td>
 
-                    <td class="p-3">{{ $it->telefono ?: '—' }}</td>
+                    <td class="p-3">
+                        {{ $it->telefono ?: '—' }}
+                        @if($it->telefonos_adicionales_count > 0)
+                        <span class="ml-1 text-xs text-gray-500"
+                            title="Tiene {{ $it->telefonos_adicionales_count }} teléfono(s) más">
+                            +{{ $it->telefonos_adicionales_count }}
+                        </span>
+                        @endif
+                    </td>
 
                     <td class="p-3">
                         <div class="max-w-[240px] break-all">
@@ -439,9 +447,72 @@
                 </div>
 
                 <div>
-                    <label class="text-sm font-semibold">Teléfono (10 dígitos)</label>
-                    <input type="text" wire:model.live="form.telefono" class="w-full mt-1 rounded-xl border-gray-300" placeholder="8781234567">
+                    <label class="text-sm font-semibold">Teléfono principal (10 dígitos)</label>
+
+                    <div class="flex gap-2 mt-1">
+                        <input type="text" wire:model.live="form.telefono"
+                            class="flex-1 rounded-xl border-gray-300" placeholder="8781234567">
+
+                        <select wire:model.live="form.telefono_uso"
+                            class="w-44 rounded-xl border-gray-300 text-sm">
+                            @foreach(\App\Models\ClienteTelefono::USOS as $valor => $texto)
+                            <option value="{{ $valor }}">{{ $texto }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
                     @error('form.telefono') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                    <p class="text-xs text-gray-400 mt-1">
+                        Es el que sale en contratos y reportes. Si solo tiene uno, déjalo en
+                        «Llamadas y WhatsApp».
+                    </p>
+
+                    {{-- Los demás números del cliente. --}}
+                    @foreach($telefonosExtra as $i => $extra)
+                    <div wire:key="tel-extra-{{ $i }}" class="mt-2 flex gap-2 items-start">
+                        <div class="flex-1">
+                            <input type="text" wire:model.live="telefonosExtra.{{ $i }}.telefono"
+                                class="w-full rounded-xl border-gray-300 text-sm" placeholder="Otro teléfono">
+                            @error('telefonosExtra.'.$i.'.telefono')
+                            <p class="text-red-600 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div class="w-44">
+                            <select wire:model.live="telefonosExtra.{{ $i }}.uso"
+                                class="w-full rounded-xl border-gray-300 text-sm">
+                                @foreach(\App\Models\ClienteTelefono::USOS as $valor => $texto)
+                                <option value="{{ $valor }}">{{ $texto }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="flex-1">
+                            <input type="text" wire:model.live="telefonosExtra.{{ $i }}.etiqueta"
+                                class="w-full rounded-xl border-gray-300 text-sm" placeholder="Casa, recados…">
+                            @error('telefonosExtra.'.$i.'.etiqueta')
+                            <p class="text-red-600 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <button type="button" wire:click="hacerPrincipal({{ $i }})"
+                            title="Volverlo el principal"
+                            class="h-10 px-2 rounded-xl border text-xs font-semibold hover:bg-gray-50 shrink-0">
+                            ↑
+                        </button>
+
+                        <button type="button" wire:click="quitarTelefono({{ $i }})"
+                            title="Quitar este teléfono"
+                            class="h-10 w-10 rounded-xl border text-red-600 hover:bg-red-50 shrink-0">
+                            &times;
+                        </button>
+                    </div>
+                    @endforeach
+
+                    <button type="button" wire:click="agregarTelefono"
+                        class="mt-2 text-sm font-semibold text-gray-600 hover:text-black">
+                        + Agregar otro teléfono
+                    </button>
                 </div>
 
                 <div>

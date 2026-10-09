@@ -26,13 +26,43 @@ class ClientePorTelefonoService
         return $digitos;
     }
 
-    /** Solo devuelve cliente cuando la coincidencia es única. */
+    /**
+     * Solo devuelve cliente cuando la coincidencia es única.
+     *
+     * Busca en el teléfono principal y en los adicionales: un cliente que
+     * escribe desde su segundo número es el mismo cliente, y antes su
+     * comprobante llegaba sin dueño.
+     */
     public function buscarUnico(?string $telefono): ?Cliente
+    {
+        $variantes = $this->variantes($telefono);
+
+        if ($variantes === []) {
+            return null;
+        }
+
+        $clientes = Cliente::query()
+            ->where(fn ($q) => $q
+                ->whereIn('telefono', $variantes)
+                ->orWhereHas('telefonosAdicionales', fn ($t) => $t->whereIn('telefono', $variantes))
+            )
+            ->limit(2)
+            ->get();
+
+        return $clientes->count() === 1 ? $clientes->first() : null;
+    }
+
+    /**
+     * Las formas en que un mismo número puede estar guardado.
+     *
+     * @return array<int, string>
+     */
+    public function variantes(?string $telefono): array
     {
         $normalizado = $this->normalizar($telefono);
 
         if ($normalizado === null) {
-            return null;
+            return [];
         }
 
         $variantes = [$normalizado];
@@ -42,11 +72,6 @@ class ClientePorTelefonoService
             $variantes[] = '521'.$normalizado;
         }
 
-        $clientes = Cliente::query()
-            ->whereIn('telefono', array_unique($variantes))
-            ->limit(2)
-            ->get();
-
-        return $clientes->count() === 1 ? $clientes->first() : null;
+        return array_values(array_unique($variantes));
     }
 }

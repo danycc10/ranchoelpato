@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Clientes;
 
 use App\Models\Cliente;
+use App\Models\ClienteTelefono;
 use App\Models\SolicitudDatosCliente;
 use App\Services\Clientes\SolicitudDatosClienteService;
 use App\Services\Contratos\DatosIdentidadService;
@@ -38,6 +39,7 @@ class Index extends Component
         'apellidos' => '',
         'nombre_legal' => '',
         'telefono' => '',
+        'telefono_uso' => 'ambos',
         'correo' => '',
         'direccion' => '',
         'rfc' => '',
@@ -138,6 +140,7 @@ class Index extends Component
             'apellidos' => '',
             'nombre_legal' => '',
             'telefono' => '',
+            'telefono_uso' => 'ambos',
             'correo' => '',
             'direccion' => '',
             'rfc' => '',
@@ -153,6 +156,8 @@ class Index extends Component
             'identificacion_numero' => '',
         ];
 
+        $this->telefonosExtra = [];
+
         $this->ineFrenteFile = null;
         $this->ineReversoFile = null;
         $this->ine_frente = null;
@@ -161,6 +166,54 @@ class Index extends Component
 
         $this->resetValidation();
         $this->modal = true;
+    }
+
+    /**
+     * Los teléfonos de más del formulario.
+     *
+     * @var array<int, array{telefono: string, etiqueta: string}>
+     */
+    public array $telefonosExtra = [];
+
+    public function agregarTelefono(): void
+    {
+        $this->telefonosExtra[] = ['telefono' => '', 'uso' => 'ambos', 'etiqueta' => ''];
+    }
+
+    public function quitarTelefono(int $indice): void
+    {
+        unset($this->telefonosExtra[$indice]);
+
+        $this->telefonosExtra = array_values($this->telefonosExtra);
+    }
+
+    /**
+     * Sube un adicional a principal y baja el que estaba.
+     *
+     * Es lo que se hace cuando el cliente cambia de número: el de siempre
+     * pasa a ser el de recados en vez de perderse.
+     */
+    public function hacerPrincipal(int $indice): void
+    {
+        $nuevo = $this->telefonosExtra[$indice] ?? null;
+
+        if (! $nuevo || trim((string) $nuevo['telefono']) === '') {
+            return;
+        }
+
+        $anterior = trim((string) ($this->form['telefono'] ?? ''));
+
+        $usoAnterior = $this->form['telefono_uso'] ?? 'ambos';
+
+        $this->form['telefono'] = $nuevo['telefono'];
+        $this->form['telefono_uso'] = $nuevo['uso'] ?? 'ambos';
+
+        $this->telefonosExtra[$indice]['telefono'] = $anterior;
+        $this->telefonosExtra[$indice]['uso'] = $usoAnterior;
+
+        if ($anterior === '') {
+            $this->quitarTelefono($indice);
+        }
     }
 
     public function editar(int $id): void
@@ -173,6 +226,7 @@ class Index extends Component
             'apellidos' => (string) $c->apellidos,
             'nombre_legal' => (string) ($c->nombre_legal ?? ''),
             'telefono' => (string) ($c->telefono ?? ''),
+            'telefono_uso' => (string) ($c->telefono_uso ?: 'ambos'),
             'correo' => (string) ($c->correo ?? ''),
             'direccion' => (string) ($c->direccion ?? ''),
             'rfc' => (string) ($c->rfc ?? ''),
@@ -187,6 +241,16 @@ class Index extends Component
             'identificacion_numero' => (string) ($c->identificacion_numero ?? ''),
         ];
 
+        $this->telefonosExtra = $c->telefonosAdicionales()
+            ->orderBy('id')
+            ->get()
+            ->map(fn (ClienteTelefono $t) => [
+                'telefono' => (string) $t->telefono,
+                'uso' => (string) ($t->uso ?: 'ambos'),
+                'etiqueta' => (string) ($t->etiqueta ?? ''),
+            ])
+            ->all();
+
         $this->ine_frente = $c->ine_frente;
         $this->ine_reverso = $c->ine_reverso;
         $this->documentos_disk = $c->documentos_disk ?: 'private';
@@ -196,6 +260,35 @@ class Index extends Component
 
         $this->resetValidation();
         $this->modal = true;
+    }
+
+    /**
+     * Deja en la base exactamente los adicionales del formulario.
+     *
+     * Se descarta el que sea igual al principal: tenerlo en los dos lados es
+     * lo que haria que un mismo numero saliera repetido en la ficha.
+     */
+    protected function guardarTelefonosExtra(Cliente $cliente, ?string $principal): void
+    {
+        $limpios = collect($this->telefonosExtra)
+            ->map(fn (array $fila) => [
+                'telefono' => $this->normalizePhone($fila['telefono'] ?? null),
+                'uso' => in_array($fila['uso'] ?? null, ['ambos', 'llamadas', 'whatsapp'], true)
+                    ? $fila['uso']
+                    : 'ambos',
+                'etiqueta' => $this->stringOrNull($fila['etiqueta'] ?? null),
+            ])
+            ->filter(fn (array $fila) => $fila['telefono'] !== null && $fila['telefono'] !== $principal)
+            ->unique('telefono')
+            ->values();
+
+        $cliente->telefonosAdicionales()->delete();
+
+        if ($limpios->isEmpty()) {
+            return;
+        }
+
+        $cliente->telefonosAdicionales()->createMany($limpios->all());
     }
 
     protected function normalizePhone(?string $value): ?string
@@ -242,6 +335,24 @@ class Index extends Component
                 }
             }],
 
+            'telefonosExtra.*.telefono' => ['nullable', 'string', function ($attr, $value, $fail) {
+                $digits = $this->normalizePhone($value);
+
+                if ($digits === null) {
+                    return;
+                }
+
+                $esMexico = strlen($digits) === 10;
+                $esEstadosUnidos = strlen($digits) === 11 && str_starts_with($digits, '1');
+
+                if (! $esMexico && ! $esEstadosUnidos) {
+                    $fail('El teléfono debe tener 10 dígitos (México) o 1 + 10 dígitos (EE. UU.).');
+                }
+            }],
+            'telefonosExtra.*.uso' => ['required', 'in:ambos,llamadas,whatsapp'],
+            'telefonosExtra.*.etiqueta' => ['nullable', 'string', 'max:60'],
+
+            'form.telefono_uso' => ['required', 'in:ambos,llamadas,whatsapp'],
             'form.correo' => ['nullable', 'string', 'email:rfc,dns', 'max:255'],
             'form.direccion' => ['nullable', 'string', 'max:255'],
             'form.rfc' => ['nullable', 'string', 'max:20'],
@@ -264,6 +375,7 @@ class Index extends Component
             'apellidos' => trim((string) $this->form['apellidos']),
             'nombre_legal' => $this->stringOrNull($this->form['nombre_legal'] ?? null),
             'telefono' => $telefono,
+            'telefono_uso' => $this->form['telefono_uso'] ?? 'ambos',
             'correo' => $this->form['correo'] ? strtolower(trim((string) $this->form['correo'])) : null,
             'direccion' => $this->stringOrNull($this->form['direccion'] ?? null),
             'rfc' => $this->form['rfc'] ? strtoupper(trim((string) $this->form['rfc'])) : null,
@@ -283,6 +395,8 @@ class Index extends Component
             $payload['estatus'] = 'activo';
             $cliente = Cliente::query()->create($payload);
         }
+
+        $this->guardarTelefonosExtra($cliente, $telefono);
 
         $updates = [];
         $disk = 'private';
@@ -511,7 +625,8 @@ class Index extends Component
 
     public function render()
     {
-        $query = Cliente::query();
+        // Se precargan para pintar el "+2" de la tabla sin una consulta por fila.
+        $query = Cliente::query()->withCount('telefonosAdicionales');
 
         if ($this->q !== '') {
             $q = trim($this->q);
@@ -521,6 +636,8 @@ class Index extends Component
                     ->orWhere('apellidos', 'like', "%{$q}%")
                     ->orWhere('nombre_legal', 'like', "%{$q}%")
                     ->orWhere('telefono', 'like', "%{$q}%")
+                    // Buscar por el segundo número tiene que encontrarlo igual.
+                    ->orWhereHas('telefonosAdicionales', fn ($t) => $t->where('telefono', 'like', "%{$q}%"))
                     ->orWhere('correo', 'like', "%{$q}%")
                     ->orWhere('curp', 'like', "%{$q}%")
                     ->orWhere('rfc', 'like', "%{$q}%");
