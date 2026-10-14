@@ -198,9 +198,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'dashboard.ver',
             'admin.ver',
 
-            'reportes.ver',
-            'reportes.diario_recibos',
-            'reportes.ingresos_mensuales',
+            // Sin reportes: son los números del negocio, no su herramienta
+            // de captura.
 
             'catalogos.ver',
 

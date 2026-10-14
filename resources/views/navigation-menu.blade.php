@@ -20,9 +20,11 @@
         Administración
     </x-nav-link>
 
+    @can('reportes.ver')
     <x-nav-link href="{{ route('reportes.index') }}" :active="request()->routeIs('reportes.*')">
-    Reportes
-</x-nav-link>
+        Reportes
+    </x-nav-link>
+    @endcan
 
 @can('sistema.ver')
     <x-nav-link href="{{ route('admin.sistema.index') }}" :active="request()->routeIs('admin.sistema.*')">
@@ -164,9 +166,11 @@
         Administración
     </x-responsive-nav-link>
 
-        <x-responsive-nav-link href="{{ route('reportes.index') }}" :active="request()->routeIs('reportes.*')">
-    Reportes
-</x-responsive-nav-link>
+    @can('reportes.ver')
+    <x-responsive-nav-link href="{{ route('reportes.index') }}" :active="request()->routeIs('reportes.*')">
+        Reportes
+    </x-responsive-nav-link>
+    @endcan
 
     @can('usuarios.ver')
   <x-responsive-nav-link href="{{ route('admin.usuarios.index') }}">Usuarios</x-responsive-nav-link>
