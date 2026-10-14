@@ -162,7 +162,8 @@
         </div>
     </div>
 
-    {{-- KPIs --}}
+    {{-- KPIs: los totales de cartera no son para todos los puestos. --}}
+    @can('dashboard.indicadores')
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
         <div class="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
@@ -217,6 +218,7 @@
         </div>
 
     </div>
+    @endcan
 
     {{-- Tablas separadas --}}
 <livewire:dashboard.cobranza-tabla-hoy

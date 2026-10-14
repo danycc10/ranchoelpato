@@ -23,6 +23,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Dashboard
         'dashboard.ver',
+        'dashboard.indicadores',
         'admin.ver',
 
         // Reportes
@@ -151,6 +152,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $jefa->syncPermissions([
             'dashboard.ver',
+            'dashboard.indicadores',
             'admin.ver',
 
             'reportes.ver',

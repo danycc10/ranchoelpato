@@ -152,8 +152,25 @@ class CobranzaDashboard extends Component
         return $this->aplicarFiltrosBase($q);
     }
 
+    /** Si los indicadores no se van a pintar, tampoco hay que calcularlos. */
+    public function getPuedeVerIndicadoresProperty(): bool
+    {
+        return auth()->user()?->can('dashboard.indicadores') ?? false;
+    }
+
     public function getKpisProperty(): object
     {
+        if (! $this->puedeVerIndicadores) {
+            return (object) [
+                'hoy_count' => 0,
+                'hoy_monto' => 0.0,
+                'atr_count' => 0,
+                'atr_monto' => 0.0,
+                'total_count' => 0,
+                'total_monto' => 0.0,
+            ];
+        }
+
         $hoyCount = (clone $this->cuotasHoyQuery())->count();
         $hoyMonto = (clone $this->cuotasHoyQuery())->sum('monto');
 

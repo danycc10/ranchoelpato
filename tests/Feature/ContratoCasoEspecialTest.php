@@ -16,6 +16,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -31,7 +33,7 @@ class ContratoCasoEspecialTest extends TestCase
     {
         $contrato = $this->contratoConCuotaVencida();
 
-        $this->actingAs(User::factory()->create());
+        $this->actingAs($this->usuarioQueVeIndicadores());
 
         // Antes de marcarlo, la cuota vencida sí aparece y cuenta en el KPI.
         Livewire::test(CobranzaTablaAtrasadas::class, ['hoy' => '2026-12-01'])
@@ -54,7 +56,7 @@ class ContratoCasoEspecialTest extends TestCase
 
         app(CasoEspecialService::class)->marcar($contrato);
 
-        $this->actingAs(User::factory()->create());
+        $this->actingAs($this->usuarioQueVeIndicadores());
 
         Livewire::test(CobranzaDashboard::class)
             ->set('hoy', '2026-12-01')
@@ -90,7 +92,7 @@ class ContratoCasoEspecialTest extends TestCase
         $this->assertSame('moroso', $contrato->fresh()->estatus);
 
         // Y la cuota vuelve a contar para cobranza.
-        $this->actingAs(User::factory()->create());
+        $this->actingAs($this->usuarioQueVeIndicadores());
         $this->assertSame(1, $this->atrasadasEnKpi());
     }
 
@@ -132,6 +134,20 @@ class ContratoCasoEspecialTest extends TestCase
         $this->expectException(\RuntimeException::class);
 
         app(CasoEspecialService::class)->marcar($contrato->fresh());
+    }
+
+    /**
+     * Los totales del tablero van detrás de `dashboard.indicadores`, y aquí se
+     * están probando las cuotas, no los permisos.
+     */
+    private function usuarioQueVeIndicadores(): User
+    {
+        $usuario = User::factory()->create();
+
+        $rol = Role::findOrCreate('ve-indicadores', 'web');
+        $rol->givePermissionTo(Permission::findOrCreate('dashboard.indicadores', 'web'));
+
+        return tap($usuario)->assignRole($rol);
     }
 
     private function atrasadasEnKpi(): int
