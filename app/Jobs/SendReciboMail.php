@@ -42,6 +42,18 @@ class SendReciboMail implements ShouldQueue
             return;
         }
 
+        // Un correo con acentos o ñ antes de la arroba no se puede entregar:
+        // avisar que esta mal escrito sirve mas que un error de envio.
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            Log::warning('SendReciboMail: el correo del cliente no es valido, se omite', [
+                'recibo_id' => $recibo->id,
+                'cliente_id' => $recibo->cliente_id,
+                'email' => $email,
+            ]);
+
+            return;
+        }
+
         try {
             Mail::to($email)->send(new ReciboMail($recibo));
         } catch (\Throwable $e) {

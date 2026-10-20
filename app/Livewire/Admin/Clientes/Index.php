@@ -353,7 +353,9 @@ class Index extends Component
             'telefonosExtra.*.etiqueta' => ['nullable', 'string', 'max:60'],
 
             'form.telefono_uso' => ['required', 'in:ambos,llamadas,whatsapp'],
-            'form.correo' => ['nullable', 'string', 'email:rfc,dns', 'max:255'],
+            // `filter` rechaza acentos y ñ antes de la arroba: el correo
+            // electronico no los admite y el envio truena hasta el final.
+            'form.correo' => ['nullable', 'string', 'email:filter,dns', 'max:255'],
             'form.direccion' => ['nullable', 'string', 'max:255'],
             'form.rfc' => ['nullable', 'string', 'max:20'],
             'form.curp' => ['nullable', 'string', 'max:30'],

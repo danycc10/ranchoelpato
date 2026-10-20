@@ -99,7 +99,7 @@ class CapturaDatosCliente extends Component
             'datos.curp' => ['nullable', 'string', 'max:30'],
             'datos.rfc' => ['nullable', 'string', 'max:30'],
             'datos.telefono' => ['required', 'string', 'max:30'],
-            'datos.correo' => ['nullable', 'email', 'max:255'],
+            'datos.correo' => ['nullable', 'email:filter', 'max:255'],
             'datos.direccion' => ['nullable', 'string', 'max:255'],
             'datos.nacionalidad' => ['nullable', 'string', 'max:60'],
             'datos.estado_civil' => ['nullable', 'string', 'max:60'],
