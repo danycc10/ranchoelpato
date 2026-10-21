@@ -20,7 +20,7 @@ use ZipArchive;
  */
 class ContratoEncabezadoHojasSiguientesTest extends TestCase
 {
-    private const IDENTIFICADOR = 'DORA CARDONA  ·  Finca Tres, Mz 1, Lote 7';
+    private const IDENTIFICADOR = 'DORA CARDONA  ·  Lote 7';
 
     private string $archivo = '';
 

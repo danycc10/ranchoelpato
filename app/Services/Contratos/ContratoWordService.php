@@ -289,7 +289,8 @@ class ContratoWordService
     }
 
     /**
-     * Lo que identifica al contrato en el encabezado: quien lo firma y que lote.
+     * Lo que identifica al contrato en el encabezado: quien lo firma y el
+     * numero de lote.
      *
      * Con el folio bastaria para el sistema, pero quien acomoda papeles busca
      * por nombre.
@@ -303,15 +304,11 @@ class ContratoWordService
             ?: ($cliente?->nombre_legal ?: $cliente?->nombre_completo)
         ));
 
-        $lote = $contrato->lote;
+        $numero = trim((string) $contrato->lote?->lote);
 
-        $ubicacion = collect([
-            $lote?->fraccionamiento?->nombre,
-            $lote?->manzana ? 'Mz '.$lote->manzana : null,
-            $lote?->lote ? 'Lote '.$lote->lote : null,
-        ])->filter()->implode(', ');
-
-        return collect([$nombre, $ubicacion])->filter()->implode('  ·  ');
+        return collect([$nombre, $numero !== '' ? 'Lote '.$numero : null])
+            ->filter()
+            ->implode('  ·  ');
     }
 
     /**
