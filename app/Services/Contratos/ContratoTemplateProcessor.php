@@ -53,6 +53,95 @@ class ContratoTemplateProcessor extends TemplateProcessor
         $this->encabezadoProtegido = true;
     }
 
+    /**
+     * Pone "Nombre — Lote" arriba de la segunda hoja en adelante.
+     *
+     * Las hojas sueltas de un contrato no dicen de quién son: con el logo
+     * solo, una pila de contratos revueltos no se puede reordenar. La
+     * primera queda intacta porque ahí va el detalle completo.
+     *
+     * Solo aplica a las plantillas que ya distinguen la primera hoja
+     * (`titlePg` con encabezado propio). En las que usan el mismo para
+     * todas no se toca nada: escribirlo ahí lo pondría también en la
+     * primera, que es justo lo que no se quiere.
+     */
+    public function identificarHojasSiguientes(string $identificador): bool
+    {
+        $identificador = trim($identificador);
+
+        if ($identificador === '') {
+            return false;
+        }
+
+        $indice = $this->indiceDelEncabezadoDeContinuacion();
+
+        if ($indice === null) {
+            return false;
+        }
+
+        $this->tempDocumentHeaders[$indice] = $this->conParrafoAlFinal(
+            $this->tempDocumentHeaders[$indice],
+            $identificador
+        );
+
+        return true;
+    }
+
+    /**
+     * El encabezado que usan las hojas siguientes, si la plantilla separa la
+     * primera. Devuelve null cuando no hay esa separación.
+     */
+    private function indiceDelEncabezadoDeContinuacion(): ?int
+    {
+        $cuerpo = $this->tempDocumentMainPart;
+
+        $tienePrimeraAparte = str_contains($cuerpo, '<w:titlePg/>')
+            && preg_match('/<w:headerReference[^>]*w:type="first"/', $cuerpo);
+
+        if (! $tienePrimeraAparte) {
+            return null;
+        }
+
+        if (! preg_match('/<w:headerReference[^>]*w:type="default"[^>]*r:id="(rId\d+)"/', $cuerpo, $m)) {
+            return null;
+        }
+
+        $rels = $this->tempDocumentRelations['word/document.xml'] ?? '';
+
+        if (! preg_match('/Id="'.$m[1].'"[^>]*Target="header(\d+)\.xml"/', $rels, $archivo)) {
+            return null;
+        }
+
+        $indice = (int) $archivo[1];
+
+        return isset($this->tempDocumentHeaders[$indice]) ? $indice : null;
+    }
+
+    /** Agrega un párrafo discreto al final del encabezado. */
+    private function conParrafoAlFinal(string $encabezado, string $texto): string
+    {
+        $ns = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+
+        $parrafo = '<w:p '.$ns.'>'
+            .'<w:pPr>'
+            .'<w:jc w:val="center"/>'
+            .'<w:spacing w:before="0" w:after="0"/>'
+            .'</w:pPr>'
+            .'<w:r>'
+            .'<w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/><w:color w:val="595959"/></w:rPr>'
+            .'<w:t xml:space="preserve">'.htmlspecialchars($texto, ENT_XML1 | ENT_QUOTES, 'UTF-8').'</w:t>'
+            .'</w:r>'
+            .'</w:p>';
+
+        $cierre = strrpos($encabezado, '</w:hdr>');
+
+        if ($cierre === false) {
+            return $encabezado;
+        }
+
+        return substr($encabezado, 0, $cierre).$parrafo.'</w:hdr>';
+    }
+
     private function inicioAnexo(): string
     {
         $alto = $this->encabezadoProtegido ? 40 : 720;

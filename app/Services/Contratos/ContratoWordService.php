@@ -265,6 +265,10 @@ class ContratoWordService
             $this->setCaratulaValues($template, $contrato);
         }
 
+        // Las hojas sueltas no dicen de quien son: de la segunda en adelante
+        // llevan arriba el nombre y el lote.
+        $template->identificarHojasSiguientes($this->identificadorDeHoja($contrato));
+
         $this->setImageIfExists($template, 'vendedor_ine_frente', $contrato->vendedor_ine_frente);
         $this->setImageIfExists($template, 'vendedor_ine_reverso', $contrato->vendedor_ine_reverso);
         $this->setImageIfExists($template, 'comprador_ine_frente', $contrato->comprador_ine_frente);
@@ -282,6 +286,32 @@ class ContratoWordService
         $this->limpiarMetadatosPersonales($absolutePath);
 
         return $relativePath;
+    }
+
+    /**
+     * Lo que identifica al contrato en el encabezado: quien lo firma y que lote.
+     *
+     * Con el folio bastaria para el sistema, pero quien acomoda papeles busca
+     * por nombre.
+     */
+    private function identificadorDeHoja(Contrato $contrato): string
+    {
+        $cliente = $contrato->cliente;
+
+        $nombre = trim((string) (
+            $contrato->comprador_nombre_legal
+            ?: ($cliente?->nombre_legal ?: $cliente?->nombre_completo)
+        ));
+
+        $lote = $contrato->lote;
+
+        $ubicacion = collect([
+            $lote?->fraccionamiento?->nombre,
+            $lote?->manzana ? 'Mz '.$lote->manzana : null,
+            $lote?->lote ? 'Lote '.$lote->lote : null,
+        ])->filter()->implode(', ');
+
+        return collect([$nombre, $ubicacion])->filter()->implode('  ·  ');
     }
 
     /**
