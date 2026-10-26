@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Edit extends Component
@@ -36,6 +37,11 @@ class Edit extends Component
     public ?int $nuevo_dia_semana = null;
 
     public ?string $nueva_fecha_primera_cuota = null;
+
+    // La fecha con la que abrió el formulario: si solo se mueve la fecha,
+    // sin tocar frecuencia ni día, también hay que regenerar las cuotas.
+    #[Locked]
+    public ?string $fecha_primera_cuota_original = null;
 
     public ?float $nuevo_monto_pago = null;
 
@@ -120,6 +126,7 @@ class Edit extends Component
             : 0;
 
         $this->nueva_fecha_primera_cuota = $this->resolverFechaInicialSugerida();
+        $this->fecha_primera_cuota_original = $this->nueva_fecha_primera_cuota;
     }
 
     public function updatedNuevaFrecuencia(): void
@@ -186,7 +193,8 @@ class Edit extends Component
             ((string) ($this->contrato->frecuencia ?? 'mensual') !== (string) $this->nueva_frecuencia) ||
             ((int) ($this->contrato->dia_mes ?? 0) !== (int) ($this->nuevo_dia_mes ?? 0)) ||
             ((int) ($this->contrato->dia_semana ?? 0) !== (int) ($this->nuevo_dia_semana ?? 0)) ||
-            ((float) ($this->contrato->monto_pago ?? 0) !== (float) ($this->nuevo_monto_pago ?? 0));
+            ((float) ($this->contrato->monto_pago ?? 0) !== (float) ($this->nuevo_monto_pago ?? 0)) ||
+            ($this->nueva_fecha_primera_cuota !== null && $this->nueva_fecha_primera_cuota !== $this->fecha_primera_cuota_original);
 
         $cambiaSaldoActual =
             ((float) ($this->contrato->saldo_actual ?? 0) !== (float) ($this->nuevo_saldo_actual ?? 0));
