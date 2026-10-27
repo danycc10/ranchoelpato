@@ -491,6 +491,12 @@ class Create extends Component
             $this->anualidad_fecha = null;
         }
 
+        // El monto de pago del contrato es el que queda al terminar la
+        // promoción; los primeros pagos los baja el calendario.
+        if ($this->promocion?->esPagoEscalonado() && (float) $this->promocion->monto_pago_posterior > 0) {
+            $this->monto_pago = (float) $this->promocion->monto_pago_posterior;
+        }
+
         $this->recalcular();
         $this->refreshPreview();
     }
@@ -1470,7 +1476,7 @@ class Create extends Component
             $promos = Promocion::query()
                 ->where('activa', true)
                 ->orderBy('nombre')
-                ->get(['id', 'nombre', 'tipo', 'dias_diferidos', 'numero_cuotas']);
+                ->get(['id', 'nombre', 'tipo', 'dias_diferidos', 'numero_cuotas', 'monto_pago_inicial', 'meses_pago_inicial', 'monto_pago_posterior']);
         }
 
         return view('livewire.admin.contratos.create', [

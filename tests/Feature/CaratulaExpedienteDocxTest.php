@@ -6,6 +6,7 @@ use App\Models\Cliente;
 use App\Models\Contrato;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
+use App\Models\Promocion;
 use App\Models\Propietario;
 use App\Services\Contratos\ContratoWordService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -46,6 +47,30 @@ class CaratulaExpedienteDocxTest extends TestCase
         $this->assertStringContainsString('$100,000.00 (CIEN MIL PESOS 00/100 MONEDA NACIONAL)', $texto);
 
         $this->assertStringNotContainsString('${', $texto);
+    }
+
+    #[Test]
+    public function con_pago_escalonado_la_caratula_dice_los_dos_montos(): void
+    {
+        Storage::fake('private');
+
+        $this->artisan('contratos:plantilla-caratula')->assertSuccessful();
+
+        $contrato = $this->contrato();
+        $contrato->update(['promocion_id' => Promocion::create([
+            'nombre' => 'Terrenos 250 / 400',
+            'codigo' => 'terrenos-250-400',
+            'tipo' => Promocion::PAGO_ESCALONADO,
+            'monto_pago_inicial' => 250,
+            'meses_pago_inicial' => 12,
+            'monto_pago_posterior' => 400,
+        ])->id]);
+
+        $texto = $this->textoDocx(Storage::disk('private')->path(
+            (new ContratoWordService)->generarDocx($contrato->fresh(), 'caratula_expediente')
+        ));
+
+        $this->assertStringContainsString('$250.00 los primeros 12 pagos; después $3,000.00', $texto);
     }
 
     #[Test]

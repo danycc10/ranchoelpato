@@ -192,6 +192,7 @@
                             <option value="cuotas_fijas">Cuotas fijas</option>
                             <option value="descuento_porcentaje">Descuento %</option>
                             <option value="descuento_fijo">Descuento fijo</option>
+                            <option value="pago_escalonado">Pago escalonado (un monto al inicio, otro después)</option>
                         </select>
                         @error('form.tipo') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
@@ -225,6 +226,33 @@
                             <label class="text-sm font-semibold">Monto fijo</label>
                             <input type="number" step="0.01" wire:model.live="form.monto_fijo" class="w-full mt-1 rounded-xl border-gray-300">
                             @error('form.monto_fijo') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                    @endif
+
+                    @if(($form['tipo'] ?? '') === 'pago_escalonado')
+                        <div>
+                            <label class="text-sm font-semibold">Pago durante la promoción</label>
+                            <input type="number" step="0.01" wire:model.live="form.monto_pago_inicial"
+                                class="w-full mt-1 rounded-xl border-gray-300" placeholder="Ej: 250">
+                            @error('form.monto_pago_inicial') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="text-sm font-semibold">¿Cuántos meses dura?</label>
+                            <input type="number" wire:model.live="form.meses_pago_inicial"
+                                class="w-full mt-1 rounded-xl border-gray-300" placeholder="Ej: 12">
+                            @error('form.meses_pago_inicial') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="text-sm font-semibold">Pago después de la promoción</label>
+                            <input type="number" step="0.01" wire:model.live="form.monto_pago_posterior"
+                                class="w-full mt-1 rounded-xl border-gray-300" placeholder="Ej: 400">
+                            @error('form.monto_pago_posterior') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                            <p class="text-xs text-gray-500 mt-1">
+                                Los montos son por pago, semanal o mensual según el contrato. 12 meses son
+                                52 pagos semanales o 12 mensuales.
+                            </p>
                         </div>
                     @endif
 

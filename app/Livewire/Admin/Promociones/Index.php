@@ -31,6 +31,9 @@ class Index extends Component
         'numero_cuotas' => null,
         'porcentaje' => null,
         'monto_fijo' => null,
+        'monto_pago_inicial' => null,
+        'meses_pago_inicial' => null,
+        'monto_pago_posterior' => null,
         'activa' => true,
         'fecha_inicio' => null,
         'fecha_fin' => null,
@@ -71,6 +74,9 @@ class Index extends Component
             'numero_cuotas' => null,
             'porcentaje' => null,
             'monto_fijo' => null,
+            'monto_pago_inicial' => null,
+            'meses_pago_inicial' => null,
+            'monto_pago_posterior' => null,
             'activa' => true,
             'fecha_inicio' => null,
             'fecha_fin' => null,
@@ -93,6 +99,9 @@ class Index extends Component
             'numero_cuotas' => $p->numero_cuotas,
             'porcentaje' => $p->porcentaje,
             'monto_fijo' => $p->monto_fijo,
+            'monto_pago_inicial' => $p->monto_pago_inicial,
+            'meses_pago_inicial' => $p->meses_pago_inicial,
+            'monto_pago_posterior' => $p->monto_pago_posterior,
             'activa' => (bool) $p->activa,
             'fecha_inicio' => optional($p->fecha_inicio)->toDateString(),
             'fecha_fin' => optional($p->fecha_fin)->toDateString(),
@@ -126,6 +135,11 @@ class Index extends Component
         if ($tipo !== 'descuento_fijo') {
             $this->form['monto_fijo'] = null;
         }
+        if ($tipo !== 'pago_escalonado') {
+            $this->form['monto_pago_inicial'] = null;
+            $this->form['meses_pago_inicial'] = null;
+            $this->form['monto_pago_posterior'] = null;
+        }
     }
 
     protected function rules(): array
@@ -145,12 +159,16 @@ class Index extends Component
                 'cuotas_fijas',
                 'descuento_porcentaje',
                 'descuento_fijo',
+                'pago_escalonado',
             ])],
 
             'form.dias_diferidos' => ['nullable', 'integer', 'min:1', 'max:365'],
             'form.numero_cuotas' => ['nullable', 'integer', 'min:1', 'max:500'],
             'form.porcentaje' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
             'form.monto_fijo' => ['nullable', 'numeric', 'min:0.01'],
+            'form.monto_pago_inicial' => ['nullable', 'numeric', 'min:0.01'],
+            'form.meses_pago_inicial' => ['nullable', 'integer', 'min:1', 'max:120'],
+            'form.monto_pago_posterior' => ['nullable', 'numeric', 'min:0.01'],
 
             'form.activa' => ['boolean'],
             'form.fecha_inicio' => ['nullable', 'date'],
@@ -176,6 +194,18 @@ class Index extends Component
 
         if ($tipo === 'descuento_fijo' && ! filled($this->form['monto_fijo'])) {
             $this->addError('form.monto_fijo', 'Requerido para descuento fijo.');
+        }
+
+        if ($tipo === 'pago_escalonado') {
+            foreach ([
+                'monto_pago_inicial' => 'Requerido: lo que paga durante la promoción.',
+                'meses_pago_inicial' => 'Requerido: cuántos meses dura la promoción.',
+                'monto_pago_posterior' => 'Requerido: lo que paga después de la promoción.',
+            ] as $campo => $mensaje) {
+                if (! filled($this->form[$campo] ?? null)) {
+                    $this->addError('form.'.$campo, $mensaje);
+                }
+            }
         }
     }
 
@@ -205,6 +235,10 @@ class Index extends Component
                 'numero_cuotas' => $this->form['tipo'] === 'cuotas_fijas' ? (int) $this->form['numero_cuotas'] : null,
                 'porcentaje' => $this->form['tipo'] === 'descuento_porcentaje' ? (float) $this->form['porcentaje'] : null,
                 'monto_fijo' => $this->form['tipo'] === 'descuento_fijo' ? (float) $this->form['monto_fijo'] : null,
+
+                'monto_pago_inicial' => $this->form['tipo'] === 'pago_escalonado' ? (float) $this->form['monto_pago_inicial'] : null,
+                'meses_pago_inicial' => $this->form['tipo'] === 'pago_escalonado' ? (int) $this->form['meses_pago_inicial'] : null,
+                'monto_pago_posterior' => $this->form['tipo'] === 'pago_escalonado' ? (float) $this->form['monto_pago_posterior'] : null,
 
                 'activa' => (bool) ($this->form['activa'] ?? true),
                 'fecha_inicio' => $this->form['fecha_inicio'] ?: null,

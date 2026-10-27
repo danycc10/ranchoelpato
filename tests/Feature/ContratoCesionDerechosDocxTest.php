@@ -7,6 +7,7 @@ use App\Models\Contrato;
 use App\Models\Cuota;
 use App\Models\Fraccionamiento;
 use App\Models\Lote;
+use App\Models\Promocion;
 use App\Models\Propietario;
 use App\Services\Clientes\SolicitudDatosClienteService;
 use App\Services\Contratos\AnexoPlanoService;
@@ -205,6 +206,33 @@ class ContratoCesionDerechosDocxTest extends TestCase
 
         // Sin placeholders sin resolver.
         $this->assertStringNotContainsString('${', $texto);
+    }
+
+    #[Test]
+    public function con_pago_escalonado_el_contrato_dice_los_dos_montos(): void
+    {
+        Storage::fake('private');
+
+        $this->artisan('contratos:plantilla-cesion')->assertSuccessful();
+
+        $contrato = $this->contratoTerreno();
+        $contrato->update(['promocion_id' => Promocion::create([
+            'nombre' => 'Terrenos 250 / 400',
+            'codigo' => 'terrenos-250-400',
+            'tipo' => Promocion::PAGO_ESCALONADO,
+            'monto_pago_inicial' => 250,
+            'meses_pago_inicial' => 12,
+            'monto_pago_posterior' => 400,
+        ])->id]);
+
+        $texto = $this->textoDocx(Storage::disk('private')->path(
+            (new ContratoWordService)->generarDocx($contrato->fresh(), 'contrato_cesion_derechos')
+        ));
+
+        $this->assertStringContainsString(
+            '$250.00 M.N. cada uno los primeros 12 pagos, y de $3,000.00 M.N. cada uno',
+            $texto
+        );
     }
 
     #[Test]

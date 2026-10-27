@@ -779,12 +779,24 @@ class Edit extends Component
 
         $inicio = Carbon::parse($this->nueva_fecha_primera_cuota)->startOfDay();
 
+        // Pago escalonado: los pagos de la promoción que aún no se hacen
+        // siguen con su monto; si no, recalcular le quitaría la promoción.
+        $pagosConMontoInicial = max(0,
+            (int) $this->contrato->promocion?->pagosConMontoInicial($frecuencia)
+            - (int) Cuota::query()
+                ->where('contrato_id', $contratoId)
+                ->where('estatus', 'pagada')
+                ->where('es_anualidad', false)
+                ->count()
+        );
+        $montoInicial = (float) ($this->contrato->promocion?->monto_pago_inicial ?? 0);
+
         $cuotasNuevas = [];
         $restante = $saldo;
         $i = 0;
 
         while ($restante > 0.00001) {
-            $montoCuota = min($montoPago, $restante);
+            $montoCuota = min($i < $pagosConMontoInicial ? $montoInicial : $montoPago, $restante);
 
             $fechaVenc = (clone $inicio);
 

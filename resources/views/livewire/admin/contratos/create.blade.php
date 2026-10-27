@@ -279,6 +279,10 @@
                     @if($this->promocion->tipo === 'cuotas_fijas')
                     — {{ (int)$this->promocion->numero_cuotas }} cuotas
                     @endif
+
+                    @if($this->promocion->esPagoEscalonado())
+                    — {{ $this->promocion->descripcionPagoEscalonado() }}
+                    @endif
                 </p>
                 @endif
             </div>

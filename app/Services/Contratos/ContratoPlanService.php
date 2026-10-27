@@ -104,11 +104,25 @@ class ContratoPlanService
         }
 
         // ✅ Plan dinámico: intercalar pagos regulares + anualidad y ambos reducen saldo
-        return self::planConAnualidadReduciendoSaldo($data, $primera, $saldo, $montoPago);
+        return self::planConAnualidadReduciendoSaldo(
+            $data,
+            $primera,
+            $saldo,
+            $montoPago,
+            // Pago escalonado: los primeros pagos van con el monto de la promoción.
+            $promo?->pagosConMontoInicial($frecuencia) ?? 0,
+            (float) ($promo?->monto_pago_inicial ?? 0),
+        );
     }
 
-    protected static function planConAnualidadReduciendoSaldo(array $data, Carbon $primeraRegular, float $saldo, float $montoPago): array
-    {
+    protected static function planConAnualidadReduciendoSaldo(
+        array $data,
+        Carbon $primeraRegular,
+        float $saldo,
+        float $montoPago,
+        int $pagosIniciales = 0,
+        float $montoInicial = 0,
+    ): array {
         $frecuencia = (string) $data['frecuencia'];
 
         $tieneAnualidad = (bool) ($data['tiene_anualidad'] ?? false);
@@ -132,6 +146,7 @@ class ContratoPlanService
         $plan = [];
         $restante = round($saldo, 2);
         $i = 1;
+        $regulares = 0;
 
         // Guard para evitar loops
         $guard = 0;
@@ -175,7 +190,10 @@ class ContratoPlanService
             }
 
             // cuota regular
-            $monto = min($restante, round($montoPago, 2));
+            $montoRegular = $regulares < $pagosIniciales ? $montoInicial : $montoPago;
+            $regulares++;
+
+            $monto = min($restante, round($montoRegular, 2));
 
             $plan[] = [
                 'numero' => $i++,

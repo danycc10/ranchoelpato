@@ -646,7 +646,7 @@ class ContratoWordService
         $template->setValue('precio_total_letra', $this->montoEnLetra($precioTotal));
         $template->setValue('enganche_numero', $this->formatMoney((float) $contrato->enganche));
         $template->setValue('saldo_financiado_numero', $this->formatMoney((float) $contrato->saldo_inicial));
-        $template->setValue('monto_pago_numero', $this->formatMoney((float) $contrato->monto_pago));
+        $template->setValue('monto_pago_numero', $this->montoPagoResumen($contrato));
         $template->setValue('periodicidad', $contrato->frecuencia === 'semanal' ? 'Semanal' : 'Mensual');
 
         [$numeroPagos] = $this->resumenCalendario($contrato);
@@ -777,7 +777,7 @@ class ContratoWordService
         $template->setValue('precio_total_letra', $this->montoEnLetra($precioTotal));
         $template->setValue('enganche_numero', $this->formatMoney((float) $contrato->enganche));
         $template->setValue('saldo_financiado_numero', $this->formatMoney((float) $contrato->saldo_inicial));
-        $template->setValue('monto_pago_numero', $this->formatMoney((float) $contrato->monto_pago));
+        $template->setValue('monto_pago_numero', $this->montoPagoEnClausula($contrato));
 
         [$numeroPagos, $primerPago] = $this->resumenCalendario($contrato);
 
@@ -998,6 +998,38 @@ class ContratoWordService
             : 0;
 
         return [$numeroPagos, $contrato->fecha_inicio, null];
+    }
+
+    /**
+     * El monto de cada pago como lo dice la cláusula: "... pagos semanales de
+     * ${monto_pago_numero} M.N. cada uno". Con pago escalonado son dos montos,
+     * y poner solo uno dejaría en el contrato un pago que no es.
+     */
+    protected function montoPagoEnClausula(Contrato $contrato): string
+    {
+        $iniciales = (int) $contrato->promocion?->pagosConMontoInicial((string) $contrato->frecuencia);
+
+        if ($iniciales <= 0) {
+            return $this->formatMoney((float) $contrato->monto_pago);
+        }
+
+        return $this->formatMoney((float) $contrato->promocion->monto_pago_inicial)
+            .' M.N. cada uno los primeros '.$iniciales.' pagos, y de '
+            .$this->formatMoney((float) $contrato->monto_pago);
+    }
+
+    /** Lo mismo para la carátula, que lo muestra en una celda. */
+    protected function montoPagoResumen(Contrato $contrato): string
+    {
+        $iniciales = (int) $contrato->promocion?->pagosConMontoInicial((string) $contrato->frecuencia);
+
+        if ($iniciales <= 0) {
+            return $this->formatMoney((float) $contrato->monto_pago);
+        }
+
+        return $this->formatMoney((float) $contrato->promocion->monto_pago_inicial)
+            .' los primeros '.$iniciales.' pagos; después '
+            .$this->formatMoney((float) $contrato->monto_pago);
     }
 
     protected function diasPagoTexto(Contrato $contrato): string
