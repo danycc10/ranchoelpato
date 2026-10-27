@@ -529,6 +529,16 @@
                         class="mt-3 text-sm font-semibold text-gray-600 hover:text-black">
                         + Agregar otro teléfono
                     </button>
+
+                    <label class="mt-4 flex items-start gap-2 text-sm">
+                        <input type="checkbox" wire:model.live="form.recibo_sin_imprimir" class="mt-0.5 rounded">
+                        <span>
+                            <span class="font-semibold">No imprimir sus recibos</span>
+                            <span class="block text-xs text-gray-500">
+                                Al cobrarle no se imprime el ticket: se genera el PDF y se le manda por WhatsApp.
+                            </span>
+                        </span>
+                    </label>
                 </div>
 
                 <div>

@@ -390,6 +390,22 @@
                         Escribe al menos 2 letras y selecciona un cliente.
                     </div>
                     @endif
+
+                    @if($this->reciboSinImprimir)
+                    @if($this->reciboSinImprimir['telefono'])
+                    <div class="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                        <div class="font-black">No imprimir físicamente</div>
+                        Este cliente pidió su recibo solo en PDF. Al guardar se le manda por WhatsApp
+                        al {{ $this->reciboSinImprimir['telefono'] }}.
+                    </div>
+                    @else
+                    <div class="mt-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                        <div class="font-black">Pidió no imprimir, pero no tiene WhatsApp</div>
+                        No tiene un número de WhatsApp registrado, así que no hay a dónde mandarle el PDF.
+                        Agrégalo en Clientes o imprímelo esta vez.
+                    </div>
+                    @endif
+                    @endif
                 </div>
 
                 <div class="sm:col-span-2">
@@ -785,7 +801,7 @@
                 wire:target="intentarGuardar,evidencia,recargo_evidencia"
                 class="w-full sm:w-auto px-4 py-2 rounded-xl bg-black text-white font-semibold disabled:opacity-50">
                 <span wire:loading.remove wire:target="intentarGuardar,evidencia,recargo_evidencia">
-                    Guardar
+                    {{ ($this->reciboSinImprimir['telefono'] ?? null) ? 'Guardar y enviar por WhatsApp' : 'Guardar' }}
                 </span>
 
                 <span wire:loading wire:target="intentarGuardar,evidencia,recargo_evidencia">
@@ -793,6 +809,8 @@
                 </span>
             </button>
 
+            {{-- A quien no quiere papel no se le ofrece imprimir. --}}
+            @unless($this->reciboSinImprimir['telefono'] ?? null)
             <button
                 type="button"
                 wire:click="intentarGuardar(true)"
@@ -807,6 +825,7 @@
                     Procesando...
                 </span>
             </button>
+            @endunless
         </div>
     </div>
 

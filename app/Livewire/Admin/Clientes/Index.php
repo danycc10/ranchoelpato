@@ -40,6 +40,7 @@ class Index extends Component
         'nombre_legal' => '',
         'telefono' => '',
         'telefono_uso' => 'ambos',
+        'recibo_sin_imprimir' => false,
         'correo' => '',
         'direccion' => '',
         'rfc' => '',
@@ -141,6 +142,7 @@ class Index extends Component
             'nombre_legal' => '',
             'telefono' => '',
             'telefono_uso' => 'ambos',
+            'recibo_sin_imprimir' => false,
             'correo' => '',
             'direccion' => '',
             'rfc' => '',
@@ -227,6 +229,7 @@ class Index extends Component
             'nombre_legal' => (string) ($c->nombre_legal ?? ''),
             'telefono' => (string) ($c->telefono ?? ''),
             'telefono_uso' => (string) ($c->telefono_uso ?: 'ambos'),
+            'recibo_sin_imprimir' => (bool) $c->recibo_sin_imprimir,
             'correo' => (string) ($c->correo ?? ''),
             'direccion' => (string) ($c->direccion ?? ''),
             'rfc' => (string) ($c->rfc ?? ''),
@@ -353,6 +356,7 @@ class Index extends Component
             'telefonosExtra.*.etiqueta' => ['nullable', 'string', 'max:60'],
 
             'form.telefono_uso' => ['required', 'in:ambos,llamadas,whatsapp'],
+            'form.recibo_sin_imprimir' => ['boolean'],
             // `filter` rechaza acentos y ñ antes de la arroba: el correo
             // electronico no los admite y el envio truena hasta el final.
             'form.correo' => ['nullable', 'string', 'email:filter,dns', 'max:255'],
@@ -378,6 +382,7 @@ class Index extends Component
             'nombre_legal' => $this->stringOrNull($this->form['nombre_legal'] ?? null),
             'telefono' => $telefono,
             'telefono_uso' => $this->form['telefono_uso'] ?? 'ambos',
+            'recibo_sin_imprimir' => (bool) ($this->form['recibo_sin_imprimir'] ?? false),
             'correo' => $this->form['correo'] ? strtolower(trim((string) $this->form['correo'])) : null,
             'direccion' => $this->stringOrNull($this->form['direccion'] ?? null),
             'rfc' => $this->form['rfc'] ? strtoupper(trim((string) $this->form['rfc'])) : null,

@@ -5,14 +5,13 @@ namespace App\Services\Comprobantes;
 use App\Models\ComprobantePago;
 use App\Models\Contrato;
 use App\Models\Cuota;
-use App\Models\Notificacion;
 use App\Models\Pago;
 use App\Models\Recibo;
 use App\Models\ReciboPago;
 use App\Models\TipoCobro;
 use App\Services\Contabilidad\PropietarioContableResolver;
-use App\Services\Notificaciones\ProcesarNotificacionService;
 use App\Services\Recibos\CuotaAntiguedadSelector;
+use App\Services\Recibos\EnviarReciboPorWhatsapp;
 use App\Services\Recibos\PeriodoResolver;
 use App\Services\Recibos\ReciboFolioService;
 use Illuminate\Support\Carbon;
@@ -523,35 +522,6 @@ class RegistrarPagoComprobanteService
             return;
         }
 
-        $notificacion = Notificacion::create([
-            'canal' => 'whatsapp',
-            'tipo' => 'recibo_pago',
-            'cliente_id' => $recibo->cliente_id,
-            'contrato_id' => $recibo->contrato_id,
-            'cuota_id' => $recibo->cuota_id,
-            'destino' => $telefono,
-            'payload' => [
-                'recibo_id' => $recibo->id,
-                'folio' => $recibo->folio,
-                'mensaje' => 'Recibimos tu pago. Adjuntamos tu recibo '.$recibo->folio
-                    .' por $'.number_format((float) $recibo->monto, 2).'. ¡Gracias!',
-            ],
-            'estatus' => 'en_cola',
-        ]);
-
-        $notificacionId = (int) $notificacion->id;
-
-        DB::afterCommit(function () use ($notificacionId): void {
-            $pendiente = Notificacion::find($notificacionId);
-
-            if (! $pendiente || $pendiente->estatus !== 'en_cola') {
-                return;
-            }
-
-            app(ProcesarNotificacionService::class)->procesar(
-                $pendiente,
-                mantenerEnColaSiFalla: true,
-            );
-        });
+        app(EnviarReciboPorWhatsapp::class)->encolar($recibo, $telefono);
     }
 }

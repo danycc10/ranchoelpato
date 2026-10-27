@@ -16,6 +16,8 @@ class Cliente extends Model
         'nombre_legal',
         'telefono',
         'telefono_uso',
+        // No quiere el recibo en papel: se le manda el PDF por WhatsApp.
+        'recibo_sin_imprimir',
         'correo',
         'direccion',
         'rfc',
@@ -39,6 +41,11 @@ class Cliente extends Model
         'estatus' => 'activo',
         // Quien solo tiene un número lo usa para las dos cosas.
         'telefono_uso' => 'ambos',
+        'recibo_sin_imprimir' => false,
+    ];
+
+    protected $casts = [
+        'recibo_sin_imprimir' => 'boolean',
     ];
 
     protected static function booted(): void

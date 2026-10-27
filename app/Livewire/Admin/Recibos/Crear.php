@@ -17,6 +17,7 @@ use App\Models\TipoCobro;
 use App\Services\Contabilidad\PropietarioContableResolver;
 use App\Services\ImageUploadService;
 use App\Services\Recibos\CuotaAntiguedadSelector;
+use App\Services\Recibos\EnviarReciboPorWhatsapp;
 use App\Services\Recibos\PeriodoResolver;
 use App\Services\Recibos\RecargoCuotaCalculator;
 use App\Services\Recibos\RecargoSeleccionAjustador;
@@ -529,6 +530,22 @@ class Crear extends Component
     public function getMostrarCampoEvidenciaProperty(): bool
     {
         return false;
+    }
+
+    /**
+     * Si el cliente pidió no imprimir su recibo, a qué número se le manda.
+     *
+     * @return array{telefono: ?string}|null null si se imprime como siempre
+     */
+    public function getReciboSinImprimirProperty(): ?array
+    {
+        $cliente = $this->cliente_id ? Cliente::find($this->cliente_id) : null;
+
+        if (! $cliente?->recibo_sin_imprimir) {
+            return null;
+        }
+
+        return ['telefono' => $cliente->telefonoParaWhatsapp()];
     }
 
     public function updatedEvidencia(): void
@@ -1814,6 +1831,9 @@ class Crear extends Component
 
         $imageUploadService ??= app(ImageUploadService::class);
 
+        // Se toma antes de guardar: al terminar se limpia el formulario.
+        $telefonoSinImprimir = $this->reciboSinImprimir['telefono'] ?? null;
+
         $recibosParaEnviar = [];
         $recibosParaImprimir = [];
         // Recibos que se imprimen dentro del ticket del principal (los recargos).
@@ -2251,9 +2271,38 @@ class Crear extends Component
             }
         }
 
+        // El cliente no quiere papel: en vez del ticket le llega el PDF.
+        if ($telefonoSinImprimir) {
+            $this->enviarPorWhatsapp($recibosParaImprimir, $telefonoSinImprimir);
+
+            return;
+        }
+
         if ($imprimir) {
             $this->imprimir($recibosParaImprimir, $recibosAdjuntosParaImprimir);
         }
+    }
+
+    /** @param  array<int, int>  $reciboIds */
+    protected function enviarPorWhatsapp(array $reciboIds, string $telefono): void
+    {
+        $envio = app(EnviarReciboPorWhatsapp::class);
+        $todosSalieron = true;
+
+        foreach (Recibo::whereKey($reciboIds)->get() as $recibo) {
+            $notificacion = $envio->encolar($recibo, $telefono);
+
+            $todosSalieron = $todosSalieron && $notificacion->fresh()?->estatus === 'enviado';
+        }
+
+        // Este aviso reemplaza al de "recibo generado": solo se ve uno.
+        $this->dispatch(
+            'toast',
+            type: $todosSalieron ? 'success' : 'warning',
+            message: $todosSalieron
+                ? 'Recibo generado. No se imprime: se envió por WhatsApp al '.$telefono.'.'
+                : 'Recibo generado, sin imprimir. WhatsApp no respondió: se reintentará el envío al '.$telefono.'.'
+        );
     }
 
     private function getFormaPagoPrincipal(array $pagosPrincipales): ?int
