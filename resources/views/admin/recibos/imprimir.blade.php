@@ -51,6 +51,7 @@
     'pdfUrl' => route('admin.recibos.pdf', $recibo),
     'agenteUrl' => route('admin.recibos.imprimir-agente', $recibo),
     'tieneAgente' => $tieneAgente ?? false,
+    'clienteSinImprimir' => $recibo->cliente?->recibo_sin_imprimir ? $recibo->cliente : null,
 ])
 @endif
 

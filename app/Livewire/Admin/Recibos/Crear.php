@@ -2271,11 +2271,10 @@ class Crear extends Component
             }
         }
 
-        // El cliente no quiere papel: en vez del ticket le llega el PDF.
+        // El cliente no quiere papel: le llega el PDF. Si aun así se pidió
+        // imprimir, la página del ticket avisa que no se imprima.
         if ($telefonoSinImprimir) {
             $this->enviarPorWhatsapp($recibosParaImprimir, $telefonoSinImprimir);
-
-            return;
         }
 
         if ($imprimir) {
@@ -2300,8 +2299,8 @@ class Crear extends Component
             'toast',
             type: $todosSalieron ? 'success' : 'warning',
             message: $todosSalieron
-                ? 'Recibo generado. No se imprime: se envió por WhatsApp al '.$telefono.'.'
-                : 'Recibo generado, sin imprimir. WhatsApp no respondió: se reintentará el envío al '.$telefono.'.'
+                ? 'Recibo generado y enviado por WhatsApp al '.$telefono.'. No lo imprimas.'
+                : 'Recibo generado. WhatsApp no respondió: se reintentará el envío al '.$telefono.'. No lo imprimas.'
         );
     }
 

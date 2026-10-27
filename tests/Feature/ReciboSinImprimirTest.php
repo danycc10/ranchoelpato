@@ -11,6 +11,7 @@ use App\Models\Recibo;
 use App\Models\User;
 use App\Services\Whatsapp\WhatsappService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Mockery;
@@ -28,7 +29,7 @@ class ReciboSinImprimirTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function a_quien_no_quiere_papel_se_le_manda_el_pdf_en_vez_de_imprimir(): void
+    public function a_quien_no_quiere_papel_se_le_manda_el_pdf_por_whatsapp(): void
     {
         $whatsapp = Mockery::mock(WhatsappService::class);
         $whatsapp->shouldReceive('enviarDocumento')
@@ -44,11 +45,12 @@ class ReciboSinImprimirTest extends TestCase
         $componente = $this->cobrar($datos)
             ->call('guardar', true)
             ->assertHasNoErrors()
-            ->assertNotDispatched('open-print-tab');
+            // Guardar e imprimir sigue abriendo el ticket; ahí se avisa.
+            ->assertDispatched('open-print-tab');
 
         // En pantalla solo se ve el último aviso.
         $this->assertSame(
-            'Recibo generado. No se imprime: se envió por WhatsApp al 8781112233.',
+            'Recibo generado y enviado por WhatsApp al 8781112233. No lo imprimas.',
             $this->ultimoAviso($componente)
         );
 
@@ -72,9 +74,8 @@ class ReciboSinImprimirTest extends TestCase
         $datos = $this->contratoConCuota(['recibo_sin_imprimir' => true]);
 
         $componente = $this->cobrar($datos)
-            ->call('guardar', true)
-            ->assertHasNoErrors()
-            ->assertNotDispatched('open-print-tab');
+            ->call('guardar')
+            ->assertHasNoErrors();
 
         $this->assertStringContainsString('se reintentará', $this->ultimoAviso($componente));
 
@@ -84,14 +85,65 @@ class ReciboSinImprimirTest extends TestCase
     }
 
     #[Test]
-    public function se_avisa_en_pantalla_y_no_se_ofrece_imprimir(): void
+    public function al_cobrar_se_avisa_que_no_se_imprima(): void
     {
         $datos = $this->contratoConCuota(['recibo_sin_imprimir' => true]);
 
         $this->cobrar($datos)
             ->assertSee('No imprimir físicamente')
-            ->assertSee('Guardar y enviar por WhatsApp')
-            ->assertDontSee('Guardar e imprimir');
+            ->assertSee('Guardar e imprimir');
+    }
+
+    #[Test]
+    public function la_pagina_del_ticket_avisa_que_no_se_imprima(): void
+    {
+        $recibo = $this->reciboDe(['recibo_sin_imprimir' => true]);
+
+        $this->actingAs($this->cajero())
+            ->get(route('admin.recibos.imprimir', $recibo))
+            ->assertOk()
+            ->assertSee('NO IMPRIMIR FÍSICAMENTE')
+            ->assertSee('WhatsApp al 8781112233')
+            ->assertSee('Imprimir navegador');
+    }
+
+    #[Test]
+    public function el_ticket_de_los_demas_no_trae_el_aviso(): void
+    {
+        $recibo = $this->reciboDe();
+
+        $this->actingAs($this->cajero())
+            ->get(route('admin.recibos.imprimir', $recibo))
+            ->assertOk()
+            ->assertDontSee('NO IMPRIMIR FÍSICAMENTE');
+    }
+
+    #[Test]
+    public function el_pdf_que_le_llega_al_cliente_no_trae_el_aviso(): void
+    {
+        $recibo = $this->reciboDe(['recibo_sin_imprimir' => true]);
+
+        $html = view('admin.recibos.imprimir', ['recibo' => $recibo, 'modo' => 'pdf'])->render();
+
+        $this->assertStringNotContainsString('NO IMPRIMIR', $html);
+    }
+
+    #[Test]
+    public function el_ticket_en_lote_tambien_avisa(): void
+    {
+        $recibo = $this->reciboDe(['recibo_sin_imprimir' => true]);
+        $cajero = $this->cajero();
+        $token = 'lote-sin-papel';
+
+        Cache::put('print_batch:'.$token, [
+            'user_id' => $cajero->id,
+            'recibo_ids' => [$recibo->id],
+        ], now()->addMinutes(15));
+
+        $this->actingAs($cajero)
+            ->get(route('admin.recibos.print-lote', ['token' => $token]))
+            ->assertOk()
+            ->assertSee('NO IMPRIMIR FÍSICAMENTE');
     }
 
     #[Test]
@@ -145,6 +197,39 @@ class ReciboSinImprimirTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertTrue($cliente->fresh()->recibo_sin_imprimir);
+    }
+
+    private function reciboDe(array $cliente = []): Recibo
+    {
+        $datos = $this->contratoConCuota($cliente);
+
+        return Recibo::create([
+            'folio' => 'R-SIN-PAPEL',
+            'fecha' => '2026-11-05',
+            'anio' => 2026,
+            'mes_del_anio' => 11,
+            'cliente_id' => $datos['cliente_id'],
+            'contrato_id' => $datos['contrato_id'],
+            'lote_id' => $datos['lote_id'],
+            'tipos_cobro_id' => $datos['tipos_cobro_id'],
+            'forma_pago_id' => $datos['forma_pago_id'],
+            'monto' => 200,
+            'saldo_anterior' => 600,
+            'saldo_posterior' => 400,
+        ]);
+    }
+
+    private function cajero(): User
+    {
+        $usuario = User::factory()->create();
+
+        $rol = Role::findOrCreate('cajero', 'web');
+
+        foreach (['admin.ver', 'recibos.imprimir'] as $permiso) {
+            $rol->givePermissionTo(Permission::findOrCreate($permiso, 'web'));
+        }
+
+        return tap($usuario)->assignRole($rol);
     }
 
     private function ultimoAviso($componente): ?string

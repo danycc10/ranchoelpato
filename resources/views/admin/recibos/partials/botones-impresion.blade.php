@@ -5,8 +5,41 @@
     @param string $pdfUrl
     @param string|null $agenteUrl
     @param bool $tieneAgente
+    @param \App\Models\Cliente|null $clienteSinImprimir el que pidió su recibo solo por WhatsApp
 --}}
 <div class="no-print">
+
+    @if($clienteSinImprimir ?? null)
+        <style>
+            .aviso-sin-imprimir{
+                max-width: 420px;
+                margin: 0 auto 10px;
+                padding: 12px;
+                border: 2px solid #d97706;
+                border-radius: 10px;
+                background: #fffbeb;
+                color: #78350f;
+                font-size: 14px;
+            }
+
+            .aviso-sin-imprimir strong{
+                display: block;
+                font-size: 18px;
+                margin-bottom: 4px;
+            }
+        </style>
+
+        <div class="aviso-sin-imprimir" role="alert">
+            <strong>NO IMPRIMIR FÍSICAMENTE</strong>
+            @if($clienteSinImprimir->telefonoParaWhatsapp())
+                {{ $clienteSinImprimir->nombre_completo }} pidió su recibo solo en PDF:
+                se le manda por WhatsApp al {{ $clienteSinImprimir->telefonoParaWhatsapp() }}.
+            @else
+                {{ $clienteSinImprimir->nombre_completo }} pidió no imprimirlo, pero no tiene
+                WhatsApp registrado: imprímelo esta vez y agrega su número en Clientes.
+            @endif
+        </div>
+    @endif
 
     <button type="button" onclick="window.print()" class="btn">
         Imprimir navegador

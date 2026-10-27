@@ -396,7 +396,7 @@
                     <div class="mt-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                         <div class="font-black">No imprimir físicamente</div>
                         Este cliente pidió su recibo solo en PDF. Al guardar se le manda por WhatsApp
-                        al {{ $this->reciboSinImprimir['telefono'] }}.
+                        al {{ $this->reciboSinImprimir['telefono'] }}: no imprimas el ticket.
                     </div>
                     @else
                     <div class="mt-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800">
@@ -801,7 +801,7 @@
                 wire:target="intentarGuardar,evidencia,recargo_evidencia"
                 class="w-full sm:w-auto px-4 py-2 rounded-xl bg-black text-white font-semibold disabled:opacity-50">
                 <span wire:loading.remove wire:target="intentarGuardar,evidencia,recargo_evidencia">
-                    {{ ($this->reciboSinImprimir['telefono'] ?? null) ? 'Guardar y enviar por WhatsApp' : 'Guardar' }}
+                    Guardar
                 </span>
 
                 <span wire:loading wire:target="intentarGuardar,evidencia,recargo_evidencia">
@@ -809,8 +809,6 @@
                 </span>
             </button>
 
-            {{-- A quien no quiere papel no se le ofrece imprimir. --}}
-            @unless($this->reciboSinImprimir['telefono'] ?? null)
             <button
                 type="button"
                 wire:click="intentarGuardar(true)"
@@ -825,7 +823,6 @@
                     Procesando...
                 </span>
             </button>
-            @endunless
         </div>
     </div>
 

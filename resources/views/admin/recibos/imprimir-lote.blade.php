@@ -50,6 +50,7 @@
         'pdfUrl' => route('admin.recibos.pdf-lote', ['token' => $token]),
         'agenteUrl' => route('admin.recibos.print-lote-agente', ['token' => $token]),
         'tieneAgente' => $tieneAgente ?? false,
+        'clienteSinImprimir' => $tickets->pluck('recibo.cliente')->first(fn ($c) => $c?->recibo_sin_imprimir),
     ])
 @endif
 
