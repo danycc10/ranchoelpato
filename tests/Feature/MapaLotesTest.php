@@ -139,7 +139,8 @@ class MapaLotesTest extends TestCase
 
     public function test_los_seis_planos_nuevos_tienen_contornos_cerrados_e_identificadores_unicos(): void
     {
-        foreach (['ballesteros' => 48, 'finca-del-rio' => 255, 'finca-espinoza' => 49, 'finca-del-norte' => 340, 'finca-miranda' => 200, 'reyes' => 68] as $clave => $cantidad) {
+        // Finca del Norte: 340 figuras del DWG más el 116-B, que en el plano no tiene rótulo.
+        foreach (['ballesteros' => 48, 'finca-del-rio' => 255, 'finca-espinoza' => 49, 'finca-del-norte' => 341, 'finca-miranda' => 200, 'reyes' => 68] as $clave => $cantidad) {
             $plano = json_decode(file_get_contents(resource_path('mapas/'.$clave.'.json')), true, 512, JSON_THROW_ON_ERROR);
             $this->assertArrayHasKey($clave, MapaLotesService::MAPAS);
             $this->assertCount($cantidad, $plano['lotes']);
@@ -149,8 +150,26 @@ class MapaLotesTest extends TestCase
                 $this->assertGreaterThan(25, $figura['area_plano']);
             }
             if (in_array($clave, ['ballesteros', 'finca-del-rio', 'finca-del-norte', 'reyes'])) {
-                $this->assertSame(array_map('strval', range(1, $cantidad)), array_column($plano['lotes'], 'numero'));
+                $numeros = array_map('strval', range(1, $clave === 'finca-del-norte' ? 340 : $cantidad));
+                if ($clave === 'finca-del-norte') {
+                    array_splice($numeros, 116, 0, ['116-B']);
+                }
+                $this->assertSame($numeros, array_column($plano['lotes'], 'numero'));
             }
+        }
+    }
+
+    public function test_finca_del_norte_vincula_el_116_b_aunque_el_catalogo_lo_escriba_distinto(): void
+    {
+        foreach (['116-B', '116 B', '116b'] as $captura) {
+            $finca = $this->fraccionamiento();
+            $finca->update(['mapa_clave' => 'finca-del-norte']);
+            $this->lote($finca, '116', 'vendido');
+            $this->lote($finca, $captura, 'apartado');
+            $figuras = collect(app(MapaLotesService::class)->datos($finca)['lotes']);
+            $this->assertSame('apartado', $figuras->firstWhere('numero', '116-B')['estatus'], $captura);
+            $this->assertSame('vendido', $figuras->firstWhere('numero', '116')['estatus'], $captura);
+            $finca->update(['mapa_clave' => null]);
         }
     }
 

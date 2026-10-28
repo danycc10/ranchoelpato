@@ -41,7 +41,7 @@ Para incorporar otro plano, preparar su JSON con la misma estructura, registrarl
 | `ballesteros` | 48 | Cierre del lote 24 con extensión máxima de 0.0001 unidades por extremo. |
 | `finca-del-rio` | 255 | Contornos originales; ubicación de MTEXT por su centro real, alineación y orientación. |
 | `finca-espinoza` | 49 | Bloque `plano`; 22 figuras en M1, 8 en M2 y 19 en M3. |
-| `finca-del-norte` | 340 | Bloque `lotes norte`; cierre de pequeños huecos con extensiones de hasta 0.05 unidades por extremo. |
+| `finca-del-norte` | 341 | Bloque `lotes norte`; cierre de pequeños huecos con extensiones de hasta 0.05 unidades por extremo. El 116-B (`manual-116-B`) se agregó a mano: en el DWG es el espacio sin rótulo entre el 117 y los lotes 60 a 63, y sus vértices son los de las líneas existentes. Si se vuelve a convertir el plano, hay que volver a agregarlo. |
 | `finca-miranda` | 200 | Modelo y bloques insertados `fisico` y `lotees`, respetando traslación y rotación; extensiones máximas de 0.05 unidades. |
 | `reyes` | 68 | Bloque `lotificacion` de `Reyes Geo.dwg`; cierre de diferencias de precisión con extensiones máximas de 0.000001 unidades. |
 

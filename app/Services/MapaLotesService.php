@@ -111,8 +111,8 @@ class MapaLotesService
 
     private function numero(string $valor): string
     {
-        // El catálogo admite "17 A" y el CAD usa "17A".
-        $valor = preg_replace('/\s+/u', '', mb_strtoupper(trim($valor)));
+        // El catálogo admite "17 A" o "116-B" y el CAD usa "17A".
+        $valor = preg_replace('/[\s\-]+/u', '', mb_strtoupper(trim($valor)));
 
         return preg_replace('/^0+(?=\d)/', '', $valor);
     }
