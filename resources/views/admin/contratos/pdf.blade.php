@@ -6,8 +6,9 @@
     <title>Contrato {{ $contrato->folio_contrato }}</title>
 
     <style>
+        /* Arriba queda lugar para el nombre y el lote de las hojas siguientes. */
         @page {
-            margin: 18px;
+            margin: 30px 18px 18px 18px;
         }
 
         body {

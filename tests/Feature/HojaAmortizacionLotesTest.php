@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Admin\ContratosPdfController;
 use App\Models\Cliente;
 use App\Models\Contrato;
 use App\Models\Cuota;
@@ -59,6 +60,46 @@ class HojaAmortizacionLotesTest extends TestCase
             ->get(route('admin.contratos.pdf', $luz))
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
+    }
+
+    #[Test]
+    public function las_hojas_siguientes_se_identifican_con_el_nombre_y_el_lote(): void
+    {
+        $terreno = $this->contratoTerreno();
+        $this->otroLote($terreno, '13', 'CT-002');
+
+        $this->assertSame('MARIA LOPEZ GARZA  ·  Lote 12', ContratosPdfController::identificadorDeHoja($terreno));
+
+        $luz = $this->contratoLuz($terreno);
+
+        $this->assertSame(
+            'MARIA LOPEZ GARZA  ·  Lotes 12 y 13',
+            ContratosPdfController::identificadorDeHoja($luz, LotesClienteService::resumen($luz))
+        );
+    }
+
+    #[Test]
+    public function el_pdf_de_varias_hojas_se_genera(): void
+    {
+        $terreno = $this->contratoTerreno();
+
+        foreach (range(1, 80) as $numero) {
+            Cuota::create([
+                'contrato_id' => $terreno->id,
+                'numero' => $numero,
+                'fecha_vencimiento' => now()->addMonths($numero)->toDateString(),
+                'monto' => 3000,
+                'estatus' => 'pendiente',
+            ]);
+        }
+
+        $pdf = $this->actingAs($this->usuarioConPermisos())
+            ->get(route('admin.contratos.pdf', $terreno))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->getContent();
+
+        $this->assertGreaterThan(1, preg_match_all('/\/Type\s*\/Page\b/', $pdf));
     }
 
     /**
