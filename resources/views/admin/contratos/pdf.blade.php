@@ -8,7 +8,7 @@
     <style>
         /* Arriba queda lugar para el nombre y el lote de las hojas siguientes. */
         @page {
-            margin: 30px 18px 18px 18px;
+            margin: 40px 18px 18px 18px;
         }
 
         body {
