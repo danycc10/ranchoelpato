@@ -80,9 +80,9 @@ class ContratosPdfController extends Controller
             }
 
             $fuente = $metricas->getFont('DejaVu Sans');
-            $ancho = $metricas->getTextWidth($texto, $fuente, 10);
+            $ancho = $metricas->getTextWidth($texto, $fuente, 12);
 
-            $canvas->text(($canvas->get_width() - $ancho) / 2, 9, $texto, $fuente, 10, [0.3, 0.3, 0.3]);
+            $canvas->text(($canvas->get_width() - $ancho) / 2, 8, $texto, $fuente, 12, [0.3, 0.3, 0.3]);
         });
     }
 }
