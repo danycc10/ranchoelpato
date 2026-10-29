@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Reports;
 
+use App\Services\Reportes\PronosticoCargaRecibos;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
@@ -28,6 +29,9 @@ class WorkloadReport extends Component
     public string $hasta;
 
     public ?int $usuarioId = null;
+
+    /** El mapa de calor en promedio por día en vez del total del periodo. */
+    public bool $promedio = false;
 
     public function mount(): void
     {
@@ -57,6 +61,12 @@ class WorkloadReport extends Component
             ->get(['id', 'name']);
     }
 
+    /** De toda la oficina y desde hoy: no depende de los filtros. */
+    public function getPronosticoProperty(): array
+    {
+        return app(PronosticoCargaRecibos::class)->pronosticar(now());
+    }
+
     public function getEstadisticasProperty(): array
     {
         [$desde, $hasta] = $this->periodo();
@@ -79,6 +89,9 @@ class WorkloadReport extends Component
             $calor[$r->dia_semana][$r->hora] = ($calor[$r->dia_semana][$r->hora] ?? 0) + 1;
         }
 
+        // Cuántos lunes, martes... tiene el periodo, para el promedio por día.
+        $veces = collect(CarbonPeriod::create($desde, $hasta))->countBy(fn (Carbon $d) => $d->dayOfWeekIso)->all();
+
         $diasTrabajados = $recibos->pluck('fecha')->unique()->count();
         $horaPico = $recibos->isEmpty() ? null : array_search(max($porHora), $porHora, true);
 
@@ -96,6 +109,7 @@ class WorkloadReport extends Component
             'por_hora' => $porHora,
             'calor' => $calor,
             'calor_max' => max([1, ...array_map(fn ($fila) => max($fila), $calor ?: [[0]])]),
+            'veces_dia_semana' => $veces,
             'por_dia' => $this->porDia($recibos, $desde, $hasta),
             'por_semana' => $this->porSemana($hasta),
             'por_usuario' => $this->porUsuario($recibos),
@@ -103,13 +117,13 @@ class WorkloadReport extends Component
     }
 
     /** Color de una celda del mapa de calor; null cuando no hubo recibos. */
-    public static function colorCalor(int $valor, int $maximo): ?string
+    public static function colorCalor(float $valor, float $maximo): ?string
     {
         if ($valor <= 0) {
             return null;
         }
 
-        $paso = (int) ceil($valor / max(1, $maximo) * count(self::RAMPA)) - 1;
+        $paso = (int) ceil($valor / max(0.000001, $maximo) * count(self::RAMPA)) - 1;
 
         return self::RAMPA[max(0, min(count(self::RAMPA) - 1, $paso))];
     }

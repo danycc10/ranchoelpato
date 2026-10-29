@@ -9,6 +9,18 @@
     $cadaCuantos = max(1, (int) ceil(count($e['por_dia']) / 16));
     $hora = fn (?int $h) => $h === null ? '—' : sprintf('%d:00', $h);
     $azul = '#2a78d6';
+
+    // El mapa de calor en total o en promedio por cada lunes, martes... del periodo.
+    $celda = fn (int $dia, int $h) => ($e['calor'][$dia][$h] ?? 0) / ($promedio ? max(1, $e['veces_dia_semana'][$dia] ?? 1) : 1);
+    $maxCelda = 0;
+    foreach (array_keys(WorkloadReport::DIAS) as $dia) {
+        foreach ($e['horas'] as $h) {
+            $maxCelda = max($maxCelda, $celda($dia, $h));
+        }
+    }
+    $formato = fn (float $v) => $v <= 0 ? '' : ($promedio ? number_format($v, 1) : number_format($v));
+
+    $p = $this->pronostico;
 @endphp
 
 <div class="max-w-7xl mx-auto p-4 space-y-6">
@@ -107,6 +119,58 @@
             </div>
         </div>
 
+        {{-- Pronóstico --}}
+        <div class="bg-white rounded-2xl border p-4">
+            <div class="font-bold">Pronóstico de los próximos 7 días</div>
+            <div class="text-sm text-gray-500">
+                De toda la oficina, sin importar los filtros. Sale de las cuotas que vencen cada día y de cuándo suelen venir a pagar los clientes.
+            </div>
+
+            @if (! $p['disponible'])
+                <div class="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600">
+                    Todavía no hay suficiente historia de cobros de cuotas para calcularlo. Hacen falta recibos de cuotas que hayan vencido hace más de un mes.
+                </div>
+            @else
+                <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                    @foreach ($p['dias'] as $d)
+                        @php
+                            $fecha = \Carbon\Carbon::parse($d['fecha']);
+                            $esperados = (int) round($d['esperados']);
+                            $diferencia = $d['esperados'] - $d['normal'];
+                            $carga = match (true) {
+                                $d['normal'] > 0 && $diferencia >= 3 && $d['esperados'] >= $d['normal'] * 1.25 => 'mas',
+                                $d['normal'] > 0 && $diferencia <= -3 && $d['esperados'] <= $d['normal'] * 0.75 => 'menos',
+                                default => 'normal',
+                            };
+                        @endphp
+                        <div class="rounded-xl border p-3 {{ $carga === 'mas' ? 'border-amber-400 bg-amber-50' : '' }}">
+                            <div class="text-sm font-semibold">
+                                {{ $fecha->isToday() ? 'Hoy' : WorkloadReport::DIAS[$fecha->dayOfWeekIso] }}
+                                <span class="font-normal text-gray-500">{{ $fecha->format('d/m') }}</span>
+                            </div>
+                            <div class="text-3xl font-black mt-1">~{{ $esperados }}</div>
+                            <div class="text-xs text-gray-600">recibos esperados</div>
+                            <div class="text-xs text-gray-500 mt-2">Un {{ mb_strtolower(WorkloadReport::DIAS[$fecha->dayOfWeekIso]) }} normal: {{ number_format($d['normal'], 0) }}</div>
+                            <div class="text-xs text-gray-500">Vencen {{ number_format($d['vencen']) }} cuotas</div>
+                            @if ($d['llevan'] !== null)
+                                <div class="text-xs text-gray-700 mt-1">Llevan {{ $d['llevan'] }} hoy</div>
+                            @endif
+                            @if ($carga === 'mas')
+                                <div class="text-xs font-semibold text-amber-800 mt-2">▲ Más carga de lo normal</div>
+                            @elseif ($carga === 'menos')
+                                <div class="text-xs font-semibold text-gray-600 mt-2">▼ Menos que lo normal</div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="mt-3 text-xs text-gray-500">
+                    En las últimas 8 semanas este cálculo se desvió en promedio ±{{ number_format($p['error_promedio'], 1) }} recibos por día.
+                    De los pagos de cuota que se capturan cerca del vencimiento, el {{ number_format($p['cobro_mismo_dia'], 0) }}% se hace el mismo día que vence.
+                </div>
+            @endif
+        </div>
+
         <div class="grid lg:grid-cols-2 gap-6">
 
             {{-- Por hora --}}
@@ -183,8 +247,22 @@
 
         {{-- Mapa de calor --}}
         <div class="bg-white rounded-2xl border p-4">
-            <div class="font-bold">¿Cuándo se carga el trabajo?</div>
-            <div class="text-sm text-gray-500">Recibos por día de la semana y hora, sumando todo el periodo. Más oscuro, más recibos.</div>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <div class="font-bold">¿Cuándo se carga el trabajo?</div>
+                    <div class="text-sm text-gray-500">
+                        @if ($promedio)
+                            Recibos en promedio por cada día de la semana y hora del periodo: lo que se espera un día así. Más oscuro, más recibos.
+                        @else
+                            Recibos por día de la semana y hora, sumando todo el periodo. Más oscuro, más recibos.
+                        @endif
+                    </div>
+                </div>
+                <div class="inline-flex rounded-xl border overflow-hidden text-sm">
+                    <button type="button" wire:click="$set('promedio', false)" class="px-3 py-1.5 {{ $promedio ? 'hover:bg-gray-50' : 'bg-black text-white' }}">Total</button>
+                    <button type="button" wire:click="$set('promedio', true)" class="px-3 py-1.5 {{ $promedio ? 'bg-black text-white' : 'hover:bg-gray-50' }}">Promedio por día</button>
+                </div>
+            </div>
 
             <div class="mt-4 overflow-x-auto">
                 <table class="border-separate" style="border-spacing: 2px;">
@@ -203,17 +281,17 @@
                                 <th class="text-xs font-semibold text-gray-600 pr-2 text-left">{{ $nombre }}</th>
                                 @foreach ($e['horas'] as $h)
                                     @php
-                                        $n = $e['calor'][$num][$h] ?? 0;
-                                        $color = WorkloadReport::colorCalor($n, $e['calor_max']);
+                                        $n = $celda($num, $h);
+                                        $color = WorkloadReport::colorCalor($n, $maxCelda);
                                         $oscuro = $color && array_search($color, WorkloadReport::RAMPA, true) >= 3;
                                     @endphp
                                     <td class="h-9 w-10 text-center text-xs rounded {{ $color ? '' : 'bg-gray-50' }}"
                                         style="{{ $color ? "background: {$color};" : '' }} color: {{ $oscuro ? '#ffffff' : '#1f2937' }};"
-                                        title="{{ $nombre }} {{ $h }}:00 a {{ $h + 1 }}:00 — {{ $n }} recibos">
-                                        {{ $n ?: '' }}
+                                        title="{{ $nombre }} {{ $h }}:00 a {{ $h + 1 }}:00 — {{ $formato($n) ?: 0 }} recibos{{ $promedio ? ' en promedio' : '' }}">
+                                        {{ $formato($n) }}
                                     </td>
                                 @endforeach
-                                <td class="text-xs font-semibold text-gray-700 pl-2">{{ array_sum($e['calor'][$num] ?? []) ?: '' }}</td>
+                                <td class="text-xs font-semibold text-gray-700 pl-2">{{ $formato(array_sum($e['calor'][$num] ?? []) / ($promedio ? max(1, $e['veces_dia_semana'][$num] ?? 1) : 1)) }}</td>
                             </tr>
                         @endforeach
                     </tbody>
