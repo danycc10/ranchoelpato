@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
  *    se abre.
  *
  * Cuenta igual que el reporte de carga: por hora de captura, sin históricos.
+ * Con un canal, solo pronostica los recibos de oficina o los de WhatsApp.
  */
 class PronosticoCargaRecibos
 {
@@ -37,11 +38,11 @@ class PronosticoCargaRecibos
      */
     private const MINIMO_EXPLICADO = 5;
 
-    public function pronosticar(Carbon $hoy, int $dias = 7): array
+    public function pronosticar(Carbon $hoy, int $dias = 7, ?string $canal = null): array
     {
         $hoy = $hoy->copy()->startOfDay();
 
-        $tasas = $this->tasasPorDiaDeDiferencia($hoy);
+        $tasas = $this->tasasPorDiaDeDiferencia($hoy, $canal);
 
         if ($tasas === null) {
             return ['disponible' => false, 'dias' => []];
@@ -57,7 +58,7 @@ class PronosticoCargaRecibos
 
         $modelo = fn (Carbon $dia) => $this->esperadoPorCuotas($dia, $tasas, $vencimientos);
 
-        $reales = $this->recibosPorDia($inicioAjuste, $hoy);
+        $reales = $this->recibosPorDia($inicioAjuste, $hoy, $canal);
 
         // Ajuste por día de la semana con las últimas semanas.
         $sumas = [];
@@ -109,7 +110,7 @@ class PronosticoCargaRecibos
      *
      * @return array<int, float>|null
      */
-    private function tasasPorDiaDeDiferencia(Carbon $hoy): ?array
+    private function tasasPorDiaDeDiferencia(Carbon $hoy, ?string $canal): ?array
     {
         // Cuotas cuyo periodo de cobro ya terminó de verse completo.
         $hasta = $hoy->copy()->subDays(self::DESPUES + 1);
@@ -129,6 +130,7 @@ class PronosticoCargaRecibos
             ->whereBetween('cuotas.fecha_vencimiento', [$desde->toDateString(), $hasta->toDateString()])
             ->whereNull('recibos.deleted_at')
             ->where('recibos.es_historico', false)
+            ->tap(fn ($q) => CanalRecibo::filtrar($q, $canal))
             ->get(['recibos.created_at', 'cuotas.fecha_vencimiento'])
             ->each(function ($r) use (&$tasas) {
                 $diferencia = (int) Carbon::parse($r->fecha_vencimiento)->diffInDays(Carbon::parse($r->created_at)->startOfDay(), false);
@@ -176,12 +178,13 @@ class PronosticoCargaRecibos
             ->mapWithKeys(fn ($total, $fecha) => [substr((string) $fecha, 0, 10) => (int) $total]);
     }
 
-    private function recibosPorDia(Carbon $desde, Carbon $hasta): Collection
+    private function recibosPorDia(Carbon $desde, Carbon $hasta, ?string $canal): Collection
     {
         return DB::table('recibos')
             ->whereNull('deleted_at')
             ->where('es_historico', false)
             ->whereBetween('created_at', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
+            ->tap(fn ($q) => CanalRecibo::filtrar($q, $canal))
             ->pluck('created_at')
             ->countBy(fn ($momento) => Carbon::parse($momento)->toDateString());
     }

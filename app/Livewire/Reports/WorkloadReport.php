@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Reports;
 
+use App\Services\Reportes\CanalRecibo;
 use App\Services\Reportes\PronosticoCargaRecibos;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -16,6 +17,10 @@ use Livewire\Component;
  * fecha del pago, porque lo que se mide es el trabajo en el sistema. Los
  * históricos importados no cuentan: entraron miles de golpe en minutos.
  * Los anulados sí, porque también se capturaron; se muestran aparte.
+ *
+ * Separa la oficina (efectivo y tarjeta, el cliente vino) de WhatsApp
+ * (transferencia y depósito) y cuenta clientes atendidos además de recibos:
+ * un cliente que paga cuota y recargo genera dos recibos en una sola visita.
  */
 class WorkloadReport extends Component
 {
@@ -24,11 +29,23 @@ class WorkloadReport extends Component
     /** Rampa azul de un solo tono para el mapa de calor, de poco a mucho. */
     public const RAMPA = ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95', '#0d366b'];
 
+    /** Siempre el mismo color para cada canal, en todas las gráficas. */
+    public const COLORES = [CanalRecibo::OFICINA => '#2a78d6', CanalRecibo::WHATSAPP => '#eb6834'];
+
+    /** Recibos del mismo cliente con el mismo usuario a menos de esto son una sola atención. */
+    private const MISMA_ATENCION_MINUTOS = 10;
+
+    /** Entre un cliente y el siguiente, más de esto ya no es fila sino tiempo sin gente. */
+    private const SEGUIDOS_MINUTOS = 30;
+
     public string $desde;
 
     public string $hasta;
 
     public ?int $usuarioId = null;
+
+    /** '' todos, o CanalRecibo::OFICINA / CanalRecibo::WHATSAPP. */
+    public string $canal = '';
 
     /** El mapa de calor en promedio por día en vez del total del periodo. */
     public bool $promedio = false;
@@ -61,10 +78,10 @@ class WorkloadReport extends Component
             ->get(['id', 'name']);
     }
 
-    /** De toda la oficina y desde hoy: no depende de los filtros. */
+    /** De todos los usuarios y desde hoy: solo sigue al filtro de canal. */
     public function getPronosticoProperty(): array
     {
-        return app(PronosticoCargaRecibos::class)->pronosticar(now());
+        return app(PronosticoCargaRecibos::class)->pronosticar(now(), canal: $this->canalElegido());
     }
 
     public function getEstadisticasProperty(): array
@@ -83,11 +100,15 @@ class WorkloadReport extends Component
         $anteriores = $this->recibos($antesDesde, $antesHasta)->count();
 
         $porHora = array_fill(0, 24, 0);
+        $porHoraCanal = array_fill_keys(array_keys(self::COLORES), array_fill(0, 24, 0));
         $calor = [];
         foreach ($recibos as $r) {
             $porHora[$r->hora]++;
+            $porHoraCanal[$r->canal][$r->hora]++;
             $calor[$r->dia_semana][$r->hora] = ($calor[$r->dia_semana][$r->hora] ?? 0) + 1;
         }
+
+        $atenciones = $this->atenciones($recibos);
 
         // Cuántos lunes, martes... tiene el periodo, para el promedio por día.
         $veces = collect(CarbonPeriod::create($desde, $hasta))->countBy(fn (Carbon $d) => $d->dayOfWeekIso)->all();
@@ -97,6 +118,7 @@ class WorkloadReport extends Component
 
         return [
             'total' => $recibos->count(),
+            'clientes' => $atenciones->count(),
             'anteriores' => $anteriores,
             'anterior_rango' => $antesDesde->format('d/m').' al '.$antesHasta->format('d/m'),
             'anulados' => $recibos->where('anulado', true)->count(),
@@ -107,12 +129,14 @@ class WorkloadReport extends Component
             'hora_pico_total' => $horaPico === null ? 0 : $porHora[$horaPico],
             'horas' => $this->horasVisibles($porHora),
             'por_hora' => $porHora,
+            'por_hora_canal' => $porHoraCanal,
+            'por_canal' => $this->porCanal($recibos, $atenciones),
             'calor' => $calor,
             'calor_max' => max([1, ...array_map(fn ($fila) => max($fila), $calor ?: [[0]])]),
             'veces_dia_semana' => $veces,
             'por_dia' => $this->porDia($recibos, $desde, $hasta),
             'por_semana' => $this->porSemana($hasta),
-            'por_usuario' => $this->porUsuario($recibos),
+            'por_usuario' => $this->porUsuario($recibos, $atenciones),
         ];
     }
 
@@ -126,6 +150,11 @@ class WorkloadReport extends Component
         $paso = (int) ceil($valor / max(0.000001, $maximo) * count(self::RAMPA)) - 1;
 
         return self::RAMPA[max(0, min(count(self::RAMPA) - 1, $paso))];
+    }
+
+    private function canalElegido(): ?string
+    {
+        return array_key_exists($this->canal, self::COLORES) ? $this->canal : null;
     }
 
     /** @return array{0: Carbon, 1: Carbon} */
@@ -158,11 +187,18 @@ class WorkloadReport extends Component
             ->where('es_historico', false)
             ->whereBetween('created_at', [$desde->copy()->startOfDay(), $hasta->copy()->endOfDay()])
             ->when($this->usuarioId, fn ($q) => $q->where('capturado_por_user_id', $this->usuarioId))
-            ->get(['created_at', 'capturado_por_user_id', 'anulado_at', 'monto'])
+            ->tap(fn ($q) => CanalRecibo::filtrar($q, $this->canalElegido()))
+            ->select(['id', 'cliente_id', 'created_at', 'capturado_por_user_id', 'anulado_at', 'monto'])
+            ->selectRaw(CanalRecibo::sqlEsOficina().' as en_oficina')
+            ->get()
             ->map(function ($r) {
                 $momento = Carbon::parse($r->created_at);
 
                 return (object) [
+                    'id' => $r->id,
+                    'cliente_id' => $r->cliente_id,
+                    'canal' => (int) $r->en_oficina === 1 ? CanalRecibo::OFICINA : CanalRecibo::WHATSAPP,
+                    'momento' => $momento->getTimestamp(),
                     'fecha' => $momento->toDateString(),
                     'hora' => $momento->hour,
                     'dia_semana' => $momento->dayOfWeekIso,
@@ -171,6 +207,81 @@ class WorkloadReport extends Component
                     'monto' => (float) $r->monto,
                 ];
             });
+    }
+
+    /**
+     * Recibos seguidos del mismo cliente, con el mismo usuario y por el mismo
+     * canal, son una sola atención (cuota y recargo, o dos lotes).
+     */
+    private function atenciones(Collection $recibos): Collection
+    {
+        return $recibos
+            ->sortBy('momento')
+            ->groupBy(fn ($r) => $r->usuario_id.'|'.($r->cliente_id ?? 'r'.$r->id).'|'.$r->canal)
+            ->flatMap(function (Collection $delCliente) {
+                $atenciones = [];
+
+                foreach ($delCliente as $r) {
+                    $ultima = array_key_last($atenciones);
+
+                    if ($ultima !== null && $r->momento - $atenciones[$ultima]['fin'] <= self::MISMA_ATENCION_MINUTOS * 60) {
+                        $atenciones[$ultima]['fin'] = $r->momento;
+                        $atenciones[$ultima]['recibos']++;
+
+                        continue;
+                    }
+
+                    $atenciones[] = [
+                        'inicio' => $r->momento,
+                        'fin' => $r->momento,
+                        'recibos' => 1,
+                        'fecha' => $r->fecha,
+                        'usuario_id' => $r->usuario_id,
+                        'canal' => $r->canal,
+                    ];
+                }
+
+                return $atenciones;
+            })
+            ->values();
+    }
+
+    /**
+     * Minutos típicos (mediana) entre que un usuario empieza con un cliente y
+     * empieza con el siguiente, solo cuando venían seguidos. El sistema no
+     * sabe cuándo llegó el cliente: con gente en fila, esto es lo que tarda
+     * cada atención.
+     */
+    private function minutosEntreClientes(Collection $atenciones): ?float
+    {
+        $huecos = $atenciones
+            ->groupBy(fn ($a) => $a['usuario_id'].'|'.$a['fecha'].'|'.$a['canal'])
+            ->flatMap(fn (Collection $delDia) => $delDia->pluck('inicio')->sort()->values()
+                ->sliding(2)
+                ->map(fn (Collection $par) => ($par->last() - $par->first()) / 60))
+            ->filter(fn ($minutos) => $minutos <= self::SEGUIDOS_MINUTOS);
+
+        return $huecos->isEmpty() ? null : (float) $huecos->median();
+    }
+
+    private function porCanal(Collection $recibos, Collection $atenciones): array
+    {
+        return collect(array_keys(self::COLORES))
+            ->mapWithKeys(function (string $canal) use ($recibos, $atenciones) {
+                $suyos = $recibos->where('canal', $canal);
+                $suyas = $atenciones->where('canal', $canal);
+
+                return [$canal => [
+                    'recibos' => $suyos->count(),
+                    'porcentaje' => $suyos->count() / max(1, $recibos->count()) * 100,
+                    'clientes' => $suyas->count(),
+                    'recibos_por_cliente' => $suyos->count() / max(1, $suyas->count()),
+                    'minutos_entre' => $this->minutosEntreClientes($suyas),
+                    'hora_pico' => $suyos->countBy('hora')->sortDesc()->keys()->first(),
+                    'monto' => $suyos->where('anulado', false)->sum('monto'),
+                ]];
+            })
+            ->all();
     }
 
     /** El horario de oficina, ampliado si hubo recibos antes o después. */
@@ -184,6 +295,7 @@ class WorkloadReport extends Component
     private function porDia(Collection $recibos, Carbon $desde, Carbon $hasta): array
     {
         $conteo = $recibos->countBy('fecha');
+        $oficina = $recibos->where('canal', CanalRecibo::OFICINA)->countBy('fecha');
 
         return collect(CarbonPeriod::create($desde, $hasta))
             ->map(fn (Carbon $dia) => [
@@ -191,6 +303,8 @@ class WorkloadReport extends Component
                 'etiqueta' => $dia->format('d/m'),
                 'dia_semana' => self::DIAS[$dia->dayOfWeekIso],
                 'total' => $conteo->get($dia->toDateString(), 0),
+                CanalRecibo::OFICINA => $oficina->get($dia->toDateString(), 0),
+                CanalRecibo::WHATSAPP => $conteo->get($dia->toDateString(), 0) - $oficina->get($dia->toDateString(), 0),
             ])
             ->all();
     }
@@ -201,23 +315,28 @@ class WorkloadReport extends Component
         $fin = $hasta->copy()->endOfWeek(Carbon::SUNDAY);
         $inicio = $fin->copy()->subWeeks(12)->addDay()->startOfDay();
 
-        $conteo = $this->recibos($inicio, $fin)
-            ->countBy(fn ($r) => Carbon::parse($r->fecha)->startOfWeek(Carbon::MONDAY)->toDateString());
+        $recibos = $this->recibos($inicio, $fin);
+        $semana = fn ($r) => Carbon::parse($r->fecha)->startOfWeek(Carbon::MONDAY)->toDateString();
+        $conteo = $recibos->countBy($semana);
+        $oficina = $recibos->where('canal', CanalRecibo::OFICINA)->countBy($semana);
 
         return collect(range(0, 11))
-            ->map(function (int $i) use ($inicio, $conteo) {
+            ->map(function (int $i) use ($inicio, $conteo, $oficina) {
                 $lunes = $inicio->copy()->addWeeks($i);
+                $clave = $lunes->toDateString();
 
                 return [
                     'etiqueta' => $lunes->format('d/m'),
                     'rango' => $lunes->format('d/m').' al '.$lunes->copy()->addDays(6)->format('d/m/Y'),
-                    'total' => $conteo->get($lunes->toDateString(), 0),
+                    'total' => $conteo->get($clave, 0),
+                    CanalRecibo::OFICINA => $oficina->get($clave, 0),
+                    CanalRecibo::WHATSAPP => $conteo->get($clave, 0) - $oficina->get($clave, 0),
                 ];
             })
             ->all();
     }
 
-    private function porUsuario(Collection $recibos): array
+    private function porUsuario(Collection $recibos, Collection $atenciones): array
     {
         $nombres = DB::table('users')
             ->whereIn('id', $recibos->pluck('usuario_id')->filter()->unique())
@@ -225,7 +344,8 @@ class WorkloadReport extends Component
 
         return $recibos
             ->groupBy(fn ($r) => $r->usuario_id ?? 0)
-            ->map(function (Collection $suyos, $id) use ($nombres, $recibos) {
+            ->map(function (Collection $suyos, $id) use ($nombres, $recibos, $atenciones) {
+                $suyas = $atenciones->filter(fn ($a) => (int) ($a['usuario_id'] ?? 0) === (int) $id);
                 $porHora = $suyos->countBy('hora');
                 $dias = $suyos->pluck('fecha')->unique()->count();
                 // Horas en las que hizo al menos un recibo: su ritmo cuando está cobrando.
@@ -234,6 +354,11 @@ class WorkloadReport extends Component
                 return [
                     'nombre' => $nombres[$id] ?? 'Sin usuario',
                     'total' => $suyos->count(),
+                    CanalRecibo::OFICINA => $suyos->where('canal', CanalRecibo::OFICINA)->count(),
+                    CanalRecibo::WHATSAPP => $suyos->where('canal', CanalRecibo::WHATSAPP)->count(),
+                    'clientes' => $suyas->count(),
+                    // En la oficina es donde se forma la fila.
+                    'minutos_entre' => $this->minutosEntreClientes($suyas->where('canal', CanalRecibo::OFICINA)),
                     'porcentaje' => $suyos->count() / max(1, $recibos->count()) * 100,
                     'anulados' => $suyos->where('anulado', true)->count(),
                     'monto' => $suyos->where('anulado', false)->sum('monto'),

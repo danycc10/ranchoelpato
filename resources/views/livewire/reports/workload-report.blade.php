@@ -1,5 +1,6 @@
 @php
     use App\Livewire\Reports\WorkloadReport;
+    use App\Services\Reportes\CanalRecibo;
 
     $e = $this->estadisticas;
     $cambio = $e['anteriores'] > 0 ? ($e['total'] - $e['anteriores']) / $e['anteriores'] * 100 : null;
@@ -8,7 +9,6 @@
     $maxSemana = max(1, ...array_column($e['por_semana'], 'total'));
     $cadaCuantos = max(1, (int) ceil(count($e['por_dia']) / 16));
     $hora = fn (?int $h) => $h === null ? '—' : sprintf('%d:00', $h);
-    $azul = '#2a78d6';
 
     // El mapa de calor en total o en promedio por cada lunes, martes... del periodo.
     $celda = fn (int $dia, int $h) => ($e['calor'][$dia][$h] ?? 0) / ($promedio ? max(1, $e['veces_dia_semana'][$dia] ?? 1) : 1);
@@ -21,6 +21,9 @@
     $formato = fn (float $v) => $v <= 0 ? '' : ($promedio ? number_format($v, 1) : number_format($v));
 
     $p = $this->pronostico;
+
+    $minutos = fn (?float $m) => $m === null ? '—' : '~'.number_format($m, $m < 10 ? 1 : 0).' min';
+    $canales = $canal === '' ? array_keys(CanalRecibo::NOMBRES) : [$canal];
 @endphp
 
 <div class="max-w-7xl mx-auto p-4 space-y-6">
@@ -49,7 +52,7 @@
             @endforeach
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-3 flex-1">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1">
             <div>
                 <label class="text-sm text-gray-600">Desde</label>
                 <input type="date" wire:model.live="desde" class="block w-full rounded-xl border px-3 py-2">
@@ -58,7 +61,16 @@
                 <label class="text-sm text-gray-600">Hasta</label>
                 <input type="date" wire:model.live="hasta" class="block w-full rounded-xl border px-3 py-2">
             </div>
-            <div class="col-span-2 md:col-span-1">
+            <div>
+                <label class="text-sm text-gray-600">Canal</label>
+                <select wire:model.live="canal" class="block w-full rounded-xl border px-3 py-2">
+                    <option value="">Oficina y WhatsApp</option>
+                    @foreach (CanalRecibo::NOMBRES as $clave => $nombre)
+                        <option value="{{ $clave }}">{{ $nombre }} ({{ mb_strtolower(CanalRecibo::DESCRIPCIONES[$clave]) }})</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
                 <label class="text-sm text-gray-600">Usuario</label>
                 <select wire:model.live="usuarioId" class="block w-full rounded-xl border px-3 py-2">
                     <option value="">Todos</option>
@@ -119,11 +131,57 @@
             </div>
         </div>
 
+        {{-- Por canal --}}
+        <div class="grid {{ count($canales) > 1 ? 'md:grid-cols-2' : '' }} gap-4">
+            @foreach ($canales as $clave)
+                @php $c = $e['por_canal'][$clave]; @endphp
+                <div class="bg-white rounded-2xl border p-4">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-block h-3 w-3 rounded-sm" style="background: {{ WorkloadReport::COLORES[$clave] }};"></span>
+                        <span class="font-bold">{{ CanalRecibo::NOMBRES[$clave] }}</span>
+                        <span class="text-sm text-gray-500">· {{ CanalRecibo::DESCRIPCIONES[$clave] }}</span>
+                    </div>
+
+                    <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div>
+                            <div class="text-xs text-gray-600">Recibos</div>
+                            <div class="text-2xl font-black">{{ number_format($c['recibos']) }}</div>
+                            @if (count($canales) > 1)
+                                <div class="text-xs text-gray-500">{{ number_format($c['porcentaje'], 0) }}% del total</div>
+                            @endif
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-600">Clientes atendidos</div>
+                            <div class="text-2xl font-black">{{ number_format($c['clientes']) }}</div>
+                            <div class="text-xs text-gray-500">{{ number_format($c['recibos_por_cliente'], 1) }} recibos por cliente</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-600">Un cliente cada</div>
+                            <div class="text-2xl font-black">{{ $minutos($c['minutos_entre']) }}</div>
+                            <div class="text-xs text-gray-500">cuando hay clientes seguidos</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-600">Hora más cargada</div>
+                            <div class="text-2xl font-black">{{ $hora($c['hora_pico']) }}</div>
+                            <div class="text-xs text-gray-500">${{ number_format($c['monto'], 0) }} cobrados</div>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+        <div class="-mt-3 text-xs text-gray-500">
+            Varios recibos del mismo cliente con el mismo usuario en menos de 10 minutos cuentan como un solo cliente atendido (por ejemplo, cuota y recargo).
+            «Un cliente cada» es el tiempo típico entre que se empieza con un cliente y se empieza con el siguiente, solo cuando venían uno tras otro (menos de 30 minutos entre ellos).
+        </div>
+
         {{-- Pronóstico --}}
         <div class="bg-white rounded-2xl border p-4">
-            <div class="font-bold">Pronóstico de los próximos 7 días</div>
+            <div class="font-bold">
+                Pronóstico de los próximos 7 días{{ $canal !== '' ? ' · '.CanalRecibo::NOMBRES[$canal] : '' }}
+            </div>
             <div class="text-sm text-gray-500">
-                De toda la oficina, sin importar los filtros. Sale de las cuotas que vencen cada día y de cuándo suelen venir a pagar los clientes.
+                De todos los usuarios, sin importar las fechas ni el usuario elegidos; sí sigue al canal.
+                Sale de las cuotas que vencen cada día y de cuándo suelen venir a pagar los clientes.
             </div>
 
             @if (! $p['disponible'])
@@ -175,18 +233,24 @@
 
             {{-- Por hora --}}
             <div class="bg-white rounded-2xl border p-4">
-                <div class="font-bold">Recibos por hora del día</div>
-                <div class="text-sm text-gray-500">Total del periodo en cada hora.</div>
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                        <div class="font-bold">Recibos por hora del día</div>
+                        <div class="text-sm text-gray-500">Total del periodo en cada hora.</div>
+                    </div>
+                    @include('livewire.reports.partials.leyenda-canales')
+                </div>
 
                 <div class="mt-4 flex items-end gap-1 h-48 border-b border-gray-200">
                     @foreach ($e['horas'] as $h)
-                        @php $n = $e['por_hora'][$h]; @endphp
-                        <div class="flex-1 h-full flex flex-col justify-end items-center" title="{{ $h }}:00 a {{ $h + 1 }}:00 — {{ number_format($n) }} recibos">
-                            @if ($n > 0)
-                                <span class="text-xs text-gray-700 mb-1">{{ $n }}</span>
-                            @endif
-                            <div class="w-full max-w-[28px] rounded-t" style="height: {{ $n / $maxHora * 85 }}%; background: {{ $azul }};"></div>
-                        </div>
+                        @include('livewire.reports.partials.barra-canales', [
+                            'barra' => array_map(fn ($porHora) => $porHora[$h], $e['por_hora_canal']),
+                            'titulo' => $h.':00 a '.($h + 1).':00',
+                            'maximo' => $maxHora,
+                            'escala' => 85,
+                            'ancho' => 'max-w-[28px]',
+                            'etiqueta' => true,
+                        ])
                     @endforeach
                 </div>
                 <div class="flex gap-1 mt-1">
@@ -198,17 +262,24 @@
 
             {{-- Por semana --}}
             <div class="bg-white rounded-2xl border p-4">
-                <div class="font-bold">Recibos por semana</div>
-                <div class="text-sm text-gray-500">Las 12 semanas que terminan en la del día «Hasta». Cada barra empieza en lunes.</div>
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                        <div class="font-bold">Recibos por semana</div>
+                        <div class="text-sm text-gray-500">Las 12 semanas que terminan en la del día «Hasta». Cada barra empieza en lunes.</div>
+                    </div>
+                    @include('livewire.reports.partials.leyenda-canales')
+                </div>
 
                 <div class="mt-4 flex items-end gap-1 h-48 border-b border-gray-200">
                     @foreach ($e['por_semana'] as $s)
-                        <div class="flex-1 h-full flex flex-col justify-end items-center" title="Semana del {{ $s['rango'] }} — {{ number_format($s['total']) }} recibos">
-                            @if ($s['total'] > 0)
-                                <span class="text-xs text-gray-700 mb-1">{{ $s['total'] }}</span>
-                            @endif
-                            <div class="w-full max-w-[36px] rounded-t" style="height: {{ $s['total'] / $maxSemana * 85 }}%; background: {{ $azul }};"></div>
-                        </div>
+                        @include('livewire.reports.partials.barra-canales', [
+                            'barra' => $s,
+                            'titulo' => 'Semana del '.$s['rango'],
+                            'maximo' => $maxSemana,
+                            'escala' => 85,
+                            'ancho' => 'max-w-[36px]',
+                            'etiqueta' => true,
+                        ])
                     @endforeach
                 </div>
                 <div class="flex gap-1 mt-1">
@@ -226,14 +297,22 @@
                     <div class="font-bold">Recibos por día</div>
                     <div class="text-sm text-gray-500">Pasa el mouse sobre una barra para ver el día.</div>
                 </div>
-                <div class="text-sm text-gray-600">Día con más: <span class="font-semibold">{{ number_format(max(array_column($e['por_dia'], 'total'))) }}</span></div>
+                <div class="flex flex-col items-end gap-1">
+                    @include('livewire.reports.partials.leyenda-canales')
+                    <div class="text-sm text-gray-600">Día con más: <span class="font-semibold">{{ number_format(max(array_column($e['por_dia'], 'total'))) }}</span></div>
+                </div>
             </div>
 
             <div class="mt-4 flex items-end gap-px h-40 border-b border-gray-200">
                 @foreach ($e['por_dia'] as $d)
-                    <div class="flex-1 h-full flex flex-col justify-end items-center" title="{{ $d['dia_semana'] }} {{ $d['etiqueta'] }} — {{ number_format($d['total']) }} recibos">
-                        <div class="w-full max-w-[36px] rounded-t" style="height: {{ $d['total'] / $maxDia * 100 }}%; background: {{ $azul }};"></div>
-                    </div>
+                    @include('livewire.reports.partials.barra-canales', [
+                        'barra' => $d,
+                        'titulo' => $d['dia_semana'].' '.$d['etiqueta'],
+                        'maximo' => $maxDia,
+                        'escala' => 100,
+                        'ancho' => 'max-w-[36px]',
+                        'etiqueta' => false,
+                    ])
                 @endforeach
             </div>
             <div class="flex gap-px mt-1">
@@ -302,7 +381,10 @@
         {{-- Por usuario --}}
         <div class="bg-white rounded-2xl border p-4">
             <div class="font-bold">Desempeño por usuario</div>
-            <div class="text-sm text-gray-500">«Por hora trabajada» divide sus recibos entre las horas en que hizo al menos uno: su ritmo cuando está cobrando.</div>
+            <div class="text-sm text-gray-500">
+                «Por hora trabajada» divide sus recibos entre las horas en que hizo al menos uno: su ritmo cuando está cobrando.
+                «Un cliente cada» es solo de la oficina, donde se forma la fila.
+            </div>
 
             <div class="mt-4 overflow-x-auto">
                 <table class="w-full text-sm">
@@ -311,6 +393,10 @@
                             <th class="py-2 pr-4">Usuario</th>
                             <th class="py-2 pr-4 text-right">Recibos</th>
                             <th class="py-2 pr-4">Parte del total</th>
+                            <th class="py-2 pr-4 text-right">Oficina</th>
+                            <th class="py-2 pr-4 text-right">WhatsApp</th>
+                            <th class="py-2 pr-4 text-right">Clientes</th>
+                            <th class="py-2 pr-4 text-right">Un cliente cada</th>
                             <th class="py-2 pr-4 text-right">Días</th>
                             <th class="py-2 pr-4 text-right">Por día</th>
                             <th class="py-2 pr-4 text-right">Por hora trabajada</th>
@@ -326,12 +412,21 @@
                                 <td class="py-2 pr-4 text-right">{{ number_format($u['total']) }}</td>
                                 <td class="py-2 pr-4">
                                     <div class="flex items-center gap-2">
-                                        <div class="h-2 w-24 bg-gray-100 rounded">
-                                            <div class="h-2 rounded" style="width: {{ $u['porcentaje'] }}%; background: {{ $azul }};"></div>
+                                        <div class="h-2 w-24 bg-gray-100 rounded flex gap-[2px] overflow-hidden"
+                                             title="{{ number_format($u[CanalRecibo::OFICINA]) }} en oficina, {{ number_format($u[CanalRecibo::WHATSAPP]) }} por WhatsApp">
+                                            @foreach (array_keys(CanalRecibo::NOMBRES) as $clave)
+                                                @if ($u[$clave] > 0)
+                                                    <div class="h-2" style="width: {{ $u[$clave] / max(1, $e['total']) * 100 }}%; background: {{ WorkloadReport::COLORES[$clave] }};"></div>
+                                                @endif
+                                            @endforeach
                                         </div>
                                         <span class="text-xs text-gray-600">{{ number_format($u['porcentaje'], 0) }}%</span>
                                     </div>
                                 </td>
+                                <td class="py-2 pr-4 text-right">{{ number_format($u[CanalRecibo::OFICINA]) }}</td>
+                                <td class="py-2 pr-4 text-right">{{ number_format($u[CanalRecibo::WHATSAPP]) }}</td>
+                                <td class="py-2 pr-4 text-right">{{ number_format($u['clientes']) }}</td>
+                                <td class="py-2 pr-4 text-right">{{ $minutos($u['minutos_entre']) }}</td>
                                 <td class="py-2 pr-4 text-right">{{ $u['dias'] }}</td>
                                 <td class="py-2 pr-4 text-right">{{ number_format($u['promedio_dia'], 1) }}</td>
                                 <td class="py-2 pr-4 text-right">{{ number_format($u['por_hora_activa'], 1) }}</td>
@@ -341,7 +436,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="py-6 text-center text-gray-500">No se generaron recibos en este periodo.</td>
+                                <td colspan="13" class="py-6 text-center text-gray-500">No se generaron recibos en este periodo.</td>
                             </tr>
                         @endforelse
                     </tbody>

@@ -123,6 +123,73 @@ class CargaTrabajoReportTest extends TestCase
     }
 
     #[Test]
+    public function separa_oficina_de_whatsapp_y_cuenta_clientes_atendidos(): void
+    {
+        $ana = User::factory()->create(['name' => 'Ana']);
+        $beto = User::factory()->create(['name' => 'Beto']);
+        $transferencia = DB::table('formas_pago')->insertGetId(['nombre' => 'TRANSFERENCIA', 'requiere_cuenta' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $carlos = $this->ids['cliente_id'];
+        $diana = $this->cliente('Diana');
+        $elena = $this->cliente('Elena');
+
+        // Ana en la oficina: Carlos paga cuota y recargo (una sola atención),
+        // luego Diana, luego Carlos otra vez y, una hora después, Diana.
+        $this->recibo($ana, '2026-10-27 10:00:00', 100, cliente: $carlos);
+        $this->recibo($ana, '2026-10-27 10:03:00', 20, cliente: $carlos);
+        $this->recibo($ana, '2026-10-27 10:12:00', 100, cliente: $diana);
+        $this->recibo($ana, '2026-10-27 10:30:00', 100, cliente: $carlos);
+        $this->recibo($ana, '2026-10-27 11:30:00', 100, cliente: $diana);
+
+        // Beto por WhatsApp a Diana, y a Elena con un pago mixto: transferencia
+        // y efectivo. Si dejó efectivo, vino a la oficina.
+        $this->recibo($beto, '2026-10-27 15:00:00', 300, cliente: $diana, forma: $transferencia);
+        $mixto = $this->recibo($beto, '2026-10-27 15:05:00', 300, cliente: $elena, forma: $transferencia);
+        DB::table('recibos_pagos')->insert([
+            ['recibo_id' => $mixto, 'forma_pago_id' => $transferencia, 'monto' => 200, 'created_at' => now(), 'updated_at' => now()],
+            ['recibo_id' => $mixto, 'forma_pago_id' => $this->ids['forma_pago_id'], 'monto' => 100, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $componente = Livewire::actingAs($ana)->test(WorkloadReport::class)->call('rango', 'semana');
+        $e = $componente->get('estadisticas');
+
+        $this->assertSame(7, $e['total']);
+        $this->assertSame(6, $e['clientes']);
+
+        $oficina = $e['por_canal']['oficina'];
+        $this->assertSame(6, $oficina['recibos']);
+        $this->assertSame(5, $oficina['clientes']);
+        $this->assertEqualsWithDelta(1.2, $oficina['recibos_por_cliente'], 0.001);
+        // De Carlos a Diana 12 minutos, de Diana a Carlos 18; la hora sin gente no cuenta.
+        $this->assertEqualsWithDelta(15.0, $oficina['minutos_entre'], 0.001);
+        $this->assertSame(10, $oficina['hora_pico']);
+
+        $whatsapp = $e['por_canal']['whatsapp'];
+        $this->assertSame(1, $whatsapp['recibos']);
+        $this->assertSame(1, $whatsapp['clientes']);
+        $this->assertNull($whatsapp['minutos_entre']);
+
+        $this->assertSame(4, $e['por_hora_canal']['oficina'][10]);
+        $this->assertSame(1, $e['por_hora_canal']['oficina'][15]);
+        $this->assertSame(1, $e['por_hora_canal']['whatsapp'][15]);
+
+        $dia = collect($e['por_dia'])->firstWhere('fecha', '2026-10-27');
+        $this->assertSame([6, 1], [$dia['oficina'], $dia['whatsapp']]);
+        $this->assertSame([6, 1], [end($e['por_semana'])['oficina'], end($e['por_semana'])['whatsapp']]);
+
+        $usuarios = collect($e['por_usuario'])->keyBy('nombre');
+        $this->assertSame([5, 0, 4], [$usuarios['Ana']['oficina'], $usuarios['Ana']['whatsapp'], $usuarios['Ana']['clientes']]);
+        $this->assertEqualsWithDelta(15.0, $usuarios['Ana']['minutos_entre'], 0.001);
+        $this->assertSame([1, 1, 2], [$usuarios['Beto']['oficina'], $usuarios['Beto']['whatsapp'], $usuarios['Beto']['clientes']]);
+
+        $componente->assertSee('Clientes atendidos')->assertSee('~15 min');
+
+        $soloWhatsapp = $componente->set('canal', 'whatsapp')->get('estadisticas');
+        $this->assertSame(1, $soloWhatsapp['total']);
+        $this->assertSame(['Beto'], array_column($soloWhatsapp['por_usuario'], 'nombre'));
+        $componente->assertSee('Pronóstico de los próximos 7 días · WhatsApp');
+    }
+
+    #[Test]
     public function el_mapa_de_calor_oscurece_con_la_cantidad(): void
     {
         $this->assertNull(WorkloadReport::colorCalor(0, 10));
@@ -130,9 +197,9 @@ class CargaTrabajoReportTest extends TestCase
         $this->assertSame(WorkloadReport::RAMPA[6], WorkloadReport::colorCalor(10, 10));
     }
 
-    private function recibo(User $usuario, string $momento, float $monto, bool $anulado = false, bool $historico = false): void
+    private function recibo(User $usuario, string $momento, float $monto, bool $anulado = false, bool $historico = false, ?int $cliente = null, ?int $forma = null): int
     {
-        DB::table('recibos')->insert($this->ids + [
+        return DB::table('recibos')->insertGetId(array_merge($this->ids, array_filter(['cliente_id' => $cliente, 'forma_pago_id' => $forma])) + [
             'folio' => 'R-'.(++$this->folio),
             'fecha' => substr($momento, 0, 10),
             'anio' => 2026,
@@ -143,6 +210,11 @@ class CargaTrabajoReportTest extends TestCase
             'created_at' => $momento,
             'updated_at' => $momento,
         ]);
+    }
+
+    private function cliente(string $nombre): int
+    {
+        return DB::table('clientes')->insertGetId(['nombres' => $nombre, 'apellidos' => 'Prueba', 'created_at' => now(), 'updated_at' => now()]);
     }
 
     private function catalogos(): array

@@ -81,6 +81,11 @@ class PronosticoCargaRecibosTest extends TestCase
         $this->assertSame(0, $dias['2026-10-28']['llevan']);
         $this->assertNull($dias['2026-10-29']['llevan']);
 
+        // Todo se cobró en efectivo: la oficina pronostica lo mismo y WhatsApp no tiene historia.
+        $oficina = app(PronosticoCargaRecibos::class)->pronosticar(now(), canal: 'oficina');
+        $this->assertEqualsWithDelta(5.0, collect($oficina['dias'])->firstWhere('fecha', '2026-10-31')['esperados'], 0.001);
+        $this->assertFalse(app(PronosticoCargaRecibos::class)->pronosticar(now(), canal: 'whatsapp')['disponible']);
+
         $usuario = User::factory()->create();
         Livewire::actingAs($usuario)
             ->test(WorkloadReport::class)
