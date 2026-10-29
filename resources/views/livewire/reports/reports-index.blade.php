@@ -39,6 +39,16 @@
             </div>
         </a>
 
+        @can('reportes.carga_trabajo')
+            <a href="{{ route('reportes.carga.trabajo') }}"
+               class="block rounded-2xl border p-5 bg-white hover:bg-gray-50 transition">
+                <div class="text-lg font-bold">Carga de trabajo</div>
+                <div class="text-gray-600 mt-1">
+                    Recibos generados por hora, día y semana, a qué horas se carga el trabajo y desempeño de cada usuario.
+                </div>
+            </a>
+        @endcan
+
         <a href="{{ route('reportes.pagadores.adelantados') }}"
            class="block rounded-2xl border p-5 bg-white hover:bg-gray-50 transition">
             <div class="text-lg font-bold">Participantes de rifa</div>

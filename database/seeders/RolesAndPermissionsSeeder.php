@@ -32,6 +32,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'reportes.cliente_pagos',
         'reportes.ingresos_mensuales',
         'reportes.movimientos_bancarios',
+        'reportes.carga_trabajo',
 
         // Catálogos
         'catalogos.ver',

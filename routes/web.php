@@ -60,6 +60,7 @@ use App\Livewire\Reports\DailyReceiptsReport;
 use App\Livewire\Reports\EarlyPayersReport;
 use App\Livewire\Reports\MonthlyIncomeReport;
 use App\Livewire\Reports\ReportsIndex;
+use App\Livewire\Reports\WorkloadReport;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -112,6 +113,10 @@ Route::middleware(['auth', 'verified', 'permission:reportes.ver'])->group(functi
 
         Route::get('/pagadores-adelantados', EarlyPayersReport::class)
             ->name('pagadores.adelantados');
+
+        Route::get('/carga-trabajo', WorkloadReport::class)
+            ->name('carga.trabajo')
+            ->middleware('permission:reportes.carga_trabajo');
     });
 });
 
