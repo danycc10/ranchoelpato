@@ -11,6 +11,7 @@ use App\Models\FormaPago;
 use App\Models\Lote;
 use App\Models\Pago;
 use App\Models\Periodo;
+use App\Models\Propietario;
 use App\Models\Recibo;
 use App\Models\ReciboPago;
 use App\Models\TipoCobro;
@@ -182,6 +183,12 @@ class Crear extends Component
     public ?string $recargo_referencia = null;
 
     public bool $recargoRequiereCuentaBancaria = false;
+
+    /**
+     * Las cuentas se ofrecen solo del propietario contable del terreno; esto
+     * muestra las activas de todos, por si el cliente depositó a otra tarjeta.
+     */
+    public bool $verTodasLasCuentas = false;
 
     public bool $showRecargoPagoBox = false;
 
@@ -1474,6 +1481,54 @@ class Crear extends Component
         return $this->formaPagoRequiereCuenta($formaPagoId ? (int) $formaPagoId : null);
     }
 
+    /** A quién le entra el dinero de un pago del recibo principal. */
+    public function propietarioDeCuentasDelPago(int $index): ?int
+    {
+        $formaPagoId = data_get($this->pagos, $index.'.forma_pago_id');
+
+        return $this->propietarioDeCuentas($this->tipos_cobro_id, $formaPagoId ? (int) $formaPagoId : null);
+    }
+
+    /** A quién le entra el dinero del recibo del recargo. */
+    public function propietarioDeCuentasDelRecargo(): ?int
+    {
+        return $this->propietarioDeCuentas(
+            $this->tipoCobroParaReciboRecargo(),
+            $this->recargo_forma_pago_id ?: $this->getFormaPagoPrincipal($this->pagos)
+        );
+    }
+
+    /**
+     * Las cuentas activas que se ofrecen: las del propietario, salvo que pidan
+     * ver todas o que no tenga ninguna. La ya elegida siempre se queda en la
+     * lista, aunque sea de otro, para que no se pierda sin avisar.
+     */
+    public function cuentasParaElegir(Collection $cuentas, ?int $propietarioId, $seleccionada): Collection
+    {
+        if ($this->verTodasLasCuentas || ! $propietarioId) {
+            return $cuentas;
+        }
+
+        if (! $cuentas->contains(fn ($c) => (int) $c->propietario_id === $propietarioId)) {
+            return $cuentas;
+        }
+
+        return $cuentas->filter(fn ($c) => (int) $c->propietario_id === $propietarioId || (int) $c->id === (int) $seleccionada);
+    }
+
+    /** El mismo propietario contable que se guardará en el recibo. */
+    protected function propietarioDeCuentas(?int $tipoCobroId, ?int $formaPagoId): ?int
+    {
+        if ($tipoCobroId) {
+            return $this->resolverPropietarioContableId($tipoCobroId, $formaPagoId);
+        }
+
+        // Sin tipo de cobro todavía, el dueño del fraccionamiento del terreno.
+        return $this->lote_id
+            ? Lote::query()->whereKey($this->lote_id)->first()?->fraccionamiento?->propietario_id
+            : null;
+    }
+
     protected function sincronizarCamposPrincipalesDesdePagos(): void
     {
         $primerPago = $this->pagos[0] ?? [];
@@ -2336,6 +2391,7 @@ class Crear extends Component
             'showAvisoOrdenCuotasModal',
             'cuotaFueraDeOrdenAutorizada',
             'pagos',
+            'verTodasLasCuentas',
         ]);
 
         $this->tipoEsServicio = false;
@@ -2831,6 +2887,7 @@ class Crear extends Component
             'tiposCobro' => TipoCobro::orderBy('nombre')->get(),
             'formasPago' => FormaPago::orderBy('nombre')->get(),
             'cuentas' => CuentaBancaria::where('activa', true)->orderBy('alias')->get(),
+            'propietarios' => Propietario::pluck('nombre', 'id'),
             'periodos' => Periodo::query()
                 ->where('tipo', 'mensual')
                 ->orderByDesc('anio')

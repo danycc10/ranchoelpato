@@ -134,15 +134,12 @@
                         @if($this->pagoRequiereCuenta($index))
                         <div>
                             <label class="text-xs text-gray-500">Cuenta bancaria</label>
-                            <select class="w-full rounded-xl border p-2"
-                                wire:model.live="pagos.{{ $index }}.cuentas_bancarias_id">
-                                <option value="">Selecciona…</option>
-                                @foreach($cuentas as $c)
-                                <option value="{{ $c->id }}">
-                                    {{ $c->alias }}{{ $c->banco ? ' - '.$c->banco : '' }}
-                                </option>
-                                @endforeach
-                            </select>
+                            @include('livewire.admin.recibos.partials.selector-cuenta', [
+                                'modelo' => 'pagos.'.$index.'.cuentas_bancarias_id',
+                                'clase' => 'w-full rounded-xl border p-2',
+                                'propietarioId' => $this->propietarioDeCuentasDelPago($index),
+                                'seleccionada' => $pago['cuentas_bancarias_id'] ?? null,
+                            ])
                             @error('pagos.' . $index . '.cuentas_bancarias_id')
                             <div class="text-sm text-red-600">{{ $message }}</div>
                             @enderror
@@ -320,15 +317,12 @@
                         @if($recargoRequiereCuentaBancaria)
                         <div>
                             <label class="text-xs text-gray-500">Cuenta bancaria</label>
-                            <select class="w-full rounded-xl border p-2 bg-white"
-                                wire:model.live="recargo_cuentas_bancarias_id">
-                                <option value="">Selecciona…</option>
-                                @foreach($cuentas as $c)
-                                <option value="{{ $c->id }}">
-                                    {{ $c->alias }}{{ $c->banco ? ' - '.$c->banco : '' }}
-                                </option>
-                                @endforeach
-                            </select>
+                            @include('livewire.admin.recibos.partials.selector-cuenta', [
+                                'modelo' => 'recargo_cuentas_bancarias_id',
+                                'clase' => 'w-full rounded-xl border p-2 bg-white',
+                                'propietarioId' => $this->propietarioDeCuentasDelRecargo(),
+                                'seleccionada' => $recargo_cuentas_bancarias_id,
+                            ])
                         </div>
                         @else
                         <div class="text-xs text-gray-500 flex items-end">
