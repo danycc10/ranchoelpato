@@ -7,6 +7,6 @@ Te deseamos un año lleno de salud, alegría y muchos logros, rodeado de las per
 
 Gracias por tu confianza y por ser parte de nuestra familia. ¡Que pases un excelente día!
 
-Con cariño,
+Con cariño,  
 El equipo de {{ config('app.name') }}
 </x-mail::message>
