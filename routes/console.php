@@ -15,3 +15,8 @@ Schedule::command('comprobantes:extraer --limit=10')
 Schedule::command('notificaciones:procesar --limit=50')
     ->everyMinute()
     ->withoutOverlapping();
+
+// Felicita por correo a los clientes que cumplen años (fecha sacada del CURP).
+Schedule::command('clientes:felicitar-cumpleanos')
+    ->dailyAt('09:00')
+    ->withoutOverlapping();

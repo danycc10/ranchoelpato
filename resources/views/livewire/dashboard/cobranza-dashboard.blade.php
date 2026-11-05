@@ -44,6 +44,8 @@
         </div>
     </div>
 
+    <livewire:dashboard.cumpleaneros />
+
     {{-- Filtros --}}
     <div class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
         <div
