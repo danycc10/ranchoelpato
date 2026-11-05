@@ -1,4 +1,13 @@
+@php
+    // Incrustado en el correo: se ve aunque el cliente no pueda abrir el sitio.
+    $logo = resource_path('images/logo-rancho-el-pato.png');
+    $logoSrc = isset($message) ? $message->embed($logo) : 'data:image/png;base64,'.base64_encode(file_get_contents($logo));
+@endphp
 <x-mail::message>
+<div style="text-align: center; margin-bottom: 24px;">
+<img src="{{ $logoSrc }}" alt="{{ config('app.name') }}" width="220" style="width: 220px; max-width: 100%; height: auto;">
+</div>
+
 # ¡Feliz cumpleaños, {{ $nombre }}! 🎂
 
 Hoy es un día especial y en {{ config('app.name') }} queremos celebrarlo contigo.
