@@ -167,6 +167,35 @@ class AdelantaYGanaTest extends TestCase
     }
 
     #[Test]
+    public function borrar_el_monto_mientras_se_escribe_no_truena(): void
+    {
+        $this->promocion();
+
+        // Al borrar el campo Livewire manda vacío; el pago se ajusta al escribir.
+        $this->abonar(2000)
+            ->set('monto', '')
+            ->assertSet('monto', null)
+            ->set('monto', 4000)
+            ->assertSet('pagos.0.monto', 4000)
+            ->assertSee('$1,000.00')
+            ->call('guardar')
+            ->assertHasNoErrors();
+
+        $this->assertSame(4000.0, (float) Recibo::query()->sole()->monto);
+    }
+
+    #[Test]
+    public function con_el_monto_vacio_avisa_en_vez_de_tronar(): void
+    {
+        $this->abonar(2000)
+            ->set('monto', '')
+            ->call('guardar')
+            ->assertHasErrors('monto');
+
+        $this->assertSame(0, Recibo::query()->count());
+    }
+
+    #[Test]
     public function no_se_puede_abonar_mas_de_lo_que_queda(): void
     {
         $this->abonar(7300)

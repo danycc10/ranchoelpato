@@ -65,7 +65,8 @@ class Crear extends Component
 
     public string $folio = '';
 
-    public float $monto = 0;
+    // Nullable: al borrar el campo Livewire lo manda vacío.
+    public ?float $monto = 0;
 
     public ?string $observaciones = null;
 
@@ -1955,6 +1956,11 @@ class Crear extends Component
 
         $this->validarAvisando();
 
+        // Antes de cuadrar las formas de pago: sin monto, el aviso útil es ese.
+        if ($this->tipoCobroEsAbonoCapital($this->tipos_cobro_id)) {
+            $this->validarAbonoCapital();
+        }
+
         $montoEsperadoPagos = ! $this->asociarACuota
             ? (float) $this->monto
             : (
@@ -1967,10 +1973,6 @@ class Crear extends Component
 
         if ($this->tipoCobroEsRecargo($this->tipos_cobro_id) && empty($this->cuotaIds)) {
             $this->detenerCon('cuotaIds', 'Debes seleccionar al menos una cuota para generar recargos.');
-        }
-
-        if ($this->tipoCobroEsAbonoCapital($this->tipos_cobro_id)) {
-            $this->validarAbonoCapital();
         }
 
         $imageUploadService ??= app(ImageUploadService::class);
