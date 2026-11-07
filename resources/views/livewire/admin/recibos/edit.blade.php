@@ -337,6 +337,19 @@
                 </div>
                 @endif
 
+                @if(!empty($anularPreview['abono']))
+                <div class="rounded-2xl border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
+                    <div class="font-black">Se deshace el abono a capital</div>
+                    <p class="mt-1">
+                        El saldo sube ${{ number_format((float) $anularPreview['abono']['total'], 2) }}
+                        @if((float) $anularPreview['abono']['bonificacion'] > 0)
+                            (incluye ${{ number_format((float) $anularPreview['abono']['bonificacion'], 2) }} de bonificación)
+                        @endif
+                        y regresan {{ $anularPreview['abono']['cuotas'] }} pago(s) al final del calendario.
+                    </p>
+                </div>
+                @endif
+
                 {{-- PAGOS --}}
                 <div class="border rounded-2xl overflow-hidden">
 

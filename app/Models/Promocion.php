@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Promocion extends Model
 {
@@ -12,6 +13,7 @@ class Promocion extends Model
         'nombre', 'codigo', 'tipo',
         'dias_diferidos', 'numero_cuotas', 'porcentaje', 'monto_fijo',
         'monto_pago_inicial', 'meses_pago_inicial', 'monto_pago_posterior',
+        'abono_por_bloque', 'bonificacion_por_bloque',
         'activa', 'fecha_inicio', 'fecha_fin',
     ];
 
@@ -24,10 +26,30 @@ class Promocion extends Model
         'monto_pago_inicial' => 'decimal:2',
         'meses_pago_inicial' => 'integer',
         'monto_pago_posterior' => 'decimal:2',
+        'abono_por_bloque' => 'decimal:2',
+        'bonificacion_por_bloque' => 'decimal:2',
     ];
 
     /** Un monto los primeros meses y otro lo que resta. */
     public const PAGO_ESCALONADO = 'pago_escalonado';
+
+    /**
+     * Se aplica al cobrar, no al crear el contrato: por cada bloque completo
+     * de abono extraordinario en efectivo se bonifica un monto al saldo.
+     */
+    public const ADELANTA_Y_GANA = 'adelanta_y_gana';
+
+    /** Las que se eligen al crear un contrato; las de cobranza no. */
+    public function scopeDeContrato($query)
+    {
+        return $query->where('tipo', '!=', self::ADELANTA_Y_GANA);
+    }
+
+    /** Dónde se ofrece; sin fraccionamientos marcados no aplica en ninguno. */
+    public function fraccionamientos(): BelongsToMany
+    {
+        return $this->belongsToMany(Fraccionamiento::class, 'fraccionamiento_promocion')->withTimestamps();
+    }
 
     public function esPagoEscalonado(): bool
     {

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Recibos;
 
+use App\Models\AbonoCapital;
 use App\Models\Contrato;
 use App\Models\ContratoHistorial;
 use App\Models\CuentaBancaria;
@@ -10,9 +11,11 @@ use App\Models\FormaPago;
 use App\Models\Pago;
 use App\Models\Recibo;
 use App\Models\TipoCobro;
+use App\Services\Contratos\AbonoCapitalService;
 use App\Services\Contratos\CuotaPagoRollbackService;
 use App\Services\Recibos\ReciboFolioService;
 use Carbon\Carbon;
+use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
@@ -317,7 +320,9 @@ class Edit extends Component
             return;
         }
 
-        if (! $this->recibo->contrato_id || ! $this->recibo->cuota_id) {
+        $abonoCapital = $this->recibo->abonoCapital;
+
+        if (! $this->recibo->contrato_id || (! $this->recibo->cuota_id && ! $abonoCapital)) {
             $this->dispatch('toast', type: 'error', message: 'Este recibo no tiene contrato o cuota relacionada.');
 
             return;
@@ -355,6 +360,11 @@ class Edit extends Component
             ])->all(),
             'concepto' => (string) ($this->recibo->tipoCobro?->nombre ?? '—'),
             'monto_recibo' => (float) ($this->recibo->monto ?? 0),
+            'abono' => $abonoCapital ? [
+                'bonificacion' => (float) $abonoCapital->monto_bonificacion,
+                'total' => $abonoCapital->totalAplicado(),
+                'cuotas' => count($abonoCapital->cuotas_recortadas['eliminadas'] ?? []),
+            ] : null,
             'pagos_count' => (int) $pagos->count(),
             'pagos_total' => (float) $pagos->sum(fn ($p) => (float) ($p->monto ?? 0)),
             'pagos' => $pagos->map(function ($p) {
@@ -406,8 +416,16 @@ class Edit extends Component
             return;
         }
 
-        if (! $this->recibo->contrato_id || ! $this->recibo->cuota_id) {
+        $abonoCapital = $this->recibo->abonoCapital;
+
+        if (! $this->recibo->contrato_id || (! $this->recibo->cuota_id && ! $abonoCapital)) {
             $this->dispatch('toast', type: 'error', message: 'Este recibo no tiene contrato o cuota relacionada.');
+
+            return;
+        }
+
+        if ($abonoCapital) {
+            $this->anularAbonoCapital($abonoCapital);
 
             return;
         }
@@ -508,6 +526,68 @@ class Edit extends Component
         $this->anularPreview = null;
 
         $this->dispatch('toast', type: 'success', message: 'El recibo y los pagos de la cuota fueron anulados correctamente.');
+
+        $this->redirectRoute('admin.recibos.index', navigate: true);
+    }
+
+    /**
+     * El recibo de un abono a capital no paga cuotas: anularlo regresa el
+     * saldo, con todo y bonificación, y las cuotas que se quitaron del final.
+     */
+    protected function anularAbonoCapital(AbonoCapital $abono): void
+    {
+        $saldoAnterior = (float) Contrato::query()->whereKey($abono->contrato_id)->value('saldo_actual');
+
+        try {
+            DB::transaction(function () use ($abono) {
+                app(AbonoCapitalService::class)->revertir($abono, (int) auth()->id());
+
+                $ahora = now();
+
+                foreach (Pago::query()->where('recibo_id', $this->recibo->id)->lockForUpdate()->get() as $pago) {
+                    $pago->anulado_at = $ahora;
+                    $pago->anulado_por_user_id = auth()->id();
+                    $pago->anulado_motivo = $this->motivoAnulacion;
+                    $pago->save();
+                    $pago->delete();
+                }
+
+                $recibo = Recibo::query()->lockForUpdate()->findOrFail($this->recibo->id);
+                $recibo->anulado_at = $ahora;
+                $recibo->anulado_por_user_id = auth()->id();
+                $recibo->anulado_motivo = $this->motivoAnulacion;
+                $recibo->tipo_movimiento = 'anulado';
+                $recibo->save();
+                $recibo->delete();
+            });
+        } catch (DomainException $e) {
+            $this->dispatch('toast', type: 'error', message: $e->getMessage());
+
+            return;
+        }
+
+        ContratoHistorial::create([
+            'contrato_id' => $abono->contrato_id,
+            'user_id' => auth()->id(),
+            'tipo' => 'anular_recibo',
+            'antes' => [
+                'origen' => 'editar_recibo',
+                'recibo_actual_id' => (int) $this->recibo->id,
+                'recibo_actual_folio' => (string) $this->recibo->folio,
+                'monto_abono' => (float) $abono->monto_abono,
+                'bonificacion' => (float) $abono->monto_bonificacion,
+            ],
+            'despues' => ['cuotas_restauradas' => count($abono->cuotas_recortadas['eliminadas'] ?? [])],
+            'saldo_anterior' => $saldoAnterior,
+            'saldo_nuevo' => (float) Contrato::query()->whereKey($abono->contrato_id)->value('saldo_actual'),
+            'nota' => 'Anulación de abono a capital: '.$this->motivoAnulacion,
+        ]);
+
+        $this->showAnularRecibo = false;
+        $this->motivoAnulacion = 'Corrección de recibo';
+        $this->anularPreview = null;
+
+        $this->dispatch('toast', type: 'success', message: 'Se anuló el abono: el saldo y los pagos del calendario regresaron como estaban.');
 
         $this->redirectRoute('admin.recibos.index', navigate: true);
     }

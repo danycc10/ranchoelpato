@@ -604,6 +604,7 @@ class Create extends Component
     public function render()
     {
         $promos = Promocion::query()
+            ->deContrato()
             ->where('activa', true)
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'tipo', 'dias_diferidos', 'numero_cuotas']);

@@ -6,6 +6,7 @@ use App\Models\Contrato;
 use App\Models\ContratoHistorial;
 use App\Models\Cuota;
 use App\Models\Recibo;
+use App\Services\Contratos\AbonoCapitalService;
 use App\Services\Contratos\ContratoCuotasReprogramarService;
 use App\Services\Contratos\ContratoPlanService;
 use App\Services\Contratos\ContratoWordService;
@@ -388,62 +389,11 @@ class Show extends Component
             'abonoCapitalFecha.date' => 'La fecha no es válida.',
         ]);
 
-        DB::transaction(function () {
-            $contrato = Contrato::query()
-                ->lockForUpdate()
-                ->findOrFail($this->contrato->id);
-
-            $monto = round((float) $this->abonoCapitalMonto, 2);
-            $saldoAnterior = round((float) ($contrato->saldo_actual ?? 0), 2);
-            $saldoNuevo = round(max(0, $saldoAnterior - $monto), 2);
-
-            $contrato->update(['saldo_actual' => $saldoNuevo]);
-
-            // Eliminar cuotas del final hasta consumir el abono
-            $cuotasPendientes = Cuota::where('contrato_id', $contrato->id)
-                ->whereIn('estatus', ['pendiente', 'vencida'])
-                ->where('es_anualidad', 0)
-                ->where(fn ($q) => $q->whereNull('pagado_total')->orWhere('pagado_total', 0))
-                ->orderByDesc('fecha_vencimiento')
-                ->orderByDesc('numero')
-                ->lockForUpdate()
-                ->get();
-
-            $abonoRestante = $monto;
-            $cuotasEliminadas = 0;
-
-            foreach ($cuotasPendientes as $cuota) {
-                if ($abonoRestante <= 0) {
-                    break;
-                }
-
-                $pendiente = round((float) $cuota->monto - (float) ($cuota->pagado_total ?? 0), 2);
-
-                if ($abonoRestante >= $pendiente) {
-                    $cuota->delete();
-                    $cuotasEliminadas++;
-                    $abonoRestante = round($abonoRestante - $pendiente, 2);
-                } else {
-                    // El abono cubre solo parte de esta cuota: reducir su monto
-                    $cuota->update(['monto' => round($pendiente - $abonoRestante, 2)]);
-                    $abonoRestante = 0;
-                }
-            }
-
-            $this->actualizarEstatusContratoSiLiquidado($contrato);
-            $contrato->refresh();
-
-            ContratoHistorial::create([
-                'contrato_id' => $contrato->id,
-                'user_id' => auth()->id(),
-                'tipo' => 'abono_capital',
-                'antes' => ['saldo_actual' => $saldoAnterior],
-                'despues' => ['saldo_actual' => $saldoNuevo, 'monto_abono' => $monto, 'cuotas_eliminadas' => $cuotasEliminadas],
-                'saldo_anterior' => $saldoAnterior,
-                'saldo_nuevo' => $saldoNuevo,
-                'nota' => $this->abonoCapitalObservaciones ?: null,
-            ]);
-        });
+        app(AbonoCapitalService::class)->aplicar(
+            $this->contrato,
+            round((float) $this->abonoCapitalMonto, 2),
+            nota: $this->abonoCapitalObservaciones ?: null,
+        );
 
         $this->showAbonoCapital = false;
         $this->loadContrato($this->contrato->refresh());

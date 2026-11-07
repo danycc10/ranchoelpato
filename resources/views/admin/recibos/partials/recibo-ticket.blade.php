@@ -82,6 +82,13 @@ $fechaRef = $cuota?->fecha_vencimiento
 $mesPagadoTexto = mb_strtoupper($fechaRef->translatedFormat('F Y'));
 }
 
+// Un abono a capital no paga ningún periodo: baja el saldo.
+$abonoCapital = $recibo->abonoCapital;
+if ($abonoCapital) {
+$numeroPeriodo = null;
+$mesPagadoTexto = null;
+}
+
 // El periodo que se imprime. Un recibo que cubre varios meses se queda sin
 // periodo guardado a propósito, así que aquí se arma el rango con los meses
 // que de verdad cubre: decir uno solo sería mentirle al cliente.
@@ -116,6 +123,10 @@ $conceptoPeriodo .= " · {$mesPagadoTexto}";
 }
 } else {
 $conceptoPeriodo = $esRecargo ? 'Recargo' : 'Pago registrado';
+}
+
+if ($abonoCapital) {
+$conceptoPeriodo = 'Abono a capital';
 }
 
 // Recibos que se imprimen dentro de este mismo ticket (el recargo conserva su
@@ -354,6 +365,22 @@ $totalPagosDetalle = (float) $pagosDetalle->sum(fn ($p) => (float) ($p->monto ??
             </tr>
         </tfoot>
     </table>
+
+    @if($abonoCapital && (float) $abonoCapital->monto_bonificacion > 0)
+    <hr class="hr">
+
+    <div class="block small">
+        <div class="row">
+            <div class="bold">Bonificación {{ $abonoCapital->promocion?->nombre ?? 'por promoción' }}</div>
+            <div class="right bold">${{ number_format((float) $abonoCapital->monto_bonificacion, 2) }}</div>
+        </div>
+        <div class="row" style="margin-top:4px; border-top:1px dashed #000; padding-top:4px;">
+            <div class="bold">Abonado a su saldo</div>
+            <div class="right bold">${{ number_format($abonoCapital->totalAplicado(), 2) }}</div>
+        </div>
+        <div class="muted">La bonificación no es efectivo recibido.</div>
+    </div>
+    @endif
 
     @if($pagosDetalle->count() > 1)
     <hr class="hr">

@@ -193,6 +193,7 @@
                             <option value="descuento_porcentaje">Descuento %</option>
                             <option value="descuento_fijo">Descuento fijo</option>
                             <option value="pago_escalonado">Pago escalonado (un monto al inicio, otro después)</option>
+                            <option value="adelanta_y_gana">Adelanta y gana (bonificación por abono en efectivo)</option>
                         </select>
                         @error('form.tipo') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
@@ -253,6 +254,42 @@
                                 Los montos son por pago, semanal o mensual según el contrato. 12 meses son
                                 52 pagos semanales o 12 mensuales.
                             </p>
+                        </div>
+                    @endif
+
+                    @if(($form['tipo'] ?? '') === 'adelanta_y_gana')
+                        <div>
+                            <label class="text-sm font-semibold">Por cada abono de</label>
+                            <input type="number" step="0.01" wire:model.live="form.abono_por_bloque"
+                                class="w-full mt-1 rounded-xl border-gray-300" placeholder="Ej: 2000">
+                            @error('form.abono_por_bloque') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="text-sm font-semibold">Se bonifican</label>
+                            <input type="number" step="0.01" wire:model.live="form.bonificacion_por_bloque"
+                                class="w-full mt-1 rounded-xl border-gray-300" placeholder="Ej: 500">
+                            @error('form.bonificacion_por_bloque') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <p class="text-xs text-gray-500">
+                                Se aplica sola al cobrar un ABONO A CAPITAL: solo en efectivo, con el cliente al
+                                corriente y por bloques completos. Lo que sobra de un bloque se abona sin bonificación.
+                            </p>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="text-sm font-semibold">Fraccionamientos que participan</label>
+                            <div class="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-56 overflow-y-auto rounded-xl border border-gray-300 p-2">
+                                @foreach($fraccionamientos as $fraccionamiento)
+                                    <label class="flex items-center gap-2 rounded-lg px-2 py-1 text-sm hover:bg-gray-50" wire:key="promo-fracc-{{ $fraccionamiento->id }}">
+                                        <input type="checkbox" value="{{ $fraccionamiento->id }}" wire:model.live="form.fraccionamiento_ids" class="rounded border-gray-300">
+                                        {{ $fraccionamiento->nombre }}
+                                    </label>
+                                @endforeach
+                            </div>
+                            @error('form.fraccionamiento_ids') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                     @endif
 

@@ -1474,6 +1474,7 @@ class Create extends Component
 
         if (Schema::hasTable('promociones')) {
             $promos = Promocion::query()
+                ->deContrato()
                 ->where('activa', true)
                 ->orderBy('nombre')
                 ->get(['id', 'nombre', 'tipo', 'dias_diferidos', 'numero_cuotas', 'monto_pago_inicial', 'meses_pago_inicial', 'monto_pago_posterior']);

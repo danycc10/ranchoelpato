@@ -707,7 +707,7 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
                 <label class="text-xs text-gray-500">Monto</label>
-                <input type="number" step="0.01" class="w-full rounded-xl border p-2" wire:model="monto">
+                <input type="number" step="0.01" class="w-full rounded-xl border p-2" wire:model.live.debounce.500ms="monto">
                 @error('monto')
                 <div class="text-sm text-red-600">{{ $message }}</div>
                 @enderror
@@ -721,6 +721,10 @@
                 @enderror
             </div>
         </div>
+
+        @if($abono = $this->abonoCapitalPreview)
+            @include('livewire.admin.recibos.partials.abono-capital', ['abono' => $abono, 'monto' => (float) $monto])
+        @endif
         @endif
 
         @if($this->mostrarCampoEvidenciaRecargo)

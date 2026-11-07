@@ -16,7 +16,9 @@ use App\Models\Recibo;
 use App\Models\ReciboPago;
 use App\Models\TipoCobro;
 use App\Services\Contabilidad\PropietarioContableResolver;
+use App\Services\Contratos\AbonoCapitalService;
 use App\Services\ImageUploadService;
+use App\Services\Recibos\AdelantaYGana;
 use App\Services\Recibos\CuotaAntiguedadSelector;
 use App\Services\Recibos\EnviarReciboPorWhatsapp;
 use App\Services\Recibos\PeriodoResolver;
@@ -312,6 +314,10 @@ class Crear extends Component
 
     public function updated($property, $value): void
     {
+        if ($property === 'monto' && ! $this->asociarACuota) {
+            $this->autoDistribuirPagos();
+        }
+
         if ($property === 'pagos' || str_starts_with($property, 'pagos.')) {
 
             if (str_contains($property, '.monto') || $property === 'pagos') {
@@ -845,6 +851,85 @@ class Crear extends Component
     protected function tipoCobroEsServicio(?int $tipoCobroId): bool
     {
         return app(TipoCobroClassifier::class)->esServicio($tipoCobroId);
+    }
+
+    public function tipoCobroEsAbonoCapital(?int $tipoCobroId): bool
+    {
+        return app(TipoCobroClassifier::class)->esAbonoCapital($tipoCobroId);
+    }
+
+    /**
+     * Lo que hará el abono a capital: la bonificación de «Adelanta y gana» o
+     * por qué no aplica, y cómo queda el saldo.
+     */
+    public function getAbonoCapitalPreviewProperty(): ?array
+    {
+        if (! $this->contrato_id || ! $this->tipoCobroEsAbonoCapital($this->tipos_cobro_id)) {
+            return null;
+        }
+
+        $contrato = Contrato::with('lote')->find($this->contrato_id);
+
+        if (! $contrato) {
+            return null;
+        }
+
+        $abono = round(max(0, (float) $this->monto), 2);
+
+        $evaluacion = app(AdelantaYGana::class)->evaluar(
+            $contrato,
+            $abono,
+            collect($this->pagos)->pluck('forma_pago_id')->all(),
+            $this->fecha ? Carbon::parse($this->fecha) : now()
+        );
+
+        $saldo = round((float) $contrato->saldo_actual, 2);
+
+        return [
+            ...$evaluacion,
+            'maximo' => app(AbonoCapitalService::class)->maximoAplicable($contrato),
+            'saldo_actual' => $saldo,
+            'saldo_nuevo' => round(max(0, $saldo - $abono - $evaluacion['bonificacion']), 2),
+        ];
+    }
+
+    protected function validarAbonoCapital(): void
+    {
+        $contrato = Contrato::query()->findOrFail($this->contrato_id);
+        $maximo = app(AbonoCapitalService::class)->maximoAplicable($contrato);
+
+        if ((float) $this->monto <= 0) {
+            $this->detenerCon('monto', 'Captura el monto del abono.');
+        }
+
+        if (round((float) $this->monto, 2) > $maximo) {
+            $this->detenerCon('monto', 'El abono no puede pasar de $'.number_format($maximo, 2).', lo que le queda por pagar.');
+        }
+    }
+
+    /** Baja el saldo por el abono más la bonificación de la promoción, si aplica. */
+    protected function aplicarAbonoCapital(Recibo $recibo, array $pagosPrincipales, Carbon $fecha): float
+    {
+        $contrato = Contrato::with('lote')->findOrFail($this->contrato_id);
+        $abono = round((float) $this->monto, 2);
+
+        $evaluacion = app(AdelantaYGana::class)->evaluar(
+            $contrato,
+            $abono,
+            array_column($pagosPrincipales, 'forma_pago_id'),
+            $fecha
+        );
+
+        app(AbonoCapitalService::class)->aplicar(
+            $contrato,
+            $abono,
+            $evaluacion['bonificacion'],
+            $recibo,
+            $evaluacion['promocion'],
+            $this->observaciones
+        );
+
+        return $evaluacion['bonificacion'];
     }
 
     protected function tipoCobroAplicaRecargoPorAtraso(?int $tipoCobroId): bool
@@ -1884,6 +1969,10 @@ class Crear extends Component
             $this->detenerCon('cuotaIds', 'Debes seleccionar al menos una cuota para generar recargos.');
         }
 
+        if ($this->tipoCobroEsAbonoCapital($this->tipos_cobro_id)) {
+            $this->validarAbonoCapital();
+        }
+
         $imageUploadService ??= app(ImageUploadService::class);
 
         // Se toma antes de guardar: al terminar se limpia el formulario.
@@ -1914,7 +2003,8 @@ class Crear extends Component
             };
 
             if (! $this->asociarACuota) {
-                $afectaSaldoContrato = $this->tipoCobroAfectaSaldoContrato($this->tipos_cobro_id);
+                $esAbonoCapital = $this->tipoCobroEsAbonoCapital($this->tipos_cobro_id);
+                $afectaSaldoContrato = $esAbonoCapital || $this->tipoCobroAfectaSaldoContrato($this->tipos_cobro_id);
 
                 $saldoAnterior = $afectaSaldoContrato
                     ? $obtenerSaldoContrato((int) $this->contrato_id)
@@ -1974,7 +2064,12 @@ class Crear extends Component
                     'fecha_pago' => now(),
                 ]);
 
-                if ($afectaSaldoContrato) {
+                $bonificacion = 0.0;
+
+                if ($esAbonoCapital) {
+                    $bonificacion = $this->aplicarAbonoCapital($recibo, $pagosPrincipales, $fecha);
+                    $actualizarSaldoPosteriorRecibo($recibo, (int) $this->contrato_id);
+                } elseif ($afectaSaldoContrato) {
                     $this->restarSaldoContrato((float) $this->monto);
                     $actualizarSaldoPosteriorRecibo($recibo, (int) $this->contrato_id);
                 } else {
@@ -1995,7 +2090,9 @@ class Crear extends Component
                     ])
                     ->log('Recibo creado');
 
-                $this->dispatch('toast', type: 'success', message: 'Recibo creado correctamente.');
+                $this->dispatch('toast', type: 'success', message: $bonificacion > 0
+                    ? 'Recibo creado. Bonificación «Adelanta y gana»: $'.number_format($bonificacion, 2).'.'
+                    : 'Recibo creado correctamente.');
 
                 $this->limpiarFormularioDespuesDeGuardar();
 

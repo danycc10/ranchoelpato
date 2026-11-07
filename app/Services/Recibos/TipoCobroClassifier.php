@@ -23,6 +23,12 @@ class TipoCobroClassifier
         return str_contains($this->nombre($tipoCobroId), 'RECARGO');
     }
 
+    /** Abono extraordinario: baja el saldo quitando cuotas del final. */
+    public function esAbonoCapital(?int $tipoCobroId): bool
+    {
+        return str_contains($this->nombre($tipoCobroId), 'ABONO A CAPITAL');
+    }
+
     public function esServicio(?int $tipoCobroId): bool
     {
         return $this->tipo($tipoCobroId)?->categoria === 'servicio';

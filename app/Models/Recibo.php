@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -181,6 +182,12 @@ class Recibo extends Model
     public function pagos(): HasMany
     {
         return $this->hasMany(Pago::class, 'recibo_id');
+    }
+
+    /** El abono a capital que hizo este recibo, con su bonificación si la hubo. */
+    public function abonoCapital(): HasOne
+    {
+        return $this->hasOne(AbonoCapital::class, 'recibo_id')->whereNull('anulado_at');
     }
 
     /**
