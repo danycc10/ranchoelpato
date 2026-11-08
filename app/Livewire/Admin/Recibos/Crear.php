@@ -11,6 +11,7 @@ use App\Models\FormaPago;
 use App\Models\Lote;
 use App\Models\Pago;
 use App\Models\Periodo;
+use App\Models\Promocion;
 use App\Models\Propietario;
 use App\Models\Recibo;
 use App\Models\ReciboPago;
@@ -192,6 +193,12 @@ class Crear extends Component
      * muestra las activas de todos, por si el cliente depositó a otra tarjeta.
      */
     public bool $verTodasLasCuentas = false;
+
+    /**
+     * Abono a capital fuera de «Adelanta y gana»: el cliente paga con otra
+     * forma que no es efectivo y no recibe bonificación.
+     */
+    public bool $abonoSinPromocion = false;
 
     public bool $showRecargoPagoBox = false;
 
@@ -894,6 +901,87 @@ class Crear extends Component
         ];
     }
 
+    /** «Adelanta y gana» si se ofrece en el terreno del abono a capital. */
+    public function getPromocionDelAbonoProperty(): ?Promocion
+    {
+        if (! $this->contrato_id || ! $this->tipoCobroEsAbonoCapital($this->tipos_cobro_id)) {
+            return null;
+        }
+
+        $contrato = Contrato::with('lote')->find($this->contrato_id);
+
+        return $contrato
+            ? app(AdelantaYGana::class)->promocionPara($contrato, $this->fecha ? Carbon::parse($this->fecha) : now())
+            : null;
+    }
+
+    /** Con la promoción el abono es solo en efectivo y se elige de la tabla. */
+    public function getAbonoConPromocionProperty(): bool
+    {
+        return ! $this->abonoSinPromocion && $this->promocionDelAbono !== null;
+    }
+
+    public function getOpcionesAbonoProperty(): array
+    {
+        if (! $this->abonoConPromocion) {
+            return [];
+        }
+
+        $maximo = app(AbonoCapitalService::class)->maximoAplicable(Contrato::findOrFail($this->contrato_id));
+
+        return app(AdelantaYGana::class)->opciones($this->promocionDelAbono, $maximo);
+    }
+
+    public function elegirAbono(float $monto): void
+    {
+        $this->monto = round($monto, 2);
+        $this->autoDistribuirPagos();
+    }
+
+    public function usarOtraFormaDePago(): void
+    {
+        $this->abonoSinPromocion = true;
+    }
+
+    public function volverALaPromocion(): void
+    {
+        $this->abonoSinPromocion = false;
+        $this->pagarAbonoEnEfectivo();
+    }
+
+    /** Deja una sola forma de pago, en efectivo, por todo el abono. */
+    protected function pagarAbonoEnEfectivo(): void
+    {
+        if (! $this->abonoConPromocion) {
+            return;
+        }
+
+        $efectivoId = $this->formaPagoEfectivoId();
+
+        $yaEsEfectivo = count($this->pagos) === 1
+            && (int) ($this->pagos[0]['forma_pago_id'] ?? 0) === $efectivoId;
+
+        if ($yaEsEfectivo || ! $efectivoId) {
+            return;
+        }
+
+        $this->pagos = [[
+            ...$this->nuevoPagoRow(),
+            'forma_pago_id' => $efectivoId,
+            'monto' => (float) $this->monto,
+        ]];
+
+        $this->sincronizarCamposPrincipalesDesdePagos();
+    }
+
+    protected function formaPagoEfectivoId(): ?int
+    {
+        return FormaPago::query()
+            ->whereRaw('UPPER(nombre) LIKE ?', ['%EFECTIVO%'])
+            ->orderBy('id')
+            ->value('id');
+    }
+
     protected function validarAbonoCapital(): void
     {
         $contrato = Contrato::query()->findOrFail($this->contrato_id);
@@ -901,6 +989,13 @@ class Crear extends Component
 
         if ((float) $this->monto <= 0) {
             $this->detenerCon('monto', 'Captura el monto del abono.');
+        }
+
+        $todoEnEfectivo = collect($this->pagos)
+            ->every(fn ($pago) => (int) ($pago['forma_pago_id'] ?? 0) === $this->formaPagoEfectivoId());
+
+        if ($this->abonoConPromocion && ! $todoEnEfectivo) {
+            $this->detenerCon('pagos', 'Con «Adelanta y gana» el abono es solo en efectivo.');
         }
 
         if (round((float) $this->monto, 2) > $maximo) {
@@ -2491,6 +2586,7 @@ class Crear extends Component
             'cuotaFueraDeOrdenAutorizada',
             'pagos',
             'verTodasLasCuentas',
+            'abonoSinPromocion',
         ]);
 
         $this->tipoEsServicio = false;
@@ -2981,6 +3077,10 @@ class Crear extends Component
         if (empty($this->pagos) || ! is_array($this->pagos) || count($this->pagos) === 0) {
             $this->pagos = [$this->nuevoPagoRow()];
         }
+
+        // Aquí y no al cambiar el contrato: también se elige desde la búsqueda
+        // del cliente, sin pasar por los hooks de Livewire.
+        $this->pagarAbonoEnEfectivo();
 
         return view('livewire.admin.recibos.crear', [
             'tiposCobro' => TipoCobro::orderBy('nombre')->get(),

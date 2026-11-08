@@ -77,13 +77,42 @@
                         </p>
                     </div>
 
+                    @unless($this->abonoConPromocion)
                     <button
                         type="button"
                         wire:click="agregarPago"
                         class="px-3 py-2 rounded-xl bg-black text-white text-xs font-semibold">
                         + Agregar forma
                     </button>
+                    @endunless
                 </div>
+
+                @if($this->abonoConPromocion)
+                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <div class="flex items-center gap-3">
+                        <div class="h-10 w-10 shrink-0 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg">💵</div>
+                        <div>
+                            <div class="font-black text-emerald-900">Efectivo</div>
+                            <div class="text-xs text-emerald-800">
+                                «{{ $this->promocionDelAbono->nombre }}» solo acepta efectivo.
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="button" wire:click="usarOtraFormaDePago"
+                        class="mt-3 text-xs font-semibold text-emerald-800 underline hover:text-emerald-950">
+                        El cliente paga con transferencia o tarjeta (sin bonificación)
+                    </button>
+                </div>
+                @else
+                @if($abonoSinPromocion && $this->promocionDelAbono)
+                <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 flex flex-wrap items-center justify-between gap-2">
+                    <span>Abono sin «{{ $this->promocionDelAbono->nombre }}»: no recibe bonificación.</span>
+                    <button type="button" wire:click="volverALaPromocion" class="font-semibold underline">
+                        Volver a la promoción (efectivo)
+                    </button>
+                </div>
+                @endif
 
                 @foreach($pagos as $index => $pago)
                 <div wire:key="pago-row-{{ $index }}" class="rounded-2xl border bg-white p-4">
@@ -237,6 +266,7 @@
                     @endif
                 </div>
                 @endforeach
+                @endif
 
                 @error('pagos')
                 <div class="text-sm text-red-600">{{ $message }}</div>
@@ -704,9 +734,17 @@
             </div>
         </div>
         @else
+        @if($this->abonoConPromocion)
+        @include('livewire.admin.recibos.partials.opciones-abono', [
+            'opciones' => $this->opcionesAbono,
+            'promocion' => $this->promocionDelAbono,
+            'monto' => (float) $monto,
+        ])
+        @endif
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-                <label class="text-xs text-gray-500">Monto</label>
+                <label class="text-xs text-gray-500">{{ $this->abonoConPromocion ? 'Otra cantidad' : 'Monto' }}</label>
                 <input type="number" step="0.01" class="w-full rounded-xl border p-2" wire:model.live.debounce.500ms="monto">
                 @error('monto')
                 <div class="text-sm text-red-600">{{ $message }}</div>

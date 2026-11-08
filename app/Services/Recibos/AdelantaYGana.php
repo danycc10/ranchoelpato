@@ -33,11 +33,7 @@ class AdelantaYGana
             return $this->resultado();
         }
 
-        $fraccionamientoId = $contrato->lote?->fraccionamiento_id;
-
-        $promocion = $vigentes->first(
-            fn (Promocion $p) => $p->fraccionamientos->contains('id', $fraccionamientoId)
-        );
+        $promocion = $this->promocionPara($contrato, $fecha, $vigentes);
 
         if (! $promocion) {
             return $this->resultado(aviso: 'Este fraccionamiento no participa en «'.$vigentes->first()->nombre.'».');
@@ -81,6 +77,51 @@ class AdelantaYGana
         }
 
         return $this->resultado($promocion, $bonificacion, $bloques);
+    }
+
+    /** La promoción que se ofrece en el terreno de este contrato en esa fecha. */
+    public function promocionPara(Contrato $contrato, Carbon $fecha, $vigentes = null): ?Promocion
+    {
+        if ($contrato->tipo === 'servicio') {
+            return null;
+        }
+
+        $fraccionamientoId = $contrato->lote?->fraccionamiento_id;
+
+        return ($vigentes ?? $this->vigentes($fecha))->first(
+            fn (Promocion $p) => $p->fraccionamientos->contains('id', $fraccionamientoId)
+        );
+    }
+
+    /**
+     * Las cantidades que se ofrecen como botones, las mismas de la circular:
+     * 1, 2, 3, 5, 10, 15 y 25 bloques. Las que pasan de lo que le queda por
+     * pagar salen deshabilitadas.
+     *
+     * @return array<int, array{abono: float, bonificacion: float, reduccion: float, disponible: bool}>
+     */
+    public function opciones(Promocion $promocion, float $maximo): array
+    {
+        $bloque = (float) $promocion->abono_por_bloque;
+        $bono = (float) $promocion->bonificacion_por_bloque;
+
+        if ($bloque <= 0) {
+            return [];
+        }
+
+        return collect([1, 2, 3, 5, 10, 15, 25])
+            ->map(function (int $bloques) use ($bloque, $bono, $maximo) {
+                $abono = $bloques * $bloque;
+                $bonificacion = round(min($bloques * $bono, max(0, $maximo - $abono)), 2);
+
+                return [
+                    'abono' => $abono,
+                    'bonificacion' => $bonificacion,
+                    'reduccion' => $abono + $bonificacion,
+                    'disponible' => $abono <= $maximo,
+                ];
+            })
+            ->all();
     }
 
     /**

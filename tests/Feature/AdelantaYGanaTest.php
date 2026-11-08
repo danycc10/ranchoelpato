@@ -167,6 +167,60 @@ class AdelantaYGanaTest extends TestCase
     }
 
     #[Test]
+    public function con_la_promocion_se_elige_la_cantidad_y_va_en_efectivo(): void
+    {
+        $this->promocion();
+
+        $oxxo = DB::table('formas_pago')->insertGetId([
+            'nombre' => 'PAGO EN OXXO', 'requiere_cuenta' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $componente = $this->abonar(0)
+            // Aunque traiga otra forma capturada, con la promoción queda efectivo.
+            ->set('pagos.0.forma_pago_id', $oxxo)
+            ->assertSee('¿Cuánto va a abonar?')
+            ->assertSee('solo acepta efectivo')
+            ->assertDontSee('+ Agregar forma')
+            ->assertSet('pagos.0.forma_pago_id', $this->datos['efectivo'])
+            // Le quedan $7,200: de $10,000 para arriba no alcanza.
+            ->assertSeeHtml('wire:click="elegirAbono(10000)"
+                disabled');
+
+        $componente->call('elegirAbono', 4000)
+            ->assertSet('monto', 4000.0)
+            ->assertSet('pagos.0.monto', 4000.0)
+            ->assertSee('$1,000.00')
+            ->call('guardar')
+            ->assertHasNoErrors();
+
+        $this->assertSame(1000.0, (float) AbonoCapital::query()->sole()->monto_bonificacion);
+    }
+
+    #[Test]
+    public function si_paga_con_otra_forma_abona_sin_bonificacion(): void
+    {
+        $this->promocion();
+
+        $oxxo = DB::table('formas_pago')->insertGetId([
+            'nombre' => 'PAGO EN OXXO', 'requiere_cuenta' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->abonar(2000)
+            ->call('usarOtraFormaDePago')
+            ->assertSee('no recibe bonificación')
+            ->assertSee('+ Agregar forma')
+            ->set('pagos.0.forma_pago_id', $oxxo)
+            ->assertSet('pagos.0.forma_pago_id', $oxxo)
+            ->call('guardar')
+            ->assertHasNoErrors();
+
+        $abono = AbonoCapital::query()->sole();
+
+        $this->assertSame(0.0, (float) $abono->monto_bonificacion);
+        $this->assertSame(5200.0, (float) $abono->saldo_nuevo);
+    }
+
+    #[Test]
     public function borrar_el_monto_mientras_se_escribe_no_truena(): void
     {
         $this->promocion();
