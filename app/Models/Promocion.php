@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Promocion extends Model
 {
@@ -49,6 +50,12 @@ class Promocion extends Model
     public function fraccionamientos(): BelongsToMany
     {
         return $this->belongsToMany(Fraccionamiento::class, 'fraccionamiento_promocion')->withTimestamps();
+    }
+
+    /** Los abonos que se cobraron con esta promoción, anulados incluidos. */
+    public function abonosCapital(): HasMany
+    {
+        return $this->hasMany(AbonoCapital::class);
     }
 
     public function esPagoEscalonado(): bool

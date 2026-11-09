@@ -54,6 +54,7 @@ use App\Livewire\Admin\Sistema\Index as SistemaIndex;
 use App\Livewire\Admin\TipoCobroPropietarioConfigs\Index as TipoCobroPropietarioConfigsIndex;
 use App\Livewire\Dashboard\CobranzaDashboard;
 use App\Livewire\Publico\CapturaDatosCliente;
+use App\Livewire\Reports\AdelantaYGanaReport;
 use App\Livewire\Reports\BankMovementsReport;
 use App\Livewire\Reports\CustomerPaymentsReport;
 use App\Livewire\Reports\DailyReceiptsReport;
@@ -113,6 +114,9 @@ Route::middleware(['auth', 'verified', 'permission:reportes.ver'])->group(functi
 
         Route::get('/pagadores-adelantados', EarlyPayersReport::class)
             ->name('pagadores.adelantados');
+
+        Route::get('/adelanta-y-gana', AdelantaYGanaReport::class)
+            ->name('adelanta.y.gana');
 
         Route::get('/carga-trabajo', WorkloadReport::class)
             ->name('carga.trabajo')

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Livewire\Admin\Promociones\Index as PromocionesIndex;
 use App\Livewire\Admin\Recibos\Crear;
 use App\Livewire\Admin\Recibos\Edit;
+use App\Livewire\Reports\AdelantaYGanaReport;
 use App\Models\AbonoCapital;
 use App\Models\Cliente;
 use App\Models\Contrato;
@@ -311,6 +312,61 @@ class AdelantaYGanaTest extends TestCase
 
         $this->assertSame(500.0, (float) $promocion->bonificacion_por_bloque);
         $this->assertSame([$this->datos['fraccionamiento_id']], $promocion->fraccionamientos()->pluck('fraccionamientos.id')->all());
+    }
+
+    #[Test]
+    public function el_reporte_cuenta_los_usos_sin_los_anulados(): void
+    {
+        $promocion = $this->promocion();
+
+        $this->abonar(2000)->call('guardar')->assertHasNoErrors();
+        $this->abonar(2000)->call('guardar')->assertHasNoErrors();
+
+        [$primero, $segundo] = Recibo::query()->orderBy('id')->get()->all();
+
+        Livewire::actingAs($this->usuarioCon(['recibos.eliminar', 'recibos.editar']))
+            ->test(Edit::class, ['uuid' => $segundo->uuid])
+            ->call('confirmarAnularRecibo')
+            ->set('motivoAnulacion', 'Se capturó dos veces')
+            ->call('anularReciboConfirmado');
+
+        $reporte = Livewire::actingAs(User::factory()->create())
+            ->test(AdelantaYGanaReport::class)
+            ->assertSet('promocionId', $promocion->id)
+            ->assertSet('desde', '2026-11-09')
+            ->assertSet('hasta', '2026-12-23')
+            ->assertSee($primero->folio)
+            ->assertDontSee($segundo->folio)
+            ->assertSee('Cliente Adelanta');
+
+        $this->assertSame(
+            ['usos' => 1, 'clientes' => 1, 'abonado' => 2000.0, 'bonificado' => 500.0, 'anulados' => 1],
+            $reporte->instance()->resumen
+        );
+
+        $reporte->set('verAnulados', true)
+            ->assertSee($segundo->folio)
+            ->assertSee('ANULADO')
+            ->call('exportExcel')
+            ->assertFileDownloaded('adelanta_y_gana_2026-11-09_a_2026-12-23.xlsx');
+    }
+
+    #[Test]
+    public function promociones_muestra_los_usos_y_no_deja_borrar_la_que_ya_se_uso(): void
+    {
+        $promocion = $this->promocion();
+
+        $this->abonar(4000)->call('guardar')->assertHasNoErrors();
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(PromocionesIndex::class)
+            ->assertSee('1 uso')
+            ->assertSee('$4,000.00 abonado')
+            ->assertSee('$1,000.00 bonificado')
+            ->call('eliminar', $promocion->id)
+            ->assertDispatched('toast', type: 'error');
+
+        $this->assertTrue(Promocion::query()->whereKey($promocion->id)->exists());
     }
 
     #[Test]

@@ -130,6 +130,10 @@ class PromocionPagoEscalonadoTest extends TestCase
     #[Test]
     public function mover_la_fecha_de_un_contrato_con_promocion_respeta_los_pagos_de_250(): void
     {
+        // La fecha nueva (lunes 9) tiene que quedar en el futuro: el día
+        // que el reloj llegó a ella la prueba empezó a fallar.
+        $this->travelTo('2026-10-27 10:00:00');
+
         $promocion = $this->promocion();
         $contrato = $this->contratoSemanal($promocion);
 

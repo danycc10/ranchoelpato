@@ -49,6 +49,14 @@
             </a>
         @endcan
 
+        <a href="{{ route('reportes.adelanta.y.gana') }}"
+           class="block rounded-2xl border p-5 bg-white hover:bg-gray-50 transition">
+            <div class="text-lg font-bold">Adelanta y gana</div>
+            <div class="text-gray-600 mt-1">
+                Cuántas veces se usó la promoción, efectivo recibido y bonificaciones dadas, por fraccionamiento y cliente.
+            </div>
+        </a>
+
         <a href="{{ route('reportes.pagadores.adelantados') }}"
            class="block rounded-2xl border p-5 bg-white hover:bg-gray-50 transition">
             <div class="text-lg font-bold">Participantes de rifa</div>

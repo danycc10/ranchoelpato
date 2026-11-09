@@ -42,6 +42,7 @@
                         <th class="p-3 text-left">Tipo</th>
                         <th class="p-3 text-left">Activa</th>
                         <th class="p-3 text-left">Vigencia</th>
+                        <th class="p-3 text-left">Usos</th>
                         <th class="p-3 text-right">Acciones</th>
                     </tr>
                 </thead>
@@ -66,6 +67,9 @@
                                 —
                                 {{ $r->fecha_fin?->format('d/m/Y') ?? '—' }}
                             </td>
+                            <td class="p-3">
+                                @include('livewire.admin.promociones.partials.usos')
+                            </td>
                             <td class="p-3 text-right whitespace-nowrap">
                                 <button wire:click="editar({{ $r->id }})"
                                         class="px-3 py-1 rounded-xl border hover:bg-gray-50">
@@ -79,7 +83,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td class="p-4 text-gray-500" colspan="6">Sin promociones.</td>
+                            <td class="p-4 text-gray-500" colspan="7">Sin promociones.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -134,6 +138,15 @@
                         <div class="text-gray-500 shrink-0">Vigencia</div>
                         <div class="font-semibold text-right min-w-0 break-words">{{ $vig }}</div>
                     </div>
+
+                    @if($r->tipo === \App\Models\Promocion::ADELANTA_Y_GANA)
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="text-gray-500 shrink-0">Usos</div>
+                            <div class="text-right min-w-0">
+                                @include('livewire.admin.promociones.partials.usos')
+                            </div>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="mt-4 grid grid-cols-1 gap-2">

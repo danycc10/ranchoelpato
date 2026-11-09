@@ -298,6 +298,14 @@ class Index extends Component
 
     public function eliminar(int $id): void
     {
+        // Al borrarla, sus abonos se quedarían sin promoción y se perdería
+        // cuántas veces se usó: la que ya se cobró se desactiva, no se borra.
+        if (Promocion::query()->whereKey($id)->whereHas('abonosCapital')->exists()) {
+            $this->dispatch('toast', type: 'error', message: 'Esta promoción ya se usó en recibos. Desactívala en lugar de eliminarla.');
+
+            return;
+        }
+
         Promocion::query()->whereKey($id)->delete();
         $this->dispatch('toast', type: 'success', message: 'Promoción eliminada.');
     }
@@ -311,6 +319,11 @@ class Index extends Component
                     ->orWhere('codigo', 'like', $term)
                     ->orWhere('tipo', 'like', $term);
             })
+            // Cuántas veces se cobró cada una; los anulados no cuentan. Solo
+            // las de cobranza (Adelanta y gana) generan abonos.
+            ->withCount(['abonosCapital as usos' => fn ($q) => $q->whereNull('anulado_at')])
+            ->withSum(['abonosCapital as abonado' => fn ($q) => $q->whereNull('anulado_at')], 'monto_abono')
+            ->withSum(['abonosCapital as bonificado' => fn ($q) => $q->whereNull('anulado_at')], 'monto_bonificacion')
             ->orderBy($this->sortBy, $this->sortDir)
             ->paginate(12);
 
