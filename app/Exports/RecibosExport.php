@@ -2,6 +2,8 @@
 
 namespace App\Exports;
 
+use App\Services\Recibos\RecibosPorWhatsapp;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
@@ -22,6 +24,8 @@ class RecibosExport implements FromCollection, WithColumnFormatting, WithEvents,
         public ?int $cuentaId,
         public string $validacion = '',   // '' | 'validado' | 'sin_validar'
         public string $verEliminados = 'activos',
+        public ?int $capturadoPor = null,
+        public string $impresion = '',   // '' | 'no_imprimir' | 'imprimir'
     ) {}
 
     public function headings(): array
@@ -86,7 +90,9 @@ class RecibosExport implements FromCollection, WithColumnFormatting, WithEvents,
             ->when($this->formaPagoId, fn ($q) => $q->where('recibos_pagos.forma_pago_id', $this->formaPagoId))
             ->when($this->cuentaId, fn ($q) => $q->where('recibos_pagos.cuenta_bancaria_id', $this->cuentaId))
             ->when($this->desde, fn ($q) => $q->whereDate('recibos.fecha', '>=', $this->desde))
-            ->when($this->hasta, fn ($q) => $q->whereDate('recibos.fecha', '<=', $this->hasta));
+            ->when($this->hasta, fn ($q) => $q->whereDate('recibos.fecha', '<=', $this->hasta))
+            ->when($this->capturadoPor, fn ($q) => $q->where('recibos.capturado_por_user_id', $this->capturadoPor))
+            ->when($this->impresion !== '', fn ($q) => app(RecibosPorWhatsapp::class)->filtrar($q, $this->impresion === 'no_imprimir'));
 
         if ($this->validacion === 'validado') {
             $q->whereNotNull('recibos_pagos.validado_at');
@@ -130,7 +136,7 @@ class RecibosExport implements FromCollection, WithColumnFormatting, WithEvents,
             (string) ($r->referencia ?? ''),
             (string) ($r->tiene_evidencia ?? ''),
             (string) ($r->validado ?? ''),
-            $r->validado_at ? \Carbon\Carbon::parse($r->validado_at)->format('d/m/Y H:i') : '',
+            $r->validado_at ? Carbon::parse($r->validado_at)->format('d/m/Y H:i') : '',
             (string) ($r->validado_por ?? ''),
         ]);
     }

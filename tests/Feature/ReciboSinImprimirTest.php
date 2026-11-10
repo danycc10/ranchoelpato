@@ -241,6 +241,44 @@ class ReciboSinImprimirTest extends TestCase
             ->assertDontSee('Enviado por WhatsApp');
     }
 
+    #[Test]
+    public function en_recibos_se_filtra_por_quien_lo_hizo_y_si_se_imprime(): void
+    {
+        $ana = User::factory()->create(['name' => 'Ana Capturista']);
+        $beto = User::factory()->create(['name' => 'Beto Capturista']);
+
+        $porWhatsapp = $this->reciboDe(['recibo_sin_imprimir' => true]);
+        $porWhatsapp->update(['capturado_por_user_id' => $ana->id]);
+
+        $enPapel = $porWhatsapp->replicate(['uuid'])->fill(['folio' => 'R-EN-PAPEL', 'capturado_por_user_id' => $beto->id]);
+        $enPapel->save();
+
+        app(EnviarReciboPorWhatsapp::class)->encolar($porWhatsapp, '8781112233');
+
+        $recibos = Livewire::actingAs($this->cajero())
+            ->test(RecibosIndex::class)
+            ->set('mes', '2026-11')
+            ->assertSee('Ana Capturista')
+            ->assertSee('Beto Capturista');
+
+        $recibos->set('impresion', 'no_imprimir')
+            ->assertSee('R-SIN-PAPEL')
+            ->assertDontSee('R-EN-PAPEL');
+
+        $recibos->set('impresion', 'imprimir')
+            ->assertSee('R-EN-PAPEL')
+            ->assertDontSee('R-SIN-PAPEL');
+
+        $recibos->set('impresion', '')
+            ->set('capturado_por', $beto->id)
+            ->assertSee('R-EN-PAPEL')
+            ->assertDontSee('R-SIN-PAPEL');
+
+        $recibos->call('limpiarFiltros')
+            ->assertSet('capturado_por', null)
+            ->assertSet('impresion', '');
+    }
+
     private function reciboDe(array $cliente = []): Recibo
     {
         $datos = $this->contratoConCuota($cliente);

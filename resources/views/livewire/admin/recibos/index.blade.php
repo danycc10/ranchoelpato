@@ -119,6 +119,29 @@
                 </select>
             </div>
 
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">Capturó</label>
+                <select
+                    wire:model.live="capturado_por"
+                    class="mt-1 w-full border rounded-xl px-3 py-3 text-sm">
+                    <option value="">Todos</option>
+                    @foreach($capturistas as $u)
+                    <option value="{{ $u->id }}">{{ $u->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label class="text-xs text-gray-500 font-semibold">Impresión</label>
+                <select
+                    wire:model.live="impresion"
+                    class="mt-1 w-full border rounded-xl px-3 py-3 text-sm">
+                    <option value="">Todos</option>
+                    <option value="imprimir">Se imprimen</option>
+                    <option value="no_imprimir">No imprimir (WhatsApp)</option>
+                </select>
+            </div>
+
         </div>
 
         <div class="mt-4 flex items-center justify-between gap-3">

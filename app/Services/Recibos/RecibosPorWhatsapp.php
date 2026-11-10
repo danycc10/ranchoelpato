@@ -3,6 +3,8 @@
 namespace App\Services\Recibos;
 
 use App\Models\Notificacion;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Query\Builder;
 
 /**
  * Qué recibos salieron por WhatsApp y, por lo tanto, no se imprimen.
@@ -16,6 +18,21 @@ class RecibosPorWhatsapp
 {
     /** De mejor a peor: si un envío salió, el recibo le llegó. */
     private const PRIORIDAD = ['enviado' => 3, 'en_cola' => 2, 'fallido' => 1];
+
+    /**
+     * Deja en la consulta solo los recibos que salieron por WhatsApp
+     * ($porWhatsapp) o solo los que no, que son los que se imprimen.
+     */
+    public function filtrar(Builder|EloquentBuilder $query, bool $porWhatsapp, string $reciboId = 'recibos.id'): Builder|EloquentBuilder
+    {
+        $enviados = fn (Builder $n) => $n->selectRaw('1')
+            ->from('notificaciones_salida')
+            ->where('canal', 'whatsapp')
+            ->where('tipo', 'recibo_pago')
+            ->whereColumn('payload->recibo_id', $reciboId);
+
+        return $porWhatsapp ? $query->whereExists($enviados) : $query->whereNotExists($enviados);
+    }
 
     /**
      * @param  iterable<int, int|null>  $reciboIds

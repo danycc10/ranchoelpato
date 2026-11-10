@@ -9,6 +9,7 @@ use App\Models\Propietario;
 use App\Models\Recibo;
 use App\Models\ReciboPago;
 use App\Models\TipoCobro;
+use App\Models\User;
 use App\Services\ImageUploadService;
 use App\Services\Recibos\RecibosPorWhatsapp;
 use App\Services\Recibos\TicketConRecargo;
@@ -50,6 +51,11 @@ class Index extends Component
 
     // '' | 'validado' | 'sin_validar'
     public string $validacion = '';
+
+    public ?int $capturado_por = null;
+
+    // '' | 'no_imprimir' (salieron por WhatsApp) | 'imprimir'
+    public string $impresion = '';
 
     // ===== Imprimir: el recibo solo, o junto con su recargo =====
     public bool $modalImprimir = false;
@@ -120,6 +126,8 @@ class Index extends Component
         'cuenta_id' => ['except' => null],
         'verEliminados' => ['except' => 'activos'],
         'validacion' => ['except' => ''],
+        'capturado_por' => ['except' => null],
+        'impresion' => ['except' => ''],
     ];
 
     public function mount(): void
@@ -208,6 +216,8 @@ class Index extends Component
             'cuenta_id',
             'verEliminados',
             'validacion',
+            'capturado_por',
+            'impresion',
         ]);
 
         $this->mes = now()->format('Y-m');
@@ -231,6 +241,8 @@ class Index extends Component
                 cuentaId: $this->cuenta_id,
                 validacion: $this->validacion,
                 verEliminados: $this->verEliminados,
+                capturadoPor: $this->capturado_por,
+                impresion: $this->impresion,
             ),
             "recibos_{$timestamp}.xlsx"
         );
@@ -781,6 +793,8 @@ class Index extends Component
             ->when($this->validacion === 'sin_validar', function ($q) {
                 $q->whereHas('pagosDetalle', fn ($rp) => $rp->whereNotNull('evidencia_path')->whereNull('validado_at'));
             })
+            ->when($this->capturado_por, fn ($q) => $q->where('capturado_por_user_id', $this->capturado_por))
+            ->when($this->impresion !== '', fn ($q) => app(RecibosPorWhatsapp::class)->filtrar($q, $this->impresion === 'no_imprimir'))
             ->when($term !== '', function ($q) use ($term, $tokens) {
                 $q->where(function ($qq) use ($term, $tokens) {
                     $qq->where('folio', 'like', "%{$term}%")
@@ -821,6 +835,12 @@ class Index extends Component
         $tiposCobro = TipoCobro::orderBy('nombre')->get();
         $formasPago = FormaPago::orderBy('nombre')->get();
 
+        // Solo quienes han hecho recibos, no todos los usuarios.
+        $capturistas = User::query()
+            ->whereIn('id', Recibo::withTrashed()->whereNotNull('capturado_por_user_id')->select('capturado_por_user_id'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         $cuentas = CuentaBancaria::query()
             ->when($this->propietario_id, fn ($q) => $q->where('propietario_id', $this->propietario_id))
             ->orderBy('alias')
@@ -832,6 +852,7 @@ class Index extends Component
             'tiposCobro',
             'formasPago',
             'cuentas',
+            'capturistas',
             'porWhatsapp'
         ))->layout('layouts.app');
     }
