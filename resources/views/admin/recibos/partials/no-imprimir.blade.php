@@ -1,11 +1,10 @@
 {{-- El recibo se mandó por WhatsApp: no se imprime. $estatus: enviado | en_cola | fallido --}}
 @php
-    // Si ya le llegó no hace falta decirlo; solo se avisa cuando algo quedó pendiente.
-    [$detalle, $color] = match ($estatus) {
-        'enviado' => [null, null],
-        'en_cola' => ['WhatsApp pendiente, se reintenta', 'text-amber-700'],
-        default => ['WhatsApp no salió', 'text-red-700'],
-    };
+    // Enviado o en cola (el programador lo reintenta) basta con la marca;
+    // solo se avisa cuando el envío ya no va a salir.
+    [$detalle, $color] = $estatus === 'fallido'
+        ? ['WhatsApp no salió', 'text-red-700']
+        : [null, null];
 @endphp
 <span class="inline-flex flex-col items-start leading-tight" title="Este recibo se mandó en PDF por WhatsApp: no lo imprimas.{{ $detalle ? ' '.$detalle.'.' : '' }}">
     <span class="inline-flex items-center gap-1 rounded-full bg-violet-600 px-2 py-0.5 text-[11px] font-bold text-white whitespace-nowrap">
