@@ -188,7 +188,7 @@
                             {{ $recibo->folio }}
                             @isset($porWhatsapp[$recibo->id])
                             <div class="mt-1">
-                                @include('admin.recibos.partials.no-imprimir', ['estatus' => $porWhatsapp[$recibo->id]])
+                                @include('admin.recibos.partials.no-imprimir')
                             </div>
                             @endisset
                         </td>

@@ -341,7 +341,7 @@
                             {{ $recibo?->folio ?? '—' }}
                             @isset($porWhatsapp[$r->recibo_id])
                             <div class="mt-1">
-                                @include('admin.recibos.partials.no-imprimir', ['estatus' => $porWhatsapp[$r->recibo_id]])
+                                @include('admin.recibos.partials.no-imprimir')
                             </div>
                             @endisset
                         </td>
@@ -414,7 +414,7 @@
                         <div class="text-sm text-gray-700 truncate">{{ $persona }}</div>
                         @isset($porWhatsapp[$r->recibo_id])
                         <div class="mt-1">
-                            @include('admin.recibos.partials.no-imprimir', ['estatus' => $porWhatsapp[$r->recibo_id]])
+                            @include('admin.recibos.partials.no-imprimir')
                         </div>
                         @endisset
                     </div>
