@@ -226,7 +226,9 @@ class ReciboSinImprimirTest extends TestCase
         Livewire::actingAs($this->cajero())
             ->test(RecibosIndex::class)
             ->set('mes', '2026-11')
-            ->assertSeeInOrder(['R-SIN-PAPEL', 'No imprimir', 'Enviado por WhatsApp'])
+            ->assertSeeInOrder(['R-SIN-PAPEL', 'No imprimir'])
+            // Ya le llegó: no hace falta decirlo.
+            ->assertDontSee('Enviado por WhatsApp')
             ->assertSee('R-EN-PAPEL')
             ->tap(fn ($c) => $this->assertSame(1, substr_count($c->html(), 'border-l-violet-500')));
 
@@ -234,7 +236,9 @@ class ReciboSinImprimirTest extends TestCase
             ->test(DailyReceiptsReport::class)
             ->set('fecha', '2026-11-05')
             ->assertSee('R-EN-PAPEL')
-            ->assertSeeInOrder(['R-SIN-PAPEL', 'No imprimir', 'Enviado por WhatsApp']);
+            ->assertSeeInOrder(['R-SIN-PAPEL', 'No imprimir'])
+            // Ya le llegó: no hace falta decirlo.
+            ->assertDontSee('Enviado por WhatsApp');
     }
 
     private function reciboDe(array $cliente = []): Recibo
