@@ -5,6 +5,7 @@ namespace App\Livewire\Reports;
 use App\Exports\DailyReceiptsExport;
 use App\Models\Propietario;
 use App\Models\ReciboPago;
+use App\Services\Recibos\RecibosPorWhatsapp;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -389,13 +390,17 @@ class DailyReceiptsReport extends Component
 
     public function render()
     {
+        $recibos = $this->recibos;
+
         return view('livewire.reports.daily-receipts-report', [
             'propietarios' => $this->propietarios,
             'conceptos' => $this->conceptos,
             'metodosPago' => $this->metodosPago,
             'resumenPorMetodo' => $this->resumenPorMetodo,
             'totalGeneral' => $this->totalGeneral,
-            'recibos' => $this->recibos,
+            'recibos' => $recibos,
+            // Los que se mandaron por WhatsApp llevan la marca de no imprimir.
+            'porWhatsapp' => app(RecibosPorWhatsapp::class)->estatusPorRecibo($recibos->pluck('recibo_id')),
         ])->layout('layouts.app');
     }
 }

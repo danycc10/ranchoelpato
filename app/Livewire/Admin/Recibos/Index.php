@@ -10,6 +10,7 @@ use App\Models\Recibo;
 use App\Models\ReciboPago;
 use App\Models\TipoCobro;
 use App\Services\ImageUploadService;
+use App\Services\Recibos\RecibosPorWhatsapp;
 use App\Services\Recibos\TicketConRecargo;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -813,6 +814,9 @@ class Index extends Component
             ->orderByDesc('id')
             ->paginate(15);
 
+        // Los que se mandaron por WhatsApp llevan la marca de no imprimir.
+        $porWhatsapp = app(RecibosPorWhatsapp::class)->estatusPorRecibo($recibos->pluck('id'));
+
         $propietarios = Propietario::orderBy('nombre')->get();
         $tiposCobro = TipoCobro::orderBy('nombre')->get();
         $formasPago = FormaPago::orderBy('nombre')->get();
@@ -827,7 +831,8 @@ class Index extends Component
             'propietarios',
             'tiposCobro',
             'formasPago',
-            'cuentas'
+            'cuentas',
+            'porWhatsapp'
         ))->layout('layouts.app');
     }
 }

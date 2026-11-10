@@ -4,11 +4,15 @@ namespace Tests\Feature;
 
 use App\Livewire\Admin\Clientes\Index as ClientesIndex;
 use App\Livewire\Admin\Recibos\Crear;
+use App\Livewire\Admin\Recibos\Index as RecibosIndex;
+use App\Livewire\Reports\DailyReceiptsReport;
 use App\Models\Cliente;
 use App\Models\Cuota;
 use App\Models\Notificacion;
 use App\Models\Recibo;
+use App\Models\ReciboPago;
 use App\Models\User;
+use App\Services\Recibos\EnviarReciboPorWhatsapp;
 use App\Services\Whatsapp\WhatsappService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -197,6 +201,40 @@ class ReciboSinImprimirTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertTrue($cliente->fresh()->recibo_sin_imprimir);
+    }
+
+    #[Test]
+    public function en_recibos_y_en_el_reporte_diario_se_ve_cual_no_se_imprime(): void
+    {
+        $porWhatsapp = $this->reciboDe(['recibo_sin_imprimir' => true]);
+        $enPapel = $porWhatsapp->replicate(['uuid'])->fill(['folio' => 'R-EN-PAPEL']);
+        $enPapel->save();
+
+        app(EnviarReciboPorWhatsapp::class)->encolar($porWhatsapp, '8781112233');
+        Notificacion::query()->update(['estatus' => 'enviado']);
+
+        foreach ([$porWhatsapp, $enPapel] as $recibo) {
+            ReciboPago::create([
+                'recibo_id' => $recibo->id,
+                'forma_pago_id' => $recibo->forma_pago_id,
+                'monto' => 200,
+                'fecha_efectiva' => '2026-11-05',
+            ]);
+        }
+
+        // Una sola marca, la del recibo que se mandó por WhatsApp.
+        Livewire::actingAs($this->cajero())
+            ->test(RecibosIndex::class)
+            ->set('mes', '2026-11')
+            ->assertSeeInOrder(['R-SIN-PAPEL', 'No imprimir', 'Enviado por WhatsApp'])
+            ->assertSee('R-EN-PAPEL')
+            ->tap(fn ($c) => $this->assertSame(1, substr_count($c->html(), 'border-l-violet-500')));
+
+        Livewire::actingAs($this->cajero())
+            ->test(DailyReceiptsReport::class)
+            ->set('fecha', '2026-11-05')
+            ->assertSee('R-EN-PAPEL')
+            ->assertSeeInOrder(['R-SIN-PAPEL', 'No imprimir', 'Enviado por WhatsApp']);
     }
 
     private function reciboDe(array $cliente = []): Recibo

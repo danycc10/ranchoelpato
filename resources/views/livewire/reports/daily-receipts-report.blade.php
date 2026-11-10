@@ -337,7 +337,14 @@
                     <tr
                         class="border-b border-black/5 cursor-pointer hover:bg-gray-100/70"
                         wire:click="openReciboModal({{ $r->id }})">
-                        <td class="py-2 px-3 font-medium whitespace-nowrap">{{ $recibo?->folio ?? '—' }}</td>
+                        <td class="py-2 px-3 font-medium whitespace-nowrap {{ isset($porWhatsapp[$r->recibo_id]) ? 'border-l-4 border-l-violet-500' : '' }}">
+                            {{ $recibo?->folio ?? '—' }}
+                            @isset($porWhatsapp[$r->recibo_id])
+                            <div class="mt-1">
+                                @include('admin.recibos.partials.no-imprimir', ['estatus' => $porWhatsapp[$r->recibo_id]])
+                            </div>
+                            @endisset
+                        </td>
                         <td class="py-2 px-3 whitespace-nowrap">{{ $persona }}</td>
                         <td class="py-2 px-3 whitespace-nowrap">{{ $lote }}</td>
                         <td class="py-2 px-3 whitespace-nowrap">{{ $finca }}</td>
@@ -405,6 +412,11 @@
                     <div class="min-w-0">
                         <div class="font-black text-sm truncate">{{ $recibo?->folio ?? '—' }}</div>
                         <div class="text-sm text-gray-700 truncate">{{ $persona }}</div>
+                        @isset($porWhatsapp[$r->recibo_id])
+                        <div class="mt-1">
+                            @include('admin.recibos.partials.no-imprimir', ['estatus' => $porWhatsapp[$r->recibo_id]])
+                        </div>
+                        @endisset
                     </div>
 
                     <div class="text-right shrink-0">

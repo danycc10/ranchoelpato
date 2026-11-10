@@ -184,8 +184,13 @@
                     @endphp
 
                     <tr class="border-t hover:brightness-95 {{ $rowClass }}">
-                        <td class="p-2.5 font-semibold align-middle">
+                        <td class="p-2.5 font-semibold align-middle {{ isset($porWhatsapp[$recibo->id]) ? 'border-l-4 border-l-violet-500' : '' }}">
                             {{ $recibo->folio }}
+                            @isset($porWhatsapp[$recibo->id])
+                            <div class="mt-1">
+                                @include('admin.recibos.partials.no-imprimir', ['estatus' => $porWhatsapp[$recibo->id]])
+                            </div>
+                            @endisset
                         </td>
 
                         <td class="p-2.5 align-middle">
