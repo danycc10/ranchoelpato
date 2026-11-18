@@ -85,6 +85,15 @@ class ContratoWordService
             'scan_filename' => 'convenio-pago-reconocimiento-adeudo.pdf',
             'uses_fraccionamiento_template' => false,
         ],
+        'anexo_cambio_dia_pago' => [
+            'label' => 'Anexo: cambio de día de pago',
+            'template' => 'plantillas/ANEXO_CAMBIO_DIA_PAGO.docx',
+            'docx_field' => 'archivo_anexo_cambio_dia_pago_docx',
+            'scan_field' => 'archivo_anexo_cambio_dia_pago',
+            'filename_slug' => 'anexo-cambio-dia-pago',
+            'scan_filename' => 'anexo-cambio-dia-pago.pdf',
+            'uses_fraccionamiento_template' => false,
+        ],
         'contrato_cesion_derechos' => [
             'label' => 'Contrato de cesión de derechos posesorios',
             'template' => 'plantillas/CONTRATO_CESION_DERECHOS_POSESORIOS.docx',
@@ -210,6 +219,7 @@ class ContratoWordService
                 'archivo_contrato_docx',
                 'archivo_convenio_pago_docx',
                 'archivo_convenio_pago_reconocimiento_adeudo_docx',
+                'archivo_anexo_cambio_dia_pago_docx',
             ],
             true
         );
@@ -263,6 +273,10 @@ class ContratoWordService
 
         if ($tipo === 'caratula_expediente') {
             $this->setCaratulaValues($template, $contrato);
+        }
+
+        if ($tipo === 'anexo_cambio_dia_pago') {
+            $this->setAnexoCambioDiaPagoValues($template, $contrato);
         }
 
         // Las hojas sueltas no dicen de quien son: de la segunda en adelante
@@ -669,6 +683,33 @@ class ContratoWordService
         $template->setValue('asesor', $this->linea(null, 30));
         $template->setValue('plano_firmado', 'SÍ / NO');
         $template->setValue('observaciones', $this->linea(null, 60));
+    }
+
+    /**
+     * Anexo que firma el cliente al pedir otro día de pago.
+     *
+     * Se imprime después de cambiar el día en el contrato, así que el día que
+     * tiene guardado ya es el nuevo. Si no lo tiene, queda la raya para
+     * llenarlo a mano.
+     */
+    protected function setAnexoCambioDiaPagoValues(TemplateProcessor $template, Contrato $contrato): void
+    {
+        if ($contrato->frecuencia === 'semanal') {
+            $dia = ContratoPlanService::diasSemana()[(int) $contrato->dia_semana] ?? null;
+            $periodo = 'semana';
+        } else {
+            $dia = $contrato->dia_mes ? (string) (int) $contrato->dia_mes : null;
+            $periodo = 'mes';
+        }
+
+        $template->setValue('nuevo_dia_pago', $this->linea($dia ? mb_strtoupper($dia, 'UTF-8') : null, 10));
+        $template->setValue('periodo_pago', $periodo);
+
+        $cliente = $contrato->cliente;
+
+        $template->setValue('firmante_nombre', mb_strtoupper($this->linea(
+            $contrato->comprador_nombre_legal ?: ($cliente?->nombre_legal ?: $cliente?->nombre_completo)
+        ), 'UTF-8'));
     }
 
     /**
