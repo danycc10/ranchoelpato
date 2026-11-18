@@ -705,11 +705,51 @@ class ContratoWordService
         $template->setValue('nuevo_dia_pago', $this->linea($dia ? mb_strtoupper($dia, 'UTF-8') : null, 10));
         $template->setValue('periodo_pago', $periodo);
 
+        $this->setRecargoAnexoValues($template, $contrato);
+
         $cliente = $contrato->cliente;
 
         $template->setValue('firmante_nombre', mb_strtoupper($this->linea(
             $contrato->comprador_nombre_legal ?: ($cliente?->nombre_legal ?: $cliente?->nombre_completo)
         ), 'UTF-8'));
+    }
+
+    /**
+     * El recargo como lo cobra el sistema (RecargoCuotaCalculator): el primero
+     * cae al día siguiente de que terminan los días de gracia y se repite cada
+     * tantos días como diga el contrato.
+     *
+     * Un contrato sin recargo capturado deja la raya para llenarla a mano.
+     */
+    protected function setRecargoAnexoValues(TemplateProcessor $template, Contrato $contrato): void
+    {
+        $valor = (float) $contrato->valor_recargo;
+
+        if ($valor <= 0) {
+            $monto = '$__________';
+        } elseif ($contrato->tipo_recargo === 'porcentaje') {
+            $monto = rtrim(rtrim(number_format($valor, 2), '0'), '.').'% sobre el monto del pago vencido';
+        } else {
+            $entero = (int) floor($valor);
+            $centavos = (int) round(($valor - $entero) * 100);
+
+            $monto = $this->formatMoney($valor)
+                .' ('.mb_strtolower($this->numeroATexto($entero), 'UTF-8').' pesos '
+                .str_pad((string) $centavos, 2, '0', STR_PAD_LEFT).'/100 M.N.)';
+        }
+
+        $cadaCuantos = max(1, (int) ($contrato->frecuencia_recargo_dias ?: 1));
+        $diasGracia = max(0, (int) $contrato->dias_gracia);
+
+        $template->setValue('recargo_monto', $monto);
+        $template->setValue('recargo_periodo', $cadaCuantos === 1
+            ? 'cada día natural de atraso'
+            : 'cada '.$cadaCuantos.' días naturales de atraso');
+        $template->setValue('recargo_inicio', $diasGracia === 0
+            ? 'a partir del día siguiente a la fecha de pago acordada'
+            : 'a partir del día siguiente a que se cumplan '.$diasGracia
+                .($diasGracia === 1 ? ' día natural' : ' días naturales')
+                .' de gracia posteriores a la fecha de pago acordada');
     }
 
     /**

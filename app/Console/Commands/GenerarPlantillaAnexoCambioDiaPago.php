@@ -13,10 +13,10 @@ use PhpOffice\PhpWord\SimpleType\Jc;
 
 /**
  * Genera la plantilla del anexo que firma el cliente cuando pide cambiar su
- * día de pago: el día nuevo y el recargo de $50.00 por cada día de atraso.
+ * día de pago: el día nuevo y el recargo por atraso.
  *
  * El texto es el que entregó el despacho. Lo que cambia por contrato (fecha,
- * día de pago y quien firma) se llena al descargarlo.
+ * día de pago, recargo y quien firma) se llena al descargarlo.
  */
 class GenerarPlantillaAnexoCambioDiaPago extends Command
 {
@@ -165,12 +165,9 @@ class GenerarPlantillaAnexoCambioDiaPago extends Command
             ' En caso de que el cliente no realice el pago correspondiente en la fecha establecida, se aplicará un recargo de ',
             self::FONT
         );
+        $segunda->addText('${recargo_monto} por ${recargo_periodo}', self::FONT_BOLD);
         $segunda->addText(
-            '$50.00 (cincuenta pesos 00/100 M.N.) por cada día natural de atraso',
-            self::FONT_BOLD
-        );
-        $segunda->addText(
-            ', comenzando a contabilizarse a partir del día siguiente a la fecha de pago acordada y hasta que se liquide el pago pendiente.',
+            ', comenzando a contabilizarse ${recargo_inicio} y hasta que se liquide el pago pendiente.',
             self::FONT
         );
 
