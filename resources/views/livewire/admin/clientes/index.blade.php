@@ -54,7 +54,7 @@
     </div>
 
     {{-- Buscar y filtrar --}}
-    <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
+    <div class="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
         <input
             type="text"
             wire:model.live.debounce.300ms="q"
@@ -70,6 +70,12 @@
             <option value="vencida">Vencidas</option>
             <option value="sin">Sin liga</option>
         </select>
+
+        <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 whitespace-nowrap">
+            <input type="checkbox" wire:model.live="verInactivos"
+                   class="rounded border-gray-300 text-black focus:ring-black">
+            Ver desactivados
+        </label>
     </div>
 
     @if($ligaFilter !== '')

@@ -61,9 +61,13 @@ class Index extends Component
     /** Filtro por el estado de la liga de captura: '', sin, enviada, contestada, vencida. */
     public string $ligaFilter = '';
 
+    /** Los desactivados no estorban en la lista; se ven solo si se pide. */
+    public bool $verInactivos = false;
+
     protected $queryString = [
         'q' => ['except' => ''],
         'ligaFilter' => ['except' => ''],
+        'verInactivos' => ['except' => false],
         'sortBy' => ['except' => 'id'],
         'sortDir' => ['except' => 'desc'],
     ];
@@ -74,6 +78,11 @@ class Index extends Component
     }
 
     public function updatedLigaFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedVerInactivos(): void
     {
         $this->resetPage();
     }
@@ -627,7 +636,13 @@ class Index extends Component
         $nuevo = $c->estatus === 'activo' ? 'inactivo' : 'activo';
         $c->update(['estatus' => $nuevo]);
 
-        $this->dispatch('toast', type: 'success', message: "Estatus actualizado: {$nuevo}");
+        // Si no se están viendo los inactivos, el que se desactiva se va de la
+        // lista; el aviso dice dónde encontrarlo.
+        $mensaje = $nuevo === 'inactivo' && ! $this->verInactivos
+            ? 'Cliente desactivado. Marca "Ver desactivados" para verlo.'
+            : "Estatus actualizado: {$nuevo}";
+
+        $this->dispatch('toast', type: 'success', message: $mensaje);
     }
 
     public function render()
@@ -653,6 +668,10 @@ class Index extends Component
 
         if ($this->ligaFilter !== '') {
             $this->filtrarPorLiga($query);
+        }
+
+        if (! $this->verInactivos) {
+            $query->where('estatus', 'activo');
         }
 
         $allowed = ['id', 'nombres', 'apellidos', 'nombre_legal', 'telefono', 'correo', 'estatus'];
