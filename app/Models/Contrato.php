@@ -77,6 +77,8 @@ class Contrato extends Model
         'archivo_caratula_expediente_docx',
         'archivo_anexo_cambio_dia_pago',
         'archivo_anexo_cambio_dia_pago_docx',
+        'archivo_carta_autorizacion',
+        'archivo_carta_autorizacion_docx',
         'alerta_convenio',
 
         // Condiciones que el contrato de cesión deja a elección de las partes.

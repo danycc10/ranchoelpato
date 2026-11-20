@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\MembreteEspinozaAsociados;
 use App\Services\Contratos\ContratoWordService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +21,8 @@ use PhpOffice\PhpWord\SimpleType\Jc;
  */
 class GenerarPlantillaAnexoCambioDiaPago extends Command
 {
+    use MembreteEspinozaAsociados;
+
     protected $signature = 'contratos:plantilla-anexo-dia-pago {--force : Sobrescribe la plantilla si ya existe}';
 
     protected $description = 'Genera la plantilla Word del anexo de cambio de día de pago y recargos por atraso.';
@@ -65,7 +68,8 @@ class GenerarPlantillaAnexoCambioDiaPago extends Command
             'headerHeight' => 720,
         ]);
 
-        $this->membrete($section);
+        // Hoja carta: 11 in menos 2 in de márgenes = 648 pt de área de texto.
+        $this->membrete($section, 648);
         $this->cuerpo($section);
         $this->firma($section);
 
@@ -81,44 +85,6 @@ class GenerarPlantillaAnexoCambioDiaPago extends Command
         $this->info("Plantilla generada en {$relativePath}");
 
         return self::SUCCESS;
-    }
-
-    /**
-     * El membrete del despacho, igual al de los convenios de pago.
-     */
-    private function membrete(Section $section): void
-    {
-        $header = $section->addHeader();
-        $logo = resource_path('images/logo-espinoza-asociados.jpg');
-
-        $primera = $header->addTextRun(['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
-
-        if (is_file($logo)) {
-            $primera->addImage($logo, [
-                'width' => 66,
-                'height' => 66,
-                'pos' => 'absolute',
-                'hPos' => 'left',
-                'hPosRelTo' => 'margin',
-                'vPos' => 'top',
-                'vPosRelTo' => 'line',
-                'wrap' => 'infront',
-            ]);
-        }
-
-        $primera->addText('ESPINOZA & ASOCIADOS', ['name' => 'Arial', 'size' => 18, 'bold' => true]);
-
-        $header->addText(
-            'DESPACHO LEGAL',
-            ['name' => 'Arial', 'size' => 18],
-            ['alignment' => Jc::CENTER, 'spaceAfter' => 0]
-        );
-
-        $header->addText(
-            '(878)-785-1461',
-            ['name' => 'Arial', 'size' => 14, 'bold' => true],
-            ['alignment' => Jc::CENTER, 'spaceAfter' => 240]
-        );
     }
 
     private function cuerpo(Section $section): void

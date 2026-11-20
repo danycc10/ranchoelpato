@@ -94,6 +94,15 @@ class ContratoWordService
             'scan_filename' => 'anexo-cambio-dia-pago.pdf',
             'uses_fraccionamiento_template' => false,
         ],
+        'carta_autorizacion' => [
+            'label' => 'Carta de autorización de pagos',
+            'template' => 'plantillas/CARTA_AUTORIZACION.docx',
+            'docx_field' => 'archivo_carta_autorizacion_docx',
+            'scan_field' => 'archivo_carta_autorizacion',
+            'filename_slug' => 'carta-autorizacion',
+            'scan_filename' => 'carta-autorizacion.pdf',
+            'uses_fraccionamiento_template' => false,
+        ],
         'contrato_cesion_derechos' => [
             'label' => 'Contrato de cesión de derechos posesorios',
             'template' => 'plantillas/CONTRATO_CESION_DERECHOS_POSESORIOS.docx',
@@ -220,6 +229,7 @@ class ContratoWordService
                 'archivo_convenio_pago_docx',
                 'archivo_convenio_pago_reconocimiento_adeudo_docx',
                 'archivo_anexo_cambio_dia_pago_docx',
+                'archivo_carta_autorizacion_docx',
             ],
             true
         );
@@ -277,6 +287,10 @@ class ContratoWordService
 
         if ($tipo === 'anexo_cambio_dia_pago') {
             $this->setAnexoCambioDiaPagoValues($template, $contrato);
+        }
+
+        if ($tipo === 'carta_autorizacion') {
+            $this->setCartaAutorizacionValues($template, $contrato);
         }
 
         // Las hojas sueltas no dicen de quien son: de la segunda en adelante
@@ -707,11 +721,41 @@ class ContratoWordService
 
         $this->setRecargoAnexoValues($template, $contrato);
 
+        $template->setValue('firmante_nombre', $this->nombreDelTitular($contrato));
+    }
+
+    /**
+     * Carta con la que el titular autoriza a otra persona (su pareja) a hacer
+     * sus pagos. Ampara todos los lotes del cliente, no solo el del contrato.
+     *
+     * El nombre de la persona autorizada no está en el sistema: queda la raya
+     * para llenarlo a mano.
+     */
+    protected function setCartaAutorizacionValues(TemplateProcessor $template, Contrato $contrato): void
+    {
+        $lotes = LotesClienteService::resumen($contrato);
+        $varios = str_contains($lotes['numeros'], ' y ');
+
+        $template->setValue('titular_nombre', $this->nombreDelTitular($contrato));
+
+        $template->setValue('lotes_titularidad', $varios
+            ? 'de los lotes identificados con los números '.$lotes['numeros']
+            : 'del lote identificado con el número '.$this->linea($lotes['numeros'], 10));
+        $template->setValue('lotes_finca', $this->linea($lotes['fraccionamientos'], 20));
+        $template->setValue('dichos_lotes', $varios ? 'dichos lotes' : 'dicho lote');
+        $template->setValue('los_lotes', $varios ? 'los lotes' : 'el lote');
+    }
+
+    /**
+     * Quien firma por el cliente, en mayúsculas como va en los formatos.
+     */
+    protected function nombreDelTitular(Contrato $contrato): string
+    {
         $cliente = $contrato->cliente;
 
-        $template->setValue('firmante_nombre', mb_strtoupper($this->linea(
+        return mb_strtoupper($this->linea(
             $contrato->comprador_nombre_legal ?: ($cliente?->nombre_legal ?: $cliente?->nombre_completo)
-        ), 'UTF-8'));
+        ), 'UTF-8');
     }
 
     /**

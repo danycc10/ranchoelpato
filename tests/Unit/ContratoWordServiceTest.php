@@ -19,6 +19,7 @@ class ContratoWordServiceTest extends TestCase
                 'convenio_pago',
                 'convenio_pago_reconocimiento_adeudo',
                 'anexo_cambio_dia_pago',
+                'carta_autorizacion',
                 'contrato_cesion_derechos',
                 'caratula_expediente',
                 'contrato_financiamiento_electrico',
